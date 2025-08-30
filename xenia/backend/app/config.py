@@ -8,10 +8,11 @@ OPTIONAL_ENV_VARS = [
     ("SUPABASE_ANON_KEY", ""),
     ("SUPABASE_SERVICE_ROLE_KEY", ""),
     ("OPENAI_API_KEY", ""),
+    ("GEMINI_API_KEY", ""),
     ("ANTHROPIC_API_KEY", ""),
     ("ARTIFACTS_BUCKET", "artifacts"),
-    ("EMBEDDING_PROVIDER", "openai"),
-    ("EMBEDDING_MODEL", "text-embedding-3-small"),
+    ("EMBEDDING_PROVIDER", "gemini"),
+    ("EMBEDDING_MODEL", "text-embedding-004"),
 ]
 
 
