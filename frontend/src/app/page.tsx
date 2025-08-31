@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Card, CardContent } from "@/components/ui/card";
@@ -81,9 +82,9 @@ export default function Home() {
           </div>
           <div className="flex items-center gap-4">
             <div className="flex -space-x-2">
-              <img src="https://images.unsplash.com/photo-1633332755192-727a05c4013d?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3MzkyNDZ8MHwxfHNlYXJjaHwxfHx1c2VyfGVufDB8fHx8MTc1NjU5ODQ4Mnww&ixlib=rb-4.1.0&q=80&w=1080" alt="User" className="w-8 h-8 rounded-full border-2 border-background" />
-              <img src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3MzkyNDZ8MHwxfHNlYXJjaHwyfHx1c2VyfGVufDB8fHx8MTc1NjU5ODQ4Mnww&ixlib=rb-4.1.0&q=80&w=1080" alt="User" className="w-8 h-8 rounded-full border-2 border-background" />
-              <img src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3MzkyNDZ8MHwxfHNlYXJjaHwzfHx1c2VyfGVufDB8fHx8MTc1NjU5ODQ4Mnww&ixlib=rb-4.1.0&q=80&w=1080" alt="User" className="w-8 h-8 rounded-full border-2 border-background" />
+              <Image src="https://images.unsplash.com/photo-1633332755192-727a05c4013d?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3MzkyNDZ8MHwxfHNlYXJjaHwxfHx1c2VyfGVufDB8fHx8MTc1NjU5ODQ4Mnww&ixlib=rb-4.1.0&q=80&w=1080" alt="User" width={32} height={32} className="w-8 h-8 rounded-full border-2 border-background" />
+              <Image src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3MzkyNDZ8MHwxfHNlYXJjaHwyfHx1c2VyfGVufDB8fHx8MTc1NjU5ODQ4Mnww&ixlib=rb-4.1.0&q=80&w=1080" alt="User" width={32} height={32} className="w-8 h-8 rounded-full border-2 border-background" />
+              <Image src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3MzkyNDZ8MHwxfHNlYXJjaHwzfHx1c2VyfGVufDB8fHx8MTc1NjU5ODQ4Mnww&ixlib=rb-4.1.0&q=80&w=1080" alt="User" width={32} height={32} className="w-8 h-8 rounded-full border-2 border-background" />
             </div>
             <p className="text-sm text-muted-foreground">Trusted by 10,000+ students worldwide</p>
           </div>
@@ -236,7 +237,7 @@ export default function Home() {
               </div>
               <p className="text-lg mb-6">&quot;XENIA helped me organize my study time and focus on my weak areas. I improved my grades by 15% in just one semester!&quot;</p>
               <div className="flex items-center gap-4">
-                <img src="https://images.unsplash.com/photo-1614544048536-0d28caf77f41" alt="Sarah J." className="w-12 h-12 rounded-full" />
+                <Image src="https://images.unsplash.com/photo-1614544048536-0d28caf77f41" alt="Sarah J." width={48} height={48} className="w-12 h-12 rounded-full" />
                 <div>
                   <h4 className="font-bold">Sarah J.</h4>
                   <p className="text-sm text-muted-foreground">Medical Student</p>
@@ -254,7 +255,7 @@ export default function Home() {
               </div>
               <p className="text-lg mb-6">&quot;The AI tutor is like having a personal teacher available 24/7. It explains difficult concepts in a way I can understand.&quot;</p>
               <div className="flex items-center gap-4">
-                <img src="https://images.unsplash.com/photo-1620477403960-4188fdd7cee0" alt="Michael T." className="w-12 h-12 rounded-full" />
+                <Image src="https://images.unsplash.com/photo-1620477403960-4188fdd7cee0" alt="Michael T." width={48} height={48} className="w-12 h-12 rounded-full" />
                 <div>
                   <h4 className="font-bold">Michael T.</h4>
                   <p className="text-sm text-muted-foreground">High School Student</p>
@@ -272,7 +273,7 @@ export default function Home() {
               </div>
               <p className="text-lg mb-6">&quot;As a teacher, I can see which topics my students struggle with and provide targeted help. XENIA has transformed my classroom.&quot;</p>
               <div className="flex items-center gap-4">
-                <img src="https://images.unsplash.com/photo-1741880295874-72b665807375" alt="Linda M." className="w-12 h-12 rounded-full" />
+                <Image src="https://images.unsplash.com/photo-1741880295874-72b665807375" alt="Linda M." width={48} height={48} className="w-12 h-12 rounded-full" />
                 <div>
                   <h4 className="font-bold">Linda M.</h4>
                   <p className="text-sm text-muted-foreground">Physics Teacher</p>
@@ -339,7 +340,7 @@ export default function Home() {
               </Button>
             </div>
             <div className="md:w-1/2 bg-card rounded-xl overflow-hidden border shadow-lg">
-              <img src="https://images.unsplash.com/photo-1571260899304-425eee4c7efc" alt="XENIA Demo" className="w-full h-64 object-cover" />
+              <Image src="https://images.unsplash.com/photo-1571260899304-425eee4c7efc" alt="XENIA Demo" width={800} height={256} className="w-full h-64 object-cover" />
             </div>
           </CardContent>
         </Card>

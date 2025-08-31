@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { api } from '@/lib/api'
 import { MainLayout } from '@/components/navigation'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
@@ -11,14 +11,11 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useErrorContext } from '@/lib/error-context'
 import { 
-  CheckCircle, 
-  Clock, 
   Play, 
   Pause, 
   Plus, 
   BookOpen,
-  Timer,
-  Target
+  Timer
 } from 'lucide-react'
 
 export default function TasksPage(){
@@ -61,7 +58,7 @@ export default function TasksPage(){
 
   async function track(){
     try {
-      const res = await api('/api/tasks/track', { 
+      await api('/api/tasks/track', { 
         method:'POST', 
         body: JSON.stringify({ user_id:'demo-user', topic, duration_min: minutes }) 
       })

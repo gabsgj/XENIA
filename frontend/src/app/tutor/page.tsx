@@ -3,18 +3,16 @@ import { useState, useRef, useEffect } from 'react'
 import { API_BASE } from '@/lib/api'
 import { useErrorContext } from '@/lib/error-context'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { MainLayout } from '@/components/navigation'
 import { 
   Send, 
   Paperclip, 
-  Image, 
   Bot, 
   User, 
   Loader2,
-  Upload,
   X
 } from 'lucide-react'
 
@@ -141,7 +139,7 @@ export default function TutorPage(){
                   <CardContent className='p-4'>
                     {message.file && (
                       <div className='mb-3 p-2 bg-muted rounded border flex items-center gap-2'>
-                        <Image className='w-4 h-4' />
+                        <Paperclip className='w-4 h-4' />
                         <span className='text-sm'>{message.file.name}</span>
                       </div>
                     )}
@@ -184,7 +182,7 @@ export default function TutorPage(){
           {file && (
             <div className='mb-4 p-3 bg-muted rounded-lg flex items-center justify-between'>
               <div className='flex items-center gap-2'>
-                <Image className='w-4 h-4' />
+                <Paperclip className='w-4 h-4' />
                 <span className='text-sm'>{file.name}</span>
                 <Badge variant="outline">Image</Badge>
               </div>
