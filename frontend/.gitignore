@@ -24,6 +24,9 @@
 .DS_Store
 *.pem
 
+**.pyc
+.env__pycache__/
+
 # debug
 npm-debug.log*
 yarn-debug.log*
@@ -39,3 +42,11 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+
+
+
+# Python caches
+**/__pycache__/
+*.py[cod]
+*$py.class
