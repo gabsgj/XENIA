@@ -1,7 +1,0 @@
-{
-  "name": "XENIA - AI Study Planner",
-  "description": "An AI-powered personalized learning platform that ingests syllabi, analyzes assessments, detects weak topics, and generates adaptive study plans. Features an AI tutor, task tracking, and progress analytics.",
-  "requestFramePermissions": [
-    "camera"
-  ]
-}
