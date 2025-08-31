@@ -8,7 +8,8 @@ def get_user_id_from_request(request: Request) -> Optional[str]:
     if uid:
         return uid
     if request.is_json:
-        uid = (request.json or {}).get("user_id")
+        data = request.get_json(silent=True) or {}
+        uid = data.get("user_id")
         if uid:
             return uid
     uid = request.values.get("user_id")

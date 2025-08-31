@@ -46,8 +46,13 @@ async function getAuthHeaders(): Promise<Record<string, string>> {
 
 export async function api<T = any>(path: string, opts: RequestInit = {}): Promise<T> {
   const authHeaders = await getAuthHeaders();
+  const hasBody = typeof (opts as any).body !== "undefined" && (opts as any).body !== null;
+  const baseHeaders: Record<string, string> = { ...(opts.headers as any), ...authHeaders } as any;
+  if (hasBody && !("Content-Type" in baseHeaders)) {
+    baseHeaders["Content-Type"] = "application/json";
+  }
   const res = await fetch(`${API_BASE}${path}`, {
-    headers: { "Content-Type": "application/json", ...(opts.headers || {}), ...authHeaders },
+    headers: baseHeaders,
     ...opts,
   });
   const correlationId = res.headers.get("x-correlation-id");

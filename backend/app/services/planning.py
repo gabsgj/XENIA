@@ -44,14 +44,20 @@ def generate_plan(user_id: str, horizon_days: int = 14) -> Dict:
         plan["user_id"] = user_id
         plan["generated_at"] = datetime.utcnow().isoformat()
         plan["weak_topics"] = mock_topics
-        
-        # Store in database
-        sb = get_supabase()
-        sb.table("plans").upsert({"user_id": user_id, "plan": plan}).execute()
+        # Store in database (best-effort)
+        try:
+            sb = get_supabase()
+            sb.table("plans").upsert({"user_id": user_id, "plan": plan}).execute()
+        except Exception:
+            # Ignore persistence failures in mock mode
+            pass
         return plan
     
-    sb = get_supabase()
-    weak = get_weak_topics(user_id)
+    # Try to fetch weak topics; on failure, fallback to a default
+    try:
+        weak = get_weak_topics(user_id)
+    except Exception:
+        weak = []
     if not weak:
         # Seed with general review
         weak = [{"topic": "General Review", "score": 1}]
@@ -63,14 +69,23 @@ def generate_plan(user_id: str, horizon_days: int = 14) -> Dict:
         "weak_topics": weak,
         "sessions": sessions,
     }
-    # upsert into plans
-    sb.table("plans").upsert({"user_id": user_id, "plan": plan}).execute()
+    # upsert into plans (best-effort)
+    try:
+        sb = get_supabase()
+        sb.table("plans").upsert({"user_id": user_id, "plan": plan}).execute()
+    except Exception:
+        # If DB is unavailable, still return the generated plan
+        pass
     return plan
 
 
 def get_current_plan(user_id: str) -> Dict:
-    sb = get_supabase()
-    resp = sb.table("plans").select("plan").eq("user_id", user_id).limit(1).execute()
-    if resp.data:
-        return resp.data[0]["plan"]
+    try:
+        sb = get_supabase()
+        resp = sb.table("plans").select("plan").eq("user_id", user_id).limit(1).execute()
+        if resp.data:
+            return resp.data[0]["plan"]
+    except Exception:
+        # On connection/query failure, fall back to generating a plan
+        pass
     return generate_plan(user_id)

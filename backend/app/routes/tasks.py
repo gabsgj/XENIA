@@ -10,7 +10,7 @@ tasks_bp = Blueprint("tasks", __name__)
 @tasks_bp.post("/track")
 def track_session():
     sb = get_supabase()
-    data = request.json or {}
+    data = request.get_json(silent=True) or {}
     if not data.get("user_id"):
         raise ApiError("AUTH_401", "Missing user id")
     if not data.get("topic"):
@@ -27,7 +27,7 @@ def track_session():
 @tasks_bp.post("/complete")
 def complete_task():
     sb = get_supabase()
-    data = request.json or {}
+    data = request.get_json(silent=True) or {}
     task_id = data.get("task_id")
     if not task_id:
         raise ApiError("PLAN_400", "Missing task_id")

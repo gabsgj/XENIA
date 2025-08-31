@@ -12,11 +12,11 @@ def generate():
     if not uid:
         raise ApiError("PLAN_400", "Missing user id")
     try:
-        horizon = (
-            int((request.json or {}).get("horizon_days", 14))
-            if request.is_json
-            else int(request.values.get("horizon_days", 14))
-        )
+        if request.is_json:
+            data = request.get_json(silent=True) or {}
+            horizon = int(data.get("horizon_days", 14))
+        else:
+            horizon = int(request.values.get("horizon_days", 14))
         if horizon <= 0 or horizon > 90:
             raise ValueError("horizon out of range")
     except Exception:
