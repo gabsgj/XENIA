@@ -9,7 +9,7 @@ pillow==11.3.0
 pytesseract==0.3.13
 pdfminer.six==20231228
 pymupdf==1.25.1
-numpy==1.26.4
+numpy
 scikit-learn==1.5.2
 pandas==2.3.2
 apscheduler==3.11.0

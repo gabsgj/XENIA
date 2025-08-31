@@ -57,9 +57,22 @@ def handle_upload(file_storage, user_id: str, artifact_type: str) -> Dict:
     # Upload raw file to storage
     bucket = os.getenv("ARTIFACTS_BUCKET", "artifacts")
     object_path = f"{user_id}/{artifact_type}/{uuid.uuid4().hex}-{filename}"
-    supabase.storage.from_(bucket).upload(object_path, data, {
-        "contentType": mime
-    })
+    try:
+        supabase.storage.from_(bucket).upload(object_path, data, {
+            "contentType": mime
+        })
+    except Exception as e:
+        # Attempt to auto-create the bucket when using a service role key
+        try:
+            supabase.storage.create_bucket(bucket, {
+                "public": False,
+                "file_size_limit": "50mb"
+            })
+            supabase.storage.from_(bucket).upload(object_path, data, {
+                "contentType": mime
+            })
+        except Exception:
+            raise
 
     # Store metadata + extracted text (and embedding if available)
     record = {

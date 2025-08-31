@@ -1,6 +1,11 @@
+import warnings
+import numpy as np
 from flask import Flask
 from flask_cors import CORS
 from .config import load_config
+
+# Suppress NumPy runtime warnings for floating-point precision issues
+warnings.filterwarnings('ignore', category=RuntimeWarning, module='numpy')
 from .routes.ingest import ingest_bp
 from .routes.tutor import tutor_bp
 from .routes.plan import plan_bp
