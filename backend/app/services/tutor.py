@@ -2,7 +2,6 @@ import io
 from typing import Dict, Optional
 from PIL import Image
 import pytesseract
-from ..supabase_client import get_supabase
 from ..services.weaktopics import get_remediation_steps
 from ..errors import ApiError
 
@@ -12,7 +11,9 @@ def _ocr_image(image_bytes: bytes) -> str:
     return pytesseract.image_to_string(img)
 
 
-def solve_question(question: Optional[str], image_bytes: Optional[bytes], user_id: str) -> Dict:
+def solve_question(
+    question: Optional[str], image_bytes: Optional[bytes], user_id: str
+) -> Dict:
     if not question and not image_bytes:
         raise ApiError("TUTOR_TIMEOUT", "No input provided to tutor", status=400)
     if not question and image_bytes:

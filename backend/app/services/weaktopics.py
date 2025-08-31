@@ -1,6 +1,7 @@
 from typing import List, Dict
 import re
 from ..supabase_client import get_supabase
+from .ai_mock import get_mock_provider, is_mock_enabled
 
 
 # Simple heuristic fallback weak-topic extraction
@@ -33,14 +34,26 @@ def extract_topics_from_text(text: str) -> List[str]:
 def get_weak_topics(user_id: str) -> List[Dict]:
     sb = get_supabase()
     # Aggregate assessment artifacts for this user
-    resp = sb.table("artifacts").select("id, artifact_type, extracted_text, created_at").eq("user_id", user_id).order("created_at", desc=True).limit(100).execute()
+    resp = (
+        sb.table("artifacts")
+        .select("id, artifact_type, extracted_text, created_at")
+        .eq("user_id", user_id)
+        .order("created_at", desc=True)
+        .limit(100)
+        .execute()
+    )
     items = resp.data or []
 
     # Heuristic: mention of "incorrect", "wrong", etc. indicates weak topic context
     weak_scores: Dict[str, int] = {}
     for item in items:
         text = (item.get("extracted_text") or "").lower()
-        score = text.count("incorrect") + text.count("wrong") + text.count("mistake") + text.count("error")
+        score = (
+            text.count("incorrect")
+            + text.count("wrong")
+            + text.count("mistake")
+            + text.count("error")
+        )
         topics = extract_topics_from_text(item.get("extracted_text") or "")
         for t in topics:
             weak_scores[t] = weak_scores.get(t, 0) + score
@@ -50,14 +63,43 @@ def get_weak_topics(user_id: str) -> List[Dict]:
 
 
 def get_remediation_steps(user_id: str, question_text: str) -> List[Dict]:
+    # Check if mock mode is enabled
+    if is_mock_enabled():
+        mock_provider = get_mock_provider()
+        response = mock_provider.get_tutor_response(question_text)
+        return response.get("steps", [])
+    
     # Very lightweight deterministic step generator as a fallback
     # 1) Identify concepts by noun phrases (naive split)
-    concepts = [w.strip(",.;:!?") for w in question_text.split() if len(w) > 4]
+    concepts = [
+        w.strip(",.;:!?") for w in question_text.split() if len(w) > 4
+    ]
     concepts = list(dict.fromkeys(concepts))[:5]
 
     steps = []
     if not question_text.strip():
-        return [{"title": "Clarify the question", "detail": "Please provide the problem statement or a clear photo."}]
+        return [
+            {
+                "title": "Clarify the question",
+                "detail": "Please provide the problem statement or a clear photo.",
+            }
+        ]
 
-    steps.append({"title": "Understand the problem", "detail": f"Restate the problem in your own words: '{question_text[:140]}...'"})
-    steps.append({"title": "Recall key concepts", "detail": f"Review: {', '.join(concepts) if concepts else 'core definitions and formulas'}."})
+    steps.append(
+        {
+            "title": "Understand the problem",
+            "detail": (
+                f"Restate the problem in your own words: '{question_text[:140]}...'"
+            ),
+        }
+    )
+    steps.append(
+        {
+            "title": "Recall key concepts",
+            "detail": (
+                f"Review: {", ".join(concepts) if concepts else "core definitions and formulas"}."
+            ),
+        }
+    )
+
+    return steps

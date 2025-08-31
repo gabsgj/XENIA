@@ -24,5 +24,7 @@ def get_reports():
     class_id = request.args.get("class_id", "")
     if not class_id:
         raise ApiError("CONTENT_NOT_FOUND", "Missing class_id")
-    reports = sb.table("reports").select("*").eq("class_id", class_id).execute().data or []
+    reports = (
+        sb.table("reports").select("*").eq("class_id", class_id).execute().data or []
+    )
     return {"class_id": class_id, "reports": reports}

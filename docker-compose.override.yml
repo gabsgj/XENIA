@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  backend:
+    command: python run.py
+    environment:
+      - FLASK_ENV=development
+      - FLASK_DEBUG=true
+      - AI_MOCK=true
+
+  frontend:
+    command: npm run dev
+    environment:
+      - NODE_ENV=development

@@ -12,7 +12,21 @@ def overview():
     parent_id = request.args.get("parent_id", "")
     if not parent_id:
         raise ApiError("AUTH_401", "Missing parent_id")
-    children = sb.table("parents_children").select("child_user_id").eq("parent_user_id", parent_id).execute().data or []
+    children = (
+        sb.table("parents_children")
+        .select("child_user_id")
+        .eq("parent_user_id", parent_id)
+        .execute()
+        .data
+        or []
+    )
     child_ids = [c["child_user_id"] for c in children]
-    profiles = sb.table("profiles").select("user_id, xp, level, streak_days").in_("user_id", child_ids).execute().data or []
+    profiles = (
+        sb.table("profiles")
+        .select("user_id, xp, level, streak_days")
+        .in_("user_id", child_ids)
+        .execute()
+        .data
+        or []
+    )
     return {"children": profiles}

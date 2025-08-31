@@ -1,194 +1,246 @@
-## XENIA – AI Study Planner
+# XENIA – AI Study Planner
 
 AI-powered personalized learning platform. Ingest syllabi and assessments (PDF/TXT/Images), detect weak topics, generate adaptive study plans, provide an AI tutor with OCR-based question parsing and step-by-step remediations, and track tasks, sessions, XP/levels/achievements/streaks with analytics for students, teachers, and parents.
 
-### Key Features
-- **Syllabus & assessment ingestion**: PDF parsing with pdfminer; OCR for images and non-extractable PDFs using Tesseract; stored in Supabase Storage; text persisted in `artifacts`.
-- **Weak-topic detection**: Heuristic analysis over assessment artifacts; optional text embeddings (Gemini by default) for future semantic use.
-- **Adaptive study planner**: Performance-weighted sessions across a horizon; persisted in `plans`.
-- **AI Tutor & doubt solver**: OCR of question images and stepwise remediation guidance.
-- **Tracking & gamification**: Sessions, tasks; XP awards; levels; streaks; achievements hooks.
-- **Dashboards**: Student analytics; optional teacher and parent views.
-- **Supabase-powered**: Auth, Postgres, Storage, pgvector.
-
-### Stack
-- Frontend: Next.js (App Router, TypeScript, TailwindCSS)
-- Backend: Python (Flask), CORS enabled
-- Database & Auth: Supabase (Postgres + RLS + Storage + pgvector)
-- OCR/PDF: Tesseract OCR, pdfminer.six, pdf2image, PyMuPDF (fitz)
-- Embeddings: Gemini by default (`text-embedding-004`); optional OpenAI fallback
-
-### Architecture Overview
-- `frontend/`: Next.js app with pages for upload, planner, tasks, tutor, analytics, teacher, parent
-- `backend/`: Flask app with blueprints:
-  - `/api/upload`: Syllabus and assessment uploads
-  - `/api/plan`: Generate and fetch current plan
-  - `/api/tasks`: Track session, complete task (awards XP)
-  - `/api/tutor`: Ask tutor with text or image
-  - `/api/analytics`: Student/teacher/parent views
-  - `/api/teacher`: Manual tagging, reports
-  - `/api/parent`: Parent overview
-- `supabase_schema.sql`: Tables, RLS policies, and profile XP/level/streak functions
-
-### Directory Structure
-```text
-xenia/
-  README.md
-  .env.example
-  supabase_schema.sql
-  backend/
-    run.py
-    requirements.txt
-    app/
-      __init__.py
-      config.py
-      supabase_client.py
-      utils.py
-      routes/
-        ingest.py tutor.py plan.py tasks.py analytics.py teacher.py parent.py
-      services/
-        ingestion.py planning.py tutor.py weaktopics.py embeddings.py gamification.py
-  frontend/
-    package.json tsconfig.json eslint.config.mjs .env.local.example
-    src/
-      lib/api.ts lib/supabaseClient.ts
-      app/
-        page.tsx layout.tsx globals.css
-        upload/ planner/ tasks/ tutor/ analytics/ teacher/ parent/
-```
+## �� Quick Start
 
 ### Prerequisites
-- Python 3.11+ (tested on 3.13)
-- Node.js 18+ (recommended 20+)
-- System packages:
-  - Tesseract OCR
-  - Poppler utils (for PDF image conversion)
+- Python 3.11+
+- Node.js 18+
+- Docker (optional)
+- Supabase account
 
-Ubuntu/Debian install:
-```bash
-sudo apt-get update -y
-sudo apt-get install -y python3-venv tesseract-ocr poppler-utils build-essential pkg-config python3-dev
-```
+### Local Development Setup
 
-### Environment Variables
-Copy `.env.example` to `.env` in the project root and fill values:
-```bash
-cp .env.example .env
-```
-- `SUPABASE_URL`: Supabase project URL (e.g., https://xxxx.supabase.co)
-- `SUPABASE_ANON_KEY`: Supabase anon key
-- `SUPABASE_SERVICE_ROLE_KEY`: Service role key (recommended for backend; do not expose to frontend)
-- `GEMINI_API_KEY`: Gemini API key (preferred embeddings provider)
-- `OPENAI_API_KEY`: Optional; set and use `EMBEDDING_PROVIDER=openai` to switch
-- `ARTIFACTS_BUCKET`: Storage bucket name (default `artifacts`)
-- `EMBEDDING_PROVIDER`: `gemini` (default) or `openai`
-- `EMBEDDING_MODEL`: `text-embedding-004` (Gemini) or an OpenAI embedding model
+1. **Clone the repository**
+   ```bash
+   git clone <repository-url>
+   cd xenia-ai-study-planner
+   ```
 
-Frontend environment (`frontend/.env.local`):
-```bash
-cp frontend/.env.local.example frontend/.env.local
-```
-- `NEXT_PUBLIC_SUPABASE_URL`
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-- `NEXT_PUBLIC_API_URL` (e.g., http://localhost:8000)
+2. **Set up environment variables**
+   ```bash
+   cp .env.example .env
+   # Edit .env with your Supabase credentials
+   ```
 
-### Supabase Setup
-1) Create a new Supabase project
-2) In SQL editor, run the contents of `supabase_schema.sql`
-3) Create a Storage bucket named `artifacts`
-4) Keep RLS enabled (policies are included in the SQL)
+3. **Backend Setup**
+   ```bash
+   cd backend
+   python3 -m venv venv
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   pip install -r requirements.txt
+   ```
 
-### Backend: Run Locally
+4. **Frontend Setup**
+   ```bash
+   cd frontend
+   cp .env.local.example .env.local
+   # Edit .env.local with your Supabase credentials
+   npm install
+   ```
+
+5. **Run with AI Mocks (No API Keys Required)**
+   ```bash
+   # Terminal 1 - Backend
+   cd backend
+   export AI_MOCK=true
+   python run.py
+   
+   # Terminal 2 - Frontend
+   cd frontend
+   npm run dev
+   ```
+
+6. **Access the application**
+   - Frontend: http://localhost:3000
+   - Backend API: http://localhost:8000
+   - Health check: http://localhost:8000/health
+
+### Docker Setup
+
+1. **Build and run with Docker Compose**
+   ```bash
+   docker-compose up --build
+   ```
+
+2. **Development with Docker Compose Override**
+   ```bash
+   docker-compose -f docker-compose.yml -f docker-compose.override.yml up --build
+   ```
+
+## 🧪 Testing
+
+### Backend Tests
 ```bash
 cd backend
-python3 -m venv ../venv
-source ../venv/bin/activate
-pip install -r requirements.txt
-
-# Ensure .env exists one level up (project root)
-export $(grep -v '^#' ../.env | xargs -d '\n' -I {} echo {})
-
-# Dev server
-python run.py
-
-# Or with gunicorn
-# gunicorn -w 2 -b 0.0.0.0:8000 run:app
-```
-Health check:
-```bash
-curl http://127.0.0.1:8000/health
+export AI_MOCK=true
+python -m pytest tests/ -v
 ```
 
-### Frontend: Run Locally
+### Frontend Tests
 ```bash
 cd frontend
-npm install
-cp .env.local.example .env.local # fill values
-npm run dev
-# open http://localhost:3000
+npm run lint
+npm run build
 ```
 
-### API Endpoints (summary)
-- `GET /health`: Service health
-- `POST /api/upload/syllabus`: multipart form `file`, `user_id`
-- `POST /api/upload/assessment`: multipart form `file`, `user_id`
-- `POST /api/plan/generate`: json `{ user_id, horizon_days }`
-- `GET /api/plan/current?user_id=...`
-- `POST /api/tasks/track`: json `{ user_id, topic, duration_min, notes? }`
-- `POST /api/tasks/complete`: json `{ user_id, task_id }`
-- `POST /api/tutor/ask`: either multipart form with `file` (image) and `user_id`, or json `{ question, user_id }`
-- `GET /api/analytics/student?user_id=...`
-- `GET /api/analytics/teacher?class_id=...`
-- `GET /api/analytics/parent?parent_id=...`
-- `POST /api/teacher/tag`: json `{ user_id, teacher_id, topic, tag }`
-- `GET /api/teacher/reports?class_id=...`
-- `GET /api/parent/overview?parent_id=...`
-
-Sample upload (assessment):
+### Run All Tests
 ```bash
-curl -X POST http://127.0.0.1:8000/api/upload/assessment \
-  -F "user_id=demo-user" \
-  -F "file=@/path/to/answer-sheet.jpg"
+# Backend
+cd backend && export AI_MOCK=true && python -m pytest tests/ -v
+
+# Frontend
+cd frontend && npm run lint && npm run build
 ```
 
-Generate plan:
+## 🔧 Configuration
+
+### Environment Variables
+
+#### Backend (.env)
 ```bash
-curl -X POST http://127.0.0.1:8000/api/plan/generate \
-  -H "Content-Type: application/json" \
-  -d '{"user_id":"demo-user","horizon_days":14}'
+# Supabase Configuration
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_ANON_KEY=your-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+
+# AI Provider Configuration
+GEMINI_API_KEY=your-gemini-api-key
+OPENAI_API_KEY=your-openai-api-key
+ANTHROPIC_API_KEY=your-anthropic-api-key
+
+# AI Mock Configuration (set to true to use mocks)
+AI_MOCK=false
+
+# Embedding Configuration
+EMBEDDING_PROVIDER=gemini
+EMBEDDING_MODEL=text-embedding-004
+
+# Storage Configuration
+ARTIFACTS_BUCKET=artifacts
+
+# Backend Configuration
+FLASK_ENV=development
+FLASK_DEBUG=true
 ```
 
-Tutor with image:
+#### Frontend (.env.local)
 ```bash
-curl -X POST http://127.0.0.1:8000/api/tutor/ask \
-  -F "user_id=demo-user" \
-  -F "file=@/path/to/question.jpg"
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+NEXT_PUBLIC_API_URL=http://localhost:8000
 ```
 
-### Embeddings and AI
-- Default embeddings provider is **Gemini**; set `GEMINI_API_KEY` and (optionally) `EMBEDDING_MODEL=text-embedding-004`.
-- To use **OpenAI** instead, set `EMBEDDING_PROVIDER=openai` and `OPENAI_API_KEY`, and adjust `EMBEDDING_MODEL`.
-- Embeddings are computed during ingestion (if key present) and stored in `artifacts.embedding` (pgvector).
+### Supabase Setup
 
-### OCR and PDF Parsing
-- Primary text extraction with pdfminer.six; fallback to OCR for PDFs by converting pages to images with pdf2image and running Tesseract.
-- Image uploads are OCR’d directly via Tesseract.
+1. Create a new Supabase project
+2. Run the schema setup:
+   ```sql
+   -- Copy and paste the contents of supabase_schema.sql
+   ```
+3. Create a Storage bucket named `artifacts`
+4. Configure RLS policies (included in schema)
 
-### Analytics and Gamification
-- Sessions and tasks support XP awards (e.g., logging sessions awards XP). Profile level and streaks are recomputed via SQL functions in `supabase_schema.sql`.
-- Student, teacher, and parent analytics endpoints aggregate basic stats; extend as needed.
+## 📚 API Documentation
 
-### Security Notes
-- Enable RLS (default in schema). Do not expose `SUPABASE_SERVICE_ROLE_KEY` to the frontend.
-- Backend uses CORS with credentials support; lock down origins in production.
-- Store secrets in environment variables (not in source control).
+### Core Endpoints
 
-### Troubleshooting
-- If OCR fails: verify `tesseract-ocr` is installed and available in PATH.
-- If PDF text is empty: `poppler-utils` required for PDF-to-image fallback; ensure installed.
-- If embeddings are `null`: verify `GEMINI_API_KEY` (or `OPENAI_API_KEY`) and check `EMBEDDING_PROVIDER`.
-- Supabase insert/storage errors: confirm `.env` values and that the `artifacts` bucket exists.
+- `GET /health` - Service health check
+- `POST /api/upload/syllabus` - Upload syllabus file
+- `POST /api/upload/assessment` - Upload assessment file
+- `POST /api/plan/generate` - Generate study plan
+- `GET /api/plan/current` - Get current plan
+- `POST /api/tasks/track` - Track study session
+- `POST /api/tasks/complete` - Complete task
+- `POST /api/tutor/ask` - Ask tutor question
+- `GET /api/analytics/student` - Student analytics
+- `GET /api/analytics/teacher` - Teacher analytics
+- `GET /api/analytics/parent` - Parent analytics
 
-### License
-This project is provided as-is for educational purposes. Review dependencies’ licenses before commercial use.
+### Error Handling
 
+All endpoints return consistent error responses:
+```json
+{
+  "errorCode": "ERROR_CODE",
+  "errorMessage": "Human readable message",
+  "details": {}
+}
+```
+
+## 🏗️ Architecture
+
+### Backend (Flask)
+- **Routes**: API endpoints organized by feature
+- **Services**: Business logic for AI, planning, analytics
+- **Mock System**: Deterministic AI responses for testing
+- **Error Handling**: Global error contract with codes
+
+### Frontend (Next.js)
+- **App Router**: Modern Next.js routing
+- **Components**: Reusable UI components
+- **API Integration**: Type-safe API client
+- **Error Handling**: User-friendly error display
+
+### Database (Supabase)
+- **PostgreSQL**: Primary database
+- **RLS**: Row-level security policies
+- **Storage**: File uploads and artifacts
+- **pgvector**: Vector embeddings for AI
+
+## 🔒 Security
+
+- Row-level security (RLS) enabled by default
+- Environment variable configuration
+- CORS properly configured
+- No secrets in source code
+- Input validation and sanitization
+
+## 🚀 Deployment
+
+### Production Deployment
+
+1. **Set up production environment variables**
+2. **Build Docker images**
+   ```bash
+   docker build -t xenia-backend ./backend
+   docker build -t xenia-frontend ./frontend
+   ```
+3. **Deploy to your preferred platform**
+4. **Configure Supabase production project**
+
+### Staging Deployment
+
+1. Use the same setup as production
+2. Configure staging environment variables
+3. Use separate Supabase project for staging
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests for new functionality
+5. Ensure all tests pass
+6. Submit a pull request
+
+## 📝 License
+
+This project is provided as-is for educational purposes. Review dependencies' licenses before commercial use.
+
+## 🆘 Troubleshooting
+
+### Common Issues
+
+1. **OCR fails**: Ensure `tesseract-ocr` is installed
+2. **PDF parsing fails**: Install `poppler-utils`
+3. **Supabase connection fails**: Check environment variables
+4. **AI features not working**: Set `AI_MOCK=true` for testing
+
+### Getting Help
+
+- Check the logs for error messages
+- Verify environment variables are set correctly
+- Run tests to ensure everything is working
+- Use AI mock mode for development without API keys

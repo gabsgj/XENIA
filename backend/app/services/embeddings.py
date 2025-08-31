@@ -2,6 +2,8 @@ from __future__ import annotations
 import os
 from typing import List, Optional
 
+from .ai_mock import get_mock_provider, is_mock_enabled
+
 _provider: Optional[str] = None
 
 
@@ -12,7 +14,9 @@ def _get_provider() -> str:
     return _provider
 
 
-def _embed_openai(texts: List[str], model: Optional[str]) -> Optional[List[List[float]]]:
+def _embed_openai(
+    texts: List[str], model: Optional[str]
+) -> Optional[List[List[float]]]:
     try:
         from openai import OpenAI  # type: ignore
     except Exception:
@@ -21,15 +25,21 @@ def _embed_openai(texts: List[str], model: Optional[str]) -> Optional[List[List[
     if not api_key:
         return None
     client = OpenAI(api_key=api_key)  # type: ignore
-    model_name = model or os.getenv("EMBEDDING_MODEL", "text-embedding-3-small")
+    model_name = model or os.getenv(
+        "EMBEDDING_MODEL", "text-embedding-3-small"
+    ) or "text-embedding-3-small"
     vectors: List[List[float]] = []
     for t in texts:
-        resp = client.embeddings.create(model=model_name, input=t[:8000])  # type: ignore
+        resp = client.embeddings.create(
+            model=model_name, input=t[:8000]
+        )  # type: ignore
         vectors.append(resp.data[0].embedding)  # type: ignore
     return vectors
 
 
-def _embed_gemini(texts: List[str], model: Optional[str]) -> Optional[List[List[float]]]:
+def _embed_gemini(
+    texts: List[str], model: Optional[str]
+) -> Optional[List[List[float]]]:
     try:
         import google.generativeai as genai  # type: ignore
     except Exception:
@@ -40,8 +50,11 @@ def _embed_gemini(texts: List[str], model: Optional[str]) -> Optional[List[List[
     genai.configure(api_key=api_key)
     # Gemini embeddings require model names prefixed with 'models/' or 'tunedModels/'.
     # Accept both forms and normalize here for robustness.
-    raw_model_name = model or os.getenv("EMBEDDING_MODEL", "models/text-embedding-004")
-    if not (raw_model_name.startswith("models/") or raw_model_name.startswith("tunedModels/")):
+    raw_model_name = model or os.getenv("EMBEDDING_MODEL", "models/text-embedding-004") or "models/text-embedding-004"
+    if not (
+        raw_model_name.startswith("models/")
+        or raw_model_name.startswith("tunedModels/")
+    ):
         model_name = f"models/{raw_model_name}"
     else:
         model_name = raw_model_name
@@ -61,7 +74,14 @@ def _embed_gemini(texts: List[str], model: Optional[str]) -> Optional[List[List[
     return vectors
 
 
-def embed_texts(texts: List[str], model: Optional[str] = None) -> Optional[List[List[float]]]:
+def embed_texts(
+    texts: List[str], model: Optional[str] = None
+) -> Optional[List[List[float]]]:
+    # Check if mock mode is enabled
+    if is_mock_enabled():
+        mock_provider = get_mock_provider()
+        return mock_provider.get_embeddings(texts, model)
+    
     provider = _get_provider()
     if provider == "openai":
         return _embed_openai(texts, model)

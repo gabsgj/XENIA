@@ -5,7 +5,6 @@ from typing import Dict
 from PIL import Image
 import pytesseract
 from pdfminer.high_level import extract_text
-import fitz  # PyMuPDF
 from pdf2image import convert_from_bytes
 from ..supabase_client import get_supabase
 from .embeddings import embed_texts
@@ -58,19 +57,16 @@ def handle_upload(file_storage, user_id: str, artifact_type: str) -> Dict:
     bucket = os.getenv("ARTIFACTS_BUCKET", "artifacts")
     object_path = f"{user_id}/{artifact_type}/{uuid.uuid4().hex}-{filename}"
     try:
-        supabase.storage.from_(bucket).upload(object_path, data, {
-            "contentType": mime
-        })
-    except Exception as e:
+        supabase.storage.from_(bucket).upload(object_path, data, {"contentType": mime})
+    except Exception:
         # Attempt to auto-create the bucket when using a service role key
         try:
-            supabase.storage.create_bucket(bucket, {
-                "public": False,
-                "file_size_limit": "50mb"
-            })
-            supabase.storage.from_(bucket).upload(object_path, data, {
-                "contentType": mime
-            })
+            supabase.storage.create_bucket(
+                bucket, {"public": False, "file_size_limit": "50mb"}
+            )
+            supabase.storage.from_(bucket).upload(
+                object_path, data, {"contentType": mime}
+            )
         except Exception:
             raise
 

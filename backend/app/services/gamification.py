@@ -1,5 +1,4 @@
 from typing import Dict
-from ..supabase_client import get_supabase
 
 
 def recompute_level(xp: int) -> Dict:
@@ -7,10 +6,14 @@ def recompute_level(xp: int) -> Dict:
     level = 1
     remaining = xp
     while True:
-        need = int(100 * (level ** 1.25))
+        need = int(100 * (level**1.25))
         if remaining >= need:
             remaining -= need
             level += 1
         else:
             break
-    return {"level": level, "progress": remaining, "to_next": int(100 * (level ** 1.25)) - remaining}
+    return {
+        "level": level,
+        "progress": remaining,
+        "to_next": int(100 * (level**1.25)) - remaining,
+    }
