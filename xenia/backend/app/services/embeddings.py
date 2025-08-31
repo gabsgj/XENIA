@@ -38,7 +38,13 @@ def _embed_gemini(texts: List[str], model: Optional[str]) -> Optional[List[List[
     if not api_key:
         return None
     genai.configure(api_key=api_key)
-    model_name = model or os.getenv("EMBEDDING_MODEL", "text-embedding-004")
+    # Gemini embeddings require model names prefixed with 'models/' or 'tunedModels/'.
+    # Accept both forms and normalize here for robustness.
+    raw_model_name = model or os.getenv("EMBEDDING_MODEL", "models/text-embedding-004")
+    if not (raw_model_name.startswith("models/") or raw_model_name.startswith("tunedModels/")):
+        model_name = f"models/{raw_model_name}"
+    else:
+        model_name = raw_model_name
     vectors: List[List[float]] = []
     for t in texts:
         res = genai.embed_content(model=model_name, content=t[:8000])  # type: ignore
