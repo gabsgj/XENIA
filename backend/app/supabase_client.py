@@ -1,7 +1,9 @@
 import os
+import logging
 from supabase import create_client, Client
 from typing import Optional
 
+logger = logging.getLogger('xenia')
 _supabase: Optional[Client] = None
 _mock_mode: bool = False
 
@@ -18,15 +20,19 @@ def get_supabase() -> Client:
         # Check if we're in mock mode or if Supabase config is missing
         if os.getenv("AI_MOCK", "false").lower() == "true" or not url or not key:
             _mock_mode = True
+            logger.info("🔧 Using MOCK Supabase client (AI_MOCK=true or missing config)")
             # Return a mock client that won't actually connect
             return _create_mock_client()
         
         try:
+            logger.info("🔗 Attempting to connect to real Supabase...")
             _supabase = create_client(url, key)
             # Test the connection
             _supabase.table("profiles").select("count", count="exact").limit(1).execute()
+            logger.info("✅ Successfully connected to Supabase")
         except Exception as e:
-            print(f"Warning: Supabase connection failed: {e}")
+            logger.warning(f"❌ Supabase connection failed: {e}")
+            logger.info("🔧 Falling back to MOCK Supabase client")
             _mock_mode = True
             return _create_mock_client()
     
@@ -35,6 +41,8 @@ def get_supabase() -> Client:
 
 def _create_mock_client() -> Client:
     """Create a mock Supabase client for development/testing"""
+    logger.info("🎭 Creating mock Supabase client with sample data")
+    
     class MockSupabaseClient:
         def __init__(self):
             self.mock_data = {
@@ -63,11 +71,14 @@ def _create_mock_client() -> Client:
                     {"class_id": "class1", "report_data": "Sample report data"}
                 ]
             }
+            logger.info("📊 Mock data initialized with sample records")
         
         def table(self, table_name: str):
+            logger.debug(f"🎭 Mock table access: {table_name}")
             return MockTable(self.mock_data.get(table_name, []))
         
         def rpc(self, func_name: str, params: dict):
+            logger.debug(f"🎭 Mock RPC call: {func_name} with params {params}")
             return MockRPC()
     
     class MockTable:
@@ -90,9 +101,11 @@ def _create_mock_client() -> Client:
             return self
         
         def insert(self, data):
+            logger.debug(f"🎭 Mock insert: {data}")
             return MockExecute()
         
         def update(self, data):
+            logger.debug(f"🎭 Mock update: {data}")
             return self
         
         def execute(self):
@@ -104,6 +117,7 @@ def _create_mock_client() -> Client:
                 elif filter_type == "in":
                     filtered_data = [item for item in filtered_data if item.get(column) in value]
             
+            logger.debug(f"🎭 Mock query returned {len(filtered_data)} records")
             return MockExecute(filtered_data)
     
     class MockExecute:
@@ -120,6 +134,7 @@ def _create_mock_client() -> Client:
     
     class MockRPC:
         def execute(self):
+            logger.debug("🎭 Mock RPC executed successfully")
             return MockExecute()
     
     return MockSupabaseClient()

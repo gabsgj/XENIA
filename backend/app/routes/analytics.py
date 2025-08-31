@@ -1,20 +1,26 @@
+import logging
 from flask import Blueprint, request
 from ..errors import ApiError
 from ..supabase_client import get_supabase
 
-
+logger = logging.getLogger('xenia')
 analytics_bp = Blueprint("analytics", __name__)
 
 
 @analytics_bp.get("/student")
 def student_analytics():
+    logger.info("📊 Student analytics endpoint called")
     sb = get_supabase()
     user_id = request.args.get("user_id", "")
     if not user_id:
         # Default to demo-user for demo purposes
         user_id = "demo-user"
+        logger.info(f"   No user_id provided, defaulting to: {user_id}")
+    else:
+        logger.info(f"   User ID: {user_id}")
     
     try:
+        logger.info("   Fetching sessions data...")
         sessions = (
             sb.table("sessions")
             .select("duration_min, topic, created_at")
@@ -24,6 +30,9 @@ def student_analytics():
             .data
             or []
         )
+        logger.info(f"   Found {len(sessions)} sessions")
+        
+        logger.info("   Fetching tasks data...")
         tasks = (
             sb.table("tasks")
             .select("status, topic, created_at")
@@ -33,6 +42,9 @@ def student_analytics():
             .data
             or []
         )
+        logger.info(f"   Found {len(tasks)} tasks")
+        
+        logger.info("   Fetching profile data...")
         xp = (
             sb.table("profiles")
             .select("xp, level, streak_days")
@@ -41,8 +53,14 @@ def student_analytics():
             .execute()
             .data
         )
-        return {"sessions": sessions, "tasks": tasks, "profile": (xp[0] if xp else {})}
+        profile = xp[0] if xp else {}
+        logger.info(f"   Profile data: {profile}")
+        
+        result = {"sessions": sessions, "tasks": tasks, "profile": profile}
+        logger.info(f"   Returning analytics data for user {user_id}")
+        return result
     except Exception as e:
+        logger.warning(f"   Database error, returning mock data: {str(e)}")
         # Return mock data if there's an error
         return {
             "sessions": [
@@ -61,12 +79,17 @@ def student_analytics():
 
 @analytics_bp.get("/teacher")
 def teacher_analytics():
+    logger.info("👨‍🏫 Teacher analytics endpoint called")
     sb = get_supabase()
     class_id = request.args.get("class_id", "")
     if not class_id:
+        logger.error("   Missing class_id parameter")
         raise ApiError("CONTENT_NOT_FOUND", "Missing class_id")
     
+    logger.info(f"   Class ID: {class_id}")
+    
     try:
+        logger.info("   Fetching student enrollments...")
         students = (
             sb.table("enrollments")
             .select("user_id")
@@ -76,6 +99,9 @@ def teacher_analytics():
             or []
         )
         user_ids = [s["user_id"] for s in students]
+        logger.info(f"   Found {len(user_ids)} students in class")
+        
+        logger.info("   Fetching student profiles...")
         profiles = (
             sb.table("profiles")
             .select("user_id, xp, level, streak_days")
@@ -84,8 +110,13 @@ def teacher_analytics():
             .data
             or []
         )
-        return {"class_id": class_id, "profiles": profiles}
+        logger.info(f"   Found {len(profiles)} student profiles")
+        
+        result = {"class_id": class_id, "profiles": profiles}
+        logger.info(f"   Returning teacher analytics for class {class_id}")
+        return result
     except Exception as e:
+        logger.warning(f"   Database error, returning mock data: {str(e)}")
         # Return mock data if there's an error
         return {
             "class_id": class_id,
@@ -98,12 +129,17 @@ def teacher_analytics():
 
 @analytics_bp.get("/parent")
 def parent_analytics():
+    logger.info("👨‍👩‍👧‍👦 Parent analytics endpoint called")
     sb = get_supabase()
     parent_id = request.args.get("parent_id", "")
     if not parent_id:
+        logger.error("   Missing parent_id parameter")
         raise ApiError("AUTH_401", "Missing parent_id")
     
+    logger.info(f"   Parent ID: {parent_id}")
+    
     try:
+        logger.info("   Fetching children data...")
         children = (
             sb.table("parents_children")
             .select("child_user_id")
@@ -113,6 +149,9 @@ def parent_analytics():
             or []
         )
         child_ids = [c["child_user_id"] for c in children]
+        logger.info(f"   Found {len(child_ids)} children")
+        
+        logger.info("   Fetching children profiles...")
         profiles = (
             sb.table("profiles")
             .select("user_id, xp, level, streak_days")
@@ -121,8 +160,13 @@ def parent_analytics():
             .data
             or []
         )
-        return {"parent_id": parent_id, "profiles": profiles}
+        logger.info(f"   Found {len(profiles)} child profiles")
+        
+        result = {"parent_id": parent_id, "profiles": profiles}
+        logger.info(f"   Returning parent analytics for parent {parent_id}")
+        return result
     except Exception as e:
+        logger.warning(f"   Database error, returning mock data: {str(e)}")
         # Return mock data if there's an error
         return {
             "parent_id": parent_id,
