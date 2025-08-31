@@ -12,7 +12,13 @@ logger = logging.getLogger("xenia.errors")
 class ApiError(Exception):
     """Unified API error with code, message, status and optional details."""
 
-    def __init__(self, error_code: str, error_message: str, status: int = 400, details: Optional[Any] = None):
+    def __init__(
+        self,
+        error_code: str,
+        error_message: str,
+        status: int = 400,
+        details: Optional[Any] = None,
+    ):
         super().__init__(error_message)
         self.error_code = error_code
         self.error_message = error_message
@@ -45,11 +51,20 @@ def _derive_error_code_from_path(path: str, status: int) -> str:
         if path.startswith("/api/upload"):
             # Try to distinguish assessment vs syllabus
             if "assessment" in path:
-                return "ASSESSMENT_PARSE_FAIL" if status >= 500 else "SYLLABUS_INVALID_FORMAT"
+                return (
+                    "ASSESSMENT_PARSE_FAIL"
+                    if status >= 500
+                    else "SYLLABUS_INVALID_FORMAT"
+                )
             return "SYLLABUS_PARSE_FAIL" if status >= 500 else "SYLLABUS_INVALID_FORMAT"
         if path.startswith("/api/tutor"):
             return "TUTOR_API_DOWN" if status >= 500 else "TUTOR_TIMEOUT"
-        if path.startswith("/api/analytics") or path.startswith("/api/tasks") or path.startswith("/api/teacher") or path.startswith("/api/parent"):
+        if (
+            path.startswith("/api/analytics")
+            or path.startswith("/api/tasks")
+            or path.startswith("/api/teacher")
+            or path.startswith("/api/parent")
+        ):
             return "CONTENT_API_FAIL" if status >= 500 else "CONTENT_NOT_FOUND"
         if status == 401:
             return "AUTH_401"
@@ -66,7 +81,9 @@ def register_error_handlers(app):
     @app.before_request
     def _set_correlation():
         # Preserve inbound correlation id if present
-        inbound = request.headers.get("x-correlation-id") or request.headers.get("X-Correlation-Id")
+        inbound = request.headers.get("x-correlation-id") or request.headers.get(
+            "X-Correlation-Id"
+        )
         g.correlation_id = inbound or uuid.uuid4().hex
 
     @app.after_request
@@ -79,7 +96,13 @@ def register_error_handlers(app):
     @app.errorhandler(ApiError)
     def _handle_api_error(err: ApiError):
         cid = getattr(g, "correlation_id", "-")
-        logger.warning("ApiError [%s] %s - %s", cid, err.error_code, err.error_message, exc_info=False)
+        logger.warning(
+            "ApiError [%s] %s - %s",
+            cid,
+            err.error_code,
+            err.error_message,
+            exc_info=False,
+        )
         return err.to_response()
 
     @app.errorhandler(HTTPException)
@@ -104,7 +127,9 @@ def register_error_handlers(app):
         details = {"type": err.__class__.__name__}
         # Minimal stack in logs, not in response
         cid = getattr(g, "correlation_id", "-")
-        logger.exception("Unhandled [%s] %s: %s\n%s", cid, code, str(err), traceback.format_exc())
+        logger.exception(
+            "Unhandled [%s] %s: %s\n%s", cid, code, str(err), traceback.format_exc()
+        )
         payload = {
             "errorCode": code,
             "errorMessage": message,
@@ -112,4 +137,3 @@ def register_error_handlers(app):
         }
         headers = {"x-correlation-id": cid} if cid else {}
         return jsonify(payload), status, headers
-
