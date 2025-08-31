@@ -1,4 +1,5 @@
 from flask import Blueprint, request
+from ..errors import ApiError
 from ..supabase_client import get_supabase
 from datetime import datetime
 
@@ -10,6 +11,10 @@ tasks_bp = Blueprint("tasks", __name__)
 def track_session():
     sb = get_supabase()
     data = request.json or {}
+    if not data.get("user_id"):
+        raise ApiError("AUTH_401", "Missing user id")
+    if not data.get("topic"):
+        raise ApiError("PLAN_400", "Missing topic")
     data["created_at"] = datetime.utcnow().isoformat()
     sb.table("sessions").insert(data).execute()
     # XP mechanic: +10 per 30 min
@@ -24,6 +29,8 @@ def complete_task():
     sb = get_supabase()
     data = request.json or {}
     task_id = data.get("task_id")
+    if not task_id:
+        raise ApiError("PLAN_400", "Missing task_id")
     sb.table("tasks").update({"status": "done"}).eq("id", task_id).execute()
     sb.rpc("add_xp", {"p_user_id": data.get("user_id"), "p_xp": 20}).execute()
     return {"ok": True}

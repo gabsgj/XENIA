@@ -1,11 +1,14 @@
 "use client"
 import { useState } from "react"
 import { API_BASE } from "@/lib/api"
+import { useErrorContext } from "@/lib/error-context"
+import { Button } from "@/components/ui/button"
 
 export default function UploadPage() {
   const [file, setFile] = useState<File | null>(null)
   const [type, setType] = useState<"syllabus" | "assessment">("syllabus")
   const [status, setStatus] = useState<string>("")
+  const { pushError } = useErrorContext()
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -14,7 +17,11 @@ export default function UploadPage() {
     form.append("file", file)
     form.append("user_id", "demo-user")
     const res = await fetch(`${API_BASE}/api/upload/${type}`, { method: "POST", body: form })
-    const data = await res.json()
+    const data = await res.json().catch(()=> null)
+    if (!res.ok) {
+      pushError({ errorCode: (data?.errorCode || (type === 'syllabus' ? 'SYLLABUS_PARSE_FAIL' : 'ASSESSMENT_PARSE_FAIL')), errorMessage: data?.errorMessage || data?.error || 'Upload failed', details: data })
+      return
+    }
     setStatus(JSON.stringify(data))
   }
 
@@ -27,7 +34,7 @@ export default function UploadPage() {
           <option value="assessment">Assessment</option>
         </select>
         <input className="block" type="file" accept=".pdf,.png,.jpg,.jpeg,.txt" onChange={(e)=> setFile(e.target.files?.[0] || null)} />
-        <button className="border rounded px-4 py-2" type="submit">Upload</button>
+        <Button type="submit">Upload</Button>
       </form>
       {status && <pre className="mt-4 whitespace-pre-wrap break-all">{status}</pre>}
     </div>

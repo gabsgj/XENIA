@@ -13,12 +13,14 @@ from .routes.tasks import tasks_bp
 from .routes.analytics import analytics_bp
 from .routes.teacher import teacher_bp
 from .routes.parent import parent_bp
+from .errors import register_error_handlers
 
 
 def create_app() -> Flask:
 	app = Flask(__name__)
 	CORS(app, supports_credentials=True)
 	load_config(app)
+	register_error_handlers(app)
 
 	# Register blueprints
 	app.register_blueprint(ingest_bp, url_prefix="/api/upload")
