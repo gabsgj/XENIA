@@ -6,15 +6,13 @@ import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Progress } from '@/components/ui/progress'
+
 import { MainLayout } from '@/components/navigation'
 import { 
   Calendar, 
   Clock, 
   RefreshCw, 
   Play, 
-  Pause, 
-  CheckCircle,
   MoreHorizontal,
   Filter
 } from 'lucide-react'

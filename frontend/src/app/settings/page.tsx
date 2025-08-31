@@ -17,9 +17,7 @@ import {
   Palette, 
   Globe,
   Trash2,
-  Save,
-  Eye,
-  EyeOff
+  Save
 } from 'lucide-react'
 
 export default function SettingsPage() {

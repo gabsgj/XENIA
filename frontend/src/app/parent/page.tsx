@@ -1,16 +1,15 @@
 'use client'
 
-import { useState } from 'react'
+
 import { MainLayout } from '@/components/navigation'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, BarChart, Bar } from 'recharts'
+import { ResponsiveContainer, XAxis, YAxis, Tooltip, BarChart, Bar } from 'recharts'
 import { 
   User, 
-  TrendingUp, 
   Clock, 
   Target, 
   Award,

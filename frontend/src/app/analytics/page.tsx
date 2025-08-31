@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { api } from '@/lib/api'
 import { useErrorContext } from '@/lib/error-context'
 import { 
@@ -10,9 +10,6 @@ import {
   XAxis, 
   YAxis, 
   Tooltip, 
-  PieChart, 
-  Pie, 
-  Cell,
   BarChart,
   Bar,
   LineChart,
@@ -29,20 +26,17 @@ import {
   Clock, 
   Target, 
   Award, 
-  Calendar,
-  BarChart3,
   Activity,
   Download
 } from 'lucide-react'
 
 export default function AnalyticsPage() {
-  const [data, setData] = useState<any>(null)
   const { pushError } = useErrorContext()
   
   useEffect(() => {
     (async () => {
       try {
-        setData(await api('/api/analytics/student?user_id=demo-user'))
+        await api('/api/analytics/student?user_id=demo-user')
       } catch (e: any) {
         pushError({
           errorCode: e?.errorCode || 'ANALYTICS_FAIL',
@@ -52,8 +46,6 @@ export default function AnalyticsPage() {
       }
     })()
   }, [pushError])
-
-  const chartColors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6']
 
   // Mock data for demonstration
   const mockData = {
@@ -230,7 +222,7 @@ export default function AnalyticsPage() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-6">
-                  {mockData.subjectMastery.map((subject, index) => (
+                  {mockData.subjectMastery.map((subject) => (
                     <div key={subject.subject} className="space-y-2">
                       <div className="flex items-center justify-between">
                         <h4 className="font-semibold">{subject.subject}</h4>
@@ -289,7 +281,7 @@ export default function AnalyticsPage() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-3">
-                    {mockData.performanceMetrics.strongTopics.map((topic, index) => (
+                    {mockData.performanceMetrics.strongTopics.map((topic) => (
                       <div key={topic} className="flex items-center gap-3 p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
                         <div className="w-2 h-2 bg-green-500 rounded-full"></div>
                         <span className="font-medium">{topic}</span>
@@ -310,7 +302,7 @@ export default function AnalyticsPage() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-3">
-                    {mockData.performanceMetrics.weakTopics.map((topic, index) => (
+                    {mockData.performanceMetrics.weakTopics.map((topic) => (
                       <div key={topic} className="flex items-center gap-3 p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
                         <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
                         <span className="font-medium">{topic}</span>

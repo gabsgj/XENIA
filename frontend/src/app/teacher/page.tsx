@@ -9,16 +9,12 @@ import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useErrorContext } from '@/lib/error-context'
 import { 
   Users, 
-  TrendingUp, 
   AlertTriangle, 
-  CheckCircle,
   Search,
   Plus,
-  BookOpen,
   Clock,
   Target,
   Award
@@ -33,7 +29,7 @@ export default function TeacherPage(){
   
   async function tagIt(){
     try {
-      const result = await api('/api/teacher/tag',{ 
+      await api('/api/teacher/tag',{ 
         method:'POST', 
         body: JSON.stringify({ user_id:'demo-user', teacher_id:'demo-teacher', topic, tag }) 
       })

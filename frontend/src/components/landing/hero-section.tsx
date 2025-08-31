@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -37,9 +38,9 @@ export function HeroSection() {
         </div>
         <div className="flex items-center gap-4">
           <div className="flex -space-x-2">
-            <img src="https://images.unsplash.com/photo-1633332755192-727a05c4013d?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3MzkyNDZ8MHwxfHNlYXJjaHwxfHx1c2VyfGVufDB8fHx8MTc1NjU5ODQ4Mnww&ixlib=rb-4.1.0&q=80&w=1080" alt="User" className="w-8 h-8 rounded-full border-2 border-background" />
-            <img src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3MzkyNDZ8MHwxfHNlYXJjaHwyfHx1c2VyfGVufDB8fHx8MTc1NjU5ODQ4Mnww&ixlib=rb-4.1.0&q=80&w=1080" alt="User" className="w-8 h-8 rounded-full border-2 border-background" />
-            <img src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3MzkyNDZ8MHwxfHNlYXJjaHwzfHx1c2VyfGVufDB8fHx8MTc1NjU5ODQ4Mnww&ixlib=rb-4.1.0&q=80&w=1080" alt="User" className="w-8 h-8 rounded-full border-2 border-background" />
+            <Image src="https://images.unsplash.com/photo-1633332755192-727a05c4013d?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3MzkyNDZ8MHwxfHNlYXJjaHwxfHx1c2VyfGVufDB8fHx8MTc1NjU5ODQ4Mnww&ixlib=rb-4.1.0&q=80&w=1080" alt="User" width={32} height={32} className="w-8 h-8 rounded-full border-2 border-background" />
+            <Image src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3MzkyNDZ8MHwxfHNlYXJjaHwyfHx1c2VyfGVufDB8fHx8MTc1NjU5ODQ4Mnww&ixlib=rb-4.1.0&q=80&w=1080" alt="User" width={32} height={32} className="w-8 h-8 rounded-full border-2 border-background" />
+            <Image src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3MzkyNDZ8MHwxfHNlYXJjaHwzfHx1c2VyfGVufDB8fHx8MTc1NjU5ODQ4Mnww&ixlib=rb-4.1.0&q=80&w=1080" alt="User" width={32} height={32} className="w-8 h-8 rounded-full border-2 border-background" />
           </div>
           <p className="text-sm text-muted-foreground">Trusted by 10,000+ students worldwide</p>
         </div>

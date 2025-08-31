@@ -7,13 +7,10 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
+
 import { 
   Upload, 
   FileText, 
-  Image, 
   X, 
   CheckCircle,
   AlertCircle,
@@ -67,7 +64,7 @@ export default function UploadPage() {
   }
 
   const getFileIcon = (file: File) => {
-    if (file.type.startsWith('image/')) return <Image className="w-5 h-5" />
+    if (file.type.startsWith('image/')) return <FileText className="w-5 h-5" />
     return <FileText className="w-5 h-5" />
   }
 
