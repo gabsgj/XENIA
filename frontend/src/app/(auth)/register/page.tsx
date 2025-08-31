@@ -8,7 +8,11 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useErrorContext } from "@/lib/error-context";
+import Link from "next/link";
+import { Eye, EyeOff, Mail, Lock, User } from "lucide-react";
 
 const RegisterSchema = z.object({
   email: z.string().email(),
@@ -22,7 +26,11 @@ export default function RegisterPage() {
   const router = useRouter();
   const { pushError } = useErrorContext();
   const [loading, setLoading] = useState(false);
-  const form = useForm<z.infer<typeof RegisterSchema>>({ resolver: zodResolver(RegisterSchema), defaultValues: { role: "student" } });
+  const [showPassword, setShowPassword] = useState(false);
+  const form = useForm<z.infer<typeof RegisterSchema>>({ 
+    resolver: zodResolver(RegisterSchema), 
+    defaultValues: { role: "student" } 
+  });
 
   async function onSubmit(values: z.infer<typeof RegisterSchema>) {
     setLoading(true);
@@ -42,23 +50,114 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="min-h-[60vh] flex items-center justify-center p-6">
-      <form onSubmit={form.handleSubmit(onSubmit)} className="w-full max-w-sm space-y-4">
-        <h2 className="text-2xl font-bold">Create account</h2>
-        <Input type="email" placeholder="Email" aria-label="Email" {...form.register("email")} />
-        {form.formState.errors.email && <p className="text-red-600 text-sm">{form.formState.errors.email.message}</p>}
-        <Input type="password" placeholder="Password" aria-label="Password" {...form.register("password")} />
-        {form.formState.errors.password && <p className="text-red-600 text-sm">{form.formState.errors.password.message}</p>}
-        <div>
-          <Label className="mb-2 block">Role</Label>
-          <select className="border p-2 rounded w-full" aria-label="Role" {...form.register("role")}>
-            <option value="student">Student</option>
-            <option value="teacher">Teacher</option>
-            <option value="parent">Parent</option>
-          </select>
+    <div className="min-h-screen flex items-center justify-center p-6 bg-muted/30">
+      <div className="w-full max-w-md">
+        {/* Header */}
+        <div className="text-center mb-8">
+          <Link href="/" className="inline-flex items-center gap-2 mb-6">
+            <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
+              <span className="text-primary-foreground font-bold">X</span>
+            </div>
+            <span className="font-bold text-2xl tracking-tight">XENIA</span>
+          </Link>
         </div>
-        <Button disabled={loading} type="submit">Register</Button>
-      </form>
+
+        <Card className="shadow-lg">
+          <CardHeader className="text-center">
+            <CardTitle className="text-2xl font-bold">Create your account</CardTitle>
+            <CardDescription>
+              Join thousands of students already using XENIA to study smarter
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                  <Input 
+                    id="email"
+                    type="email" 
+                    placeholder="Enter your email" 
+                    className="pl-10"
+                    {...form.register("email")} 
+                  />
+                </div>
+                {form.formState.errors.email && (
+                  <p className="text-destructive text-sm">{form.formState.errors.email.message}</p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="password">Password</Label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                  <Input 
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    placeholder="Create a password (min 6 characters)" 
+                    className="pl-10 pr-10"
+                    {...form.register("password")} 
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+                {form.formState.errors.password && (
+                  <p className="text-destructive text-sm">{form.formState.errors.password.message}</p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="role">I am a</Label>
+                <div className="relative">
+                  <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4 z-10" />
+                  <Select onValueChange={(value) => form.setValue("role", value as "student" | "teacher" | "parent")} defaultValue="student">
+                    <SelectTrigger className="pl-10">
+                      <SelectValue placeholder="Select your role" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="student">Student</SelectItem>
+                      <SelectItem value="teacher">Teacher</SelectItem>
+                      <SelectItem value="parent">Parent</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {form.formState.errors.role && (
+                  <p className="text-destructive text-sm">{form.formState.errors.role.message}</p>
+                )}
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <input type="checkbox" id="terms" className="rounded" required />
+                <Label htmlFor="terms" className="text-sm">
+                  I agree to the{" "}
+                  <Link href="/terms" className="text-primary hover:underline">Terms of Service</Link>
+                  {" "}and{" "}
+                  <Link href="/privacy" className="text-primary hover:underline">Privacy Policy</Link>
+                </Label>
+              </div>
+
+              <Button disabled={loading} type="submit" className="w-full" size="lg">
+                {loading ? "Creating account..." : "Create account"}
+              </Button>
+            </form>
+
+            <div className="mt-6 text-center">
+              <p className="text-sm text-muted-foreground">
+                Already have an account?{" "}
+                <Link href="/login" className="text-primary font-medium hover:underline">
+                  Sign in
+                </Link>
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
