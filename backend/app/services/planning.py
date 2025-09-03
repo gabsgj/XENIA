@@ -29,10 +29,15 @@ def _distribute_sessions(topics: List[Dict], days: int) -> List[Dict]:
 
 
 def generate_plan(user_id: str, horizon_days: int = 14) -> Dict:
-    # Check if mock mode is enabled
-    if is_mock_enabled():
+    # Prefer deriving weak topics from uploaded artifacts when available
+    try:
+        derived_weak = get_weak_topics(user_id)
+    except Exception:
+        derived_weak = []
+
+    if not derived_weak and is_mock_enabled():
+        # In mock mode, seed with deterministic topics so app remains functional
         mock_provider = get_mock_provider()
-        # Generate mock topics for planning
         mock_topics = [
             {"topic": "Algebra Fundamentals", "score": 3},
             {"topic": "Linear Equations", "score": 4},
@@ -49,7 +54,6 @@ def generate_plan(user_id: str, horizon_days: int = 14) -> Dict:
             sb = get_supabase()
             sb.table("plans").upsert({"user_id": user_id, "plan": plan}).execute()
         except Exception:
-            # Ignore persistence failures in mock mode
             pass
         return plan
     

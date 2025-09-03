@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { api } from '@/lib/api'
 import { useErrorContext } from '@/lib/error-context'
 import { 
@@ -47,7 +47,7 @@ export default function AnalyticsPage() {
     })()
   }, [pushError])
 
-  // Mock data for demonstration
+  // Mock data for fallback visuals
   const mockData = {
     weeklyProgress: [
       { week: 'Week 1', completed: 85, target: 100 },
@@ -78,7 +78,14 @@ export default function AnalyticsPage() {
       weakTopics: ['Organic Chemistry', 'Calculus Integration', 'Quantum Physics'],
       strongTopics: ['Linear Algebra', 'Cell Biology', 'Thermodynamics']
     }
-  }
+
+
+  // Derive metrics from data when available
+  const totalStudyTime = data ? (data.sessions || []).reduce((a:number,b:any)=> a + (b.duration_min||0), 0) : mockData.performanceMetrics.totalStudyTime
+  const completionRate = data ? Math.round(((data.tasks||[]).filter((t:any)=> t.status==='done').length / Math.max(1,(data.tasks||[]).length)) * 100) : mockData.performanceMetrics.completionRate
+  const streakDays = data?.profile?.streak_days ?? mockData.performanceMetrics.streakDays
+  const averageSessionLength = data && (data.sessions||[]).length ? Math.round(totalStudyTime / (data.sessions||[]).length) : mockData.performanceMetrics.averageSessionLength
+  const studyTimeSeries = (data?.sessions||[]).map((s:any)=> ({ date: (s.created_at||'').slice(0,10), minutes: s.duration_min||0 }))
 
   return (
     <MainLayout>
@@ -104,7 +111,7 @@ export default function AnalyticsPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground">Total Study Time</p>
-                  <p className="text-3xl font-bold">{mockData.performanceMetrics.totalStudyTime}<span className="text-lg font-normal">min</span></p>
+                  <p className="text-3xl font-bold">{totalStudyTime}<span className="text-lg font-normal">min</span></p>
                 </div>
                 <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/20 rounded-full flex items-center justify-center">
                   <Clock className="w-6 h-6 text-blue-600 dark:text-blue-400" />
@@ -118,7 +125,7 @@ export default function AnalyticsPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground">Completion Rate</p>
-                  <p className="text-3xl font-bold">{mockData.performanceMetrics.completionRate}<span className="text-lg font-normal">%</span></p>
+                  <p className="text-3xl font-bold">{completionRate}<span className="text-lg font-normal">%</span></p>
                 </div>
                 <div className="w-12 h-12 bg-green-100 dark:bg-green-900/20 rounded-full flex items-center justify-center">
                   <Target className="w-6 h-6 text-green-600 dark:text-green-400" />
@@ -132,7 +139,7 @@ export default function AnalyticsPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground">Current Streak</p>
-                  <p className="text-3xl font-bold">{mockData.performanceMetrics.streakDays}<span className="text-lg font-normal">days</span></p>
+                  <p className="text-3xl font-bold">{streakDays}<span className="text-lg font-normal">days</span></p>
                 </div>
                 <div className="w-12 h-12 bg-orange-100 dark:bg-orange-900/20 rounded-full flex items-center justify-center">
                   <Award className="w-6 h-6 text-orange-600 dark:text-orange-400" />
@@ -146,7 +153,7 @@ export default function AnalyticsPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground">Avg Session</p>
-                  <p className="text-3xl font-bold">{mockData.performanceMetrics.averageSessionLength}<span className="text-lg font-normal">min</span></p>
+                  <p className="text-3xl font-bold">{averageSessionLength}<span className="text-lg font-normal">min</span></p>
                 </div>
                 <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900/20 rounded-full flex items-center justify-center">
                   <Activity className="w-6 h-6 text-purple-600 dark:text-purple-400" />
@@ -195,7 +202,7 @@ export default function AnalyticsPage() {
                 <CardContent>
                   <div className="h-64">
                     <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={mockData.studyTime}>
+                      <LineChart data={studyTimeSeries.length?studyTimeSeries:mockData.studyTime}>
                         <XAxis dataKey="date" />
                         <YAxis />
                         <Tooltip />
@@ -251,7 +258,7 @@ export default function AnalyticsPage() {
               <CardContent>
                 <div className="h-80">
                   <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={mockData.studyTime}>
+                    <AreaChart data={studyTimeSeries.length?studyTimeSeries:mockData.studyTime}>
                       <XAxis dataKey="date" />
                       <YAxis />
                       <Tooltip />

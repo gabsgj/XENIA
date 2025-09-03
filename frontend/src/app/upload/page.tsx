@@ -7,6 +7,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
+import { API_BASE } from '@/lib/api'
+import { useErrorContext } from '@/lib/error-context'
 
 import { 
   Upload, 
@@ -23,6 +25,7 @@ export default function UploadPage() {
   const [files, setFiles] = useState<File[]>([])
   const [uploading, setUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
+  const { pushError } = useErrorContext()
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
     setFiles(prev => [...prev, ...acceptedFiles])
@@ -50,17 +53,34 @@ export default function UploadPage() {
     setUploading(true)
     setUploadProgress(0)
     
-    // Simulate upload progress
-    const interval = setInterval(() => {
-      setUploadProgress(prev => {
-        if (prev >= 100) {
-          clearInterval(interval)
-          setUploading(false)
-          return 100
+    try {
+      for (let i = 0; i < files.length; i++) {
+        const f = files[i]
+        const form = new FormData()
+        form.append('file', f)
+        form.append('user_id', 'demo-user')
+        const route = f.type.startsWith('image/') ? 'assessment' : 'syllabus'
+        const res = await fetch(`${API_BASE}/api/upload/${route}`, { method: 'POST', body: form })
+        const j = await res.json().catch(()=> null)
+        if(!res.ok){
+          throw {
+            errorCode: j?.errorCode || 'SYLLABUS_INVALID_FORMAT',
+            errorMessage: j?.errorMessage || 'Upload failed',
+            details: j
+          }
         }
-        return prev + 10
+        setUploadProgress(Math.round(((i+1)/files.length)*100))
+      }
+      setFiles([])
+    } catch (e:any) {
+      pushError({
+        errorCode: e?.errorCode || 'SYLLABUS_PARSE_FAIL',
+        errorMessage: e?.errorMessage || 'Upload failed',
+        details: e
       })
-    }, 200)
+    } finally {
+      setUploading(false)
+    }
   }
 
   const getFileIcon = (file: File) => {

@@ -8,6 +8,7 @@ from pdfminer.high_level import extract_text
 from pdf2image import convert_from_bytes
 from ..supabase_client import get_supabase
 from .embeddings import embed_texts
+from .ai_mock import get_mock_provider, is_mock_enabled
 
 
 def _extract_text_from_pdf(pdf_bytes: bytes) -> str:
@@ -53,35 +54,49 @@ def handle_upload(file_storage, user_id: str, artifact_type: str) -> Dict:
     else:
         text = data.decode("utf-8", errors="ignore")
 
-    # Upload raw file to storage
+    # Upload raw file to storage (mock-friendly)
     bucket = os.getenv("ARTIFACTS_BUCKET", "artifacts")
     object_path = f"{user_id}/{artifact_type}/{uuid.uuid4().hex}-{filename}"
     try:
         supabase.storage.from_(bucket).upload(object_path, data, {"contentType": mime})
     except Exception:
-        # Attempt to auto-create the bucket when using a service role key
         try:
-            supabase.storage.create_bucket(
-                bucket, {"public": False, "file_size_limit": "50mb"}
-            )
-            supabase.storage.from_(bucket).upload(
-                object_path, data, {"contentType": mime}
-            )
+            supabase.storage.create_bucket(bucket, {"public": False, "file_size_limit": "50mb"})
+            supabase.storage.from_(bucket).upload(object_path, data, {"contentType": mime})
         except Exception:
-            raise
+            # In strict environments without storage API, continue if mock mode
+            if not is_mock_enabled():
+                raise
 
     # Store metadata + extracted text (and embedding if available)
     record = {
-        "user_id": user_id,
+        "user_id": user_id or "demo-user",
         "artifact_type": artifact_type,
         "filename": filename,
         "storage_path": object_path,
         "mime_type": mime,
         "extracted_text": text,
     }
-    vectors = embed_texts([text])
+    vectors = embed_texts([text]) or []
     if vectors and len(vectors) == 1:
         record["embedding"] = vectors[0]
-    supabase.table("artifacts").insert(record).execute()
+    try:
+        supabase.table("artifacts").insert(record).execute()
+    except Exception:
+        # Ignore DB insert failures in mock mode
+        if not is_mock_enabled():
+            raise
 
-    return {"ok": True, "path": object_path, "chars": len(text)}
+    # Optionally return mock AI analysis signals for frontend
+    analysis = None
+    try:
+        if is_mock_enabled():
+            mock = get_mock_provider()
+            if artifact_type == "syllabus":
+                analysis = mock.analyze_syllabus(text)
+            elif artifact_type == "assessment":
+                analysis = mock.analyze_assessment(text)
+    except Exception:
+        analysis = None
+
+    return {"ok": True, "path": object_path, "chars": len(text), "analysis": analysis}
