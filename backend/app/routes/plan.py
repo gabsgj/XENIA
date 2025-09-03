@@ -13,9 +13,8 @@ def generate():
     logger.info("🎯 Generate plan endpoint called")
     uid = get_user_id_from_request(request) or ""
     if not uid:
-        # For demo purposes, use demo-user if no user_id provided
-        uid = "demo-user"
-        logger.info(f"   No user_id provided, defaulting to: {uid}")
+        logger.error("   Missing user_id in request")
+        raise ApiError("PLAN_400", "Missing user_id")
     else:
         logger.info(f"   User ID: {uid}")
     
