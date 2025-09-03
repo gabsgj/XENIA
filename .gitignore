@@ -24,8 +24,8 @@ dist-ssr
 *.sw?
 
 
-*.pyc
-
+*.pyc/*
+*.pyc*
 
 # Python caches
 **/__pycache__/
