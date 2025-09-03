@@ -32,11 +32,13 @@ import {
 
 export default function AnalyticsPage() {
   const { pushError } = useErrorContext()
+  const [data, setData] = useState<any | null>(null)
   
   useEffect(() => {
     (async () => {
       try {
-        await api('/api/analytics/student?user_id=demo-user')
+        const res = await api('/api/analytics/student?user_id=demo-user')
+        setData(res)
       } catch (e: any) {
         pushError({
           errorCode: e?.errorCode || 'ANALYTICS_FAIL',

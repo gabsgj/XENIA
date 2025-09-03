@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { api } from '@/lib/api'
 import { MainLayout } from '@/components/navigation'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
@@ -25,6 +25,24 @@ export default function TasksPage(){
   const [activeTimer, setActiveTimer] = useState<boolean>(false)
   const [timerMinutes, setTimerMinutes] = useState(0)
   const { pushError } = useErrorContext()
+  const [tasks, setTasks] = useState<any[]>([])
+  const [sessions, setSessions] = useState<any[]>([])
+
+  useEffect(()=>{
+    (async()=>{
+      try{
+        const data = await api('/api/analytics/student?user_id=demo-user')
+        setTasks(data.tasks||[])
+        setSessions(data.sessions||[])
+      }catch(e:any){
+        pushError({
+          errorCode: e?.errorCode||'CONTENT_API_FAIL',
+          errorMessage: e?.errorMessage,
+          details: e
+        })
+      }
+    })()
+  },[pushError])
 
   const mockTasks = [
     {
@@ -96,24 +114,24 @@ export default function TasksPage(){
                 <CardDescription>Your current study tasks and progress</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                {mockTasks.map((task) => (
+                {(tasks.length?tasks:mockTasks).map((task:any) => (
                   <div key={task.id} className="p-4 border rounded-lg hover:bg-muted/50 transition-all">
                     <div className="flex items-center justify-between mb-3">
-                      <h3 className="font-semibold">{task.title}</h3>
-                      <Badge variant={task.status === 'completed' ? 'success' : task.status === 'in-progress' ? 'warning' : 'secondary'}>
-                        {task.status}
+                      <h3 className="font-semibold">{task.title||task.topic}</h3>
+                      <Badge variant={task.status === 'done' ? 'success' : task.status === 'in-progress' ? 'warning' : 'secondary'}>
+                        {task.status||'pending'}
                       </Badge>
                     </div>
-                    <p className="text-sm text-muted-foreground mb-3">{task.subject}</p>
+                    <p className="text-sm text-muted-foreground mb-3">{task.subject||'General'}</p>
                     <div className="space-y-2 mb-4">
                       <div className="flex justify-between text-sm">
                         <span>Progress</span>
-                        <span>{task.progress}%</span>
+                        <span>{task.progress||0}%</span>
                       </div>
-                      <Progress value={task.progress} className="h-2" />
+                      <Progress value={task.progress||0} className="h-2" />
                       <div className="flex justify-between text-xs text-muted-foreground">
-                        <span>{task.completedTime} min completed</span>
-                        <span>{task.estimatedTime} min total</span>
+                        <span>{task.completedTime||0} min completed</span>
+                        <span>{task.estimatedTime||30} min total</span>
                       </div>
                     </div>
                     {task.status !== 'completed' && (
@@ -198,14 +216,14 @@ export default function TasksPage(){
               <CardContent className="space-y-4">
                 <div className="flex items-center justify-between">
                   <span className="text-sm">Tasks Completed</span>
-                  <span className="font-semibold">1/3</span>
+                  <span className="font-semibold">{tasks.filter(t=>t.status==='done').length}/{tasks.length||3}</span>
                 </div>
-                <Progress value={33} className="h-2" />
+                <Progress value={tasks.length? Math.round((tasks.filter(t=>t.status==='done').length/Math.max(1,tasks.length))*100):33} className="h-2" />
                 <div className="flex items-center justify-between">
                   <span className="text-sm">Study Time Goal</span>
-                  <span className="font-semibold">120/180 min</span>
+                  <span className="font-semibold">{sessions.reduce((a,b)=>a+(b.duration_min||0),0)}/180 min</span>
                 </div>
-                <Progress value={67} className="h-2" />
+                <Progress value={Math.min(100, Math.round((sessions.reduce((a,b)=>a+(b.duration_min||0),0)/180)*100))} className="h-2" />
               </CardContent>
             </Card>
           </div>
