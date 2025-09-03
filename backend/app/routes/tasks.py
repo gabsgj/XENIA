@@ -2,7 +2,7 @@ import logging
 from flask import Blueprint, request
 from ..errors import ApiError
 from ..supabase_client import get_supabase
-from datetime import datetime
+from datetime import datetime, timezone
 
 logger = logging.getLogger('xenia')
 tasks_bp = Blueprint("tasks", __name__)
@@ -31,7 +31,8 @@ def track_session():
     
     try:
         logger.info("   Inserting session into database...")
-        data["created_at"] = datetime.utcnow().isoformat()
+        # Store timezone-aware UTC timestamp
+        data["created_at"] = datetime.now(timezone.utc).isoformat()
         sb.table("sessions").insert(data).execute()
         logger.info("   Session inserted successfully")
         

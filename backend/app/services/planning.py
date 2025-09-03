@@ -1,5 +1,5 @@
 from typing import Dict, List
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from ..supabase_client import get_supabase
 from .weaktopics import get_weak_topics
 from .ai_mock import get_mock_provider, is_mock_enabled
@@ -7,7 +7,8 @@ from .ai_mock import get_mock_provider, is_mock_enabled
 
 def _distribute_sessions(topics: List[Dict], days: int) -> List[Dict]:
     sessions = []
-    today = datetime.utcnow().date()
+    # Use timezone-aware UTC date (avoids deprecated datetime.utcnow())
+    today = datetime.now(timezone.utc).date()
     total = max(1, sum(max(1, t.get("score", 1)) for t in topics))
     for idx, t in enumerate(topics):
         weight = max(1, t.get("score", 1))
@@ -47,7 +48,7 @@ def generate_plan(user_id: str, horizon_days: int = 14) -> Dict:
         ]
         plan = mock_provider.generate_study_plan(mock_topics, horizon_days)
         plan["user_id"] = user_id
-        plan["generated_at"] = datetime.utcnow().isoformat()
+        plan["generated_at"] = datetime.now(timezone.utc).isoformat()
         plan["weak_topics"] = mock_topics
         # Store in database (best-effort)
         try:
@@ -68,7 +69,7 @@ def generate_plan(user_id: str, horizon_days: int = 14) -> Dict:
     sessions = _distribute_sessions(weak, horizon_days)
     plan = {
         "user_id": user_id,
-        "generated_at": datetime.utcnow().isoformat(),
+        "generated_at": datetime.now(timezone.utc).isoformat(),
         "horizon_days": horizon_days,
         "weak_topics": weak,
         "sessions": sessions,
