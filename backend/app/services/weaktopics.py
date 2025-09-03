@@ -69,8 +69,48 @@ def get_remediation_steps(user_id: str, question_text: str) -> List[Dict]:
         response = mock_provider.get_tutor_response(question_text)
         return response.get("steps", [])
     
-    # Very lightweight deterministic step generator as a fallback
-    # 1) Identify concepts by noun phrases (naive split)
+    # Use real AI for tutor responses when not in mock mode
+    from .ai_providers import get_ai_response
+    
+    try:
+        # Create a structured prompt for step-by-step tutoring
+        prompt = f"""
+You are an AI tutor. A student has asked: "{question_text}"
+
+Provide a step-by-step solution in JSON format with this structure:
+{{
+  "steps": [
+    {{
+      "title": "Step title",
+      "detail": "Detailed explanation of this step"
+    }}
+  ]
+}}
+
+Focus on:
+1. Understanding the problem
+2. Identifying key concepts
+3. Breaking down the solution
+4. Providing clear explanations
+
+Keep each step concise but educational.
+"""
+        
+        response = get_ai_response(prompt)
+        
+        # Try to parse JSON response
+        import json
+        try:
+            parsed = json.loads(response)
+            if "steps" in parsed and isinstance(parsed["steps"], list):
+                return parsed["steps"]
+        except json.JSONDecodeError:
+            pass
+            
+    except Exception as e:
+        print(f"AI tutor error: {e}")
+    
+    # Fallback to simple deterministic steps
     concepts = [
         w.strip(",.;:!?") for w in question_text.split() if len(w) > 4
     ]
@@ -97,7 +137,7 @@ def get_remediation_steps(user_id: str, question_text: str) -> List[Dict]:
         {
             "title": "Recall key concepts",
             "detail": (
-                f"Review: {", ".join(concepts) if concepts else "core definitions and formulas"}."
+                f"Review: {', '.join(concepts) if concepts else 'core definitions and formulas'}."
             ),
         }
     )

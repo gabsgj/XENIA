@@ -13,11 +13,27 @@ def student_analytics():
     sb = get_supabase()
     user_id = request.args.get("user_id", "")
     if not user_id:
-        # Default to demo-user for demo purposes
-        user_id = "demo-user"
-        logger.info(f"   No user_id provided, defaulting to: {user_id}")
+        # Generate a valid UUID for demo purposes
+        import uuid
+        user_id = str(uuid.uuid4())
+        logger.info(f"   No user_id provided, generating demo UUID: {user_id}")
     else:
         logger.info(f"   User ID: {user_id}")
+        
+    # Validate UUID format
+    try:
+        import uuid
+        if user_id == "demo-user":
+            # Convert demo-user to a valid UUID
+            user_id = str(uuid.uuid4())
+            logger.info(f"   Converting demo-user to valid UUID: {user_id}")
+        else:
+            # Validate existing UUID
+            uuid.UUID(user_id)
+    except ValueError:
+        # Generate valid UUID if invalid format
+        user_id = str(uuid.uuid4())
+        logger.info(f"   Invalid UUID format, generating new one: {user_id}")
     
     try:
         logger.info("   Fetching sessions data...")

@@ -87,7 +87,7 @@ def handle_upload(file_storage, user_id: str, artifact_type: str) -> Dict:
         if not is_mock_enabled():
             raise
 
-    # Optionally return mock AI analysis signals for frontend
+    # Return AI analysis for frontend
     analysis = None
     try:
         if is_mock_enabled():
@@ -96,7 +96,15 @@ def handle_upload(file_storage, user_id: str, artifact_type: str) -> Dict:
                 analysis = mock.analyze_syllabus(text)
             elif artifact_type == "assessment":
                 analysis = mock.analyze_assessment(text)
-    except Exception:
+        else:
+            # Use real AI analysis when not in mock mode
+            from .ai_providers import get_syllabus_analysis, get_assessment_analysis
+            if artifact_type == "syllabus":
+                analysis = get_syllabus_analysis(text)
+            elif artifact_type == "assessment":
+                analysis = get_assessment_analysis(text)
+    except Exception as e:
+        print(f"Analysis error: {e}")
         analysis = None
 
     return {"ok": True, "path": object_path, "chars": len(text), "analysis": analysis}
