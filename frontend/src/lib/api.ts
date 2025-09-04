@@ -47,14 +47,10 @@ function buildApiError(path: string, status: number, bodyText: string, jsonBody:
 async function getAuthHeaders(): Promise<Record<string, string>> {
   try {
     if (typeof window === "undefined") return {};
-    const envUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const envKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-    if (!envUrl || !envKey) return {};
-    const { getSupabaseClient } = await import("@/lib/supabaseClient");
-    const supabase = await getSupabaseClient();
-    const { data } = await supabase.auth.getSession();
-    const userId = data.session?.user?.id;
-    if (!userId) return {};
+    
+    // Use the consistent getUserId function for authentication
+    const userId = getUserId();
+    
     return { "X-User-Id": userId };
   } catch {
     return {};
