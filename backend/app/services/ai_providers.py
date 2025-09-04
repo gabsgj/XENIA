@@ -15,14 +15,23 @@ def get_ai_response(prompt: str, model: Optional[str] = None) -> str:
     import logging
     logger = logging.getLogger('xenia')
     
-    # Try Gemini first (since we have API key)
-    gemini_key = os.getenv("GEMINI_API_KEY")
-    logger.info(f"🤖 Attempting Gemini API call with key: {'✅ Present' if gemini_key else '❌ Missing'}")
+    # Check if AI mock mode is explicitly enabled
+    if os.getenv("AI_MOCK", "false").lower() == "true":
+        logger.info("🎭 AI Mock mode explicitly enabled - using mock responses")
+        from .ai_mock import get_mock_provider
+        return get_mock_provider().get_tutor_response(prompt)["explanation"]
     
-    if gemini_key and gemini_key.strip():
+    # Try Gemini first
+    gemini_key = os.getenv("GEMINI_API_KEY")
+    is_demo_gemini = (gemini_key and ("demo" in gemini_key.lower() or 
+                                      gemini_key.startswith("AIzaSyDemo_")))
+    
+    logger.info(f"🤖 Gemini API key: {'✅ Real' if gemini_key and not is_demo_gemini else '🎭 Demo/Missing' if gemini_key else '❌ Missing'}")
+    
+    if gemini_key and gemini_key.strip() and not is_demo_gemini:
         try:
             import google.generativeai as genai
-            logger.info("   Configuring Gemini API...")
+            logger.info("   Configuring real Gemini API...")
             genai.configure(api_key=gemini_key.strip())
             
             logger.info("   Creating Gemini model...")
@@ -51,56 +60,68 @@ def get_ai_response(prompt: str, model: Optional[str] = None) -> str:
     
     # Try OpenAI
     openai_key = os.getenv("OPENAI_API_KEY")
-    if openai_key and openai_key.strip():
+    is_demo_openai = (openai_key and ("demo" in openai_key.lower() or 
+                                      openai_key.startswith("sk-demo-")))
+    
+    logger.info(f"🤖 OpenAI API key: {'✅ Real' if openai_key and not is_demo_openai else '🎭 Demo/Missing' if openai_key else '❌ Missing'}")
+    
+    if openai_key and openai_key.strip() and not is_demo_openai:
         try:
             from openai import OpenAI
+            logger.info("   Using real OpenAI API...")
             client = OpenAI(api_key=openai_key.strip())
             response = client.chat.completions.create(
                 model="gpt-3.5-turbo",
                 messages=[{"role": "user", "content": prompt}],
                 max_tokens=1000
             )
+            logger.info(f"   ✅ OpenAI response received: {len(response.choices[0].message.content)} characters")
             return response.choices[0].message.content
         except Exception as e:
             logger.error(f"   ❌ OpenAI API error: {e}")
     
     # Try Anthropic
     anthropic_key = os.getenv("ANTHROPIC_API_KEY")
-    if anthropic_key and anthropic_key.strip():
+    is_demo_anthropic = (anthropic_key and ("demo" in anthropic_key.lower() or 
+                                            anthropic_key.startswith("sk-ant-demo-")))
+    
+    logger.info(f"🤖 Anthropic API key: {'✅ Real' if anthropic_key and not is_demo_anthropic else '🎭 Demo/Missing' if anthropic_key else '❌ Missing'}")
+    
+    if anthropic_key and anthropic_key.strip() and not is_demo_anthropic:
         try:
             import anthropic
+            logger.info("   Using real Anthropic API...")
             client = anthropic.Anthropic(api_key=anthropic_key.strip())
             response = client.messages.create(
                 model="claude-3-sonnet-20240229",
                 max_tokens=1000,
                 messages=[{"role": "user", "content": prompt}]
             )
+            logger.info(f"   ✅ Anthropic response received: {len(response.content[0].text)} characters")
             return response.content[0].text
         except Exception as e:
             logger.error(f"   ❌ Anthropic API error: {e}")
     
-    # Fallback response if no API keys work
-    logger.warning("   ⚠️ Using fallback response - no AI APIs available")
-    return json.dumps({
-        "steps": [
-            {
-                "title": "Understand the problem",
-                "detail": "Break down what the question is asking step by step."
-            },
-            {
-                "title": "Apply relevant concepts", 
-                "detail": "Use the appropriate formulas, theorems, or methods to solve this problem."
-            },
-            {
-                "title": "Show your work",
-                "detail": "Work through the solution systematically, showing each calculation."
-            },
-            {
-                "title": "Check your answer",
-                "detail": "Verify your solution makes sense and satisfies the original problem."
-            }
-        ]
-    })
+    # Fallback to intelligent mock if no real APIs are available
+    logger.warning("   🎭 No real AI APIs available - using intelligent mock fallback")
+    logger.info("   💡 To use real AI: Set GEMINI_API_KEY, OPENAI_API_KEY, or ANTHROPIC_API_KEY with valid keys")
+    
+    # Use the mock provider for consistent fallback behavior
+    from .ai_mock import get_mock_provider
+    mock_response = get_mock_provider().get_tutor_response(prompt)
+    
+    # Return a more natural response format that matches real AI output
+    return f"""Based on your question: {prompt[:100]}{'...' if len(prompt) > 100 else ''}
+
+{mock_response['explanation']}
+
+Steps to solve this:
+1. {mock_response['steps'][0] if mock_response.get('steps') else 'Identify the key concepts involved'}
+2. {mock_response['steps'][1] if len(mock_response.get('steps', [])) > 1 else 'Apply the appropriate method or formula'}
+3. {mock_response['steps'][2] if len(mock_response.get('steps', [])) > 2 else 'Work through the solution step by step'}
+4. {mock_response['steps'][3] if len(mock_response.get('steps', [])) > 3 else 'Verify your answer makes sense'}
+
+Note: This is a fallback response. For enhanced AI tutoring, configure real API keys."""
 
 def filter_and_prioritize_topics(extracted_topics: list, syllabus_content: str, user_preferences: Dict = None) -> Dict[str, Any]:
     """Use Gemini AI to intelligently filter and prioritize extracted topics."""
