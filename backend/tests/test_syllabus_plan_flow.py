@@ -53,8 +53,18 @@ def app_client(monkeypatch):
     class DummyStore:
         topics = []
         artifacts = []
+    
+    # Reset store for clean test state
+    DummyStore.topics = []
+    DummyStore.artifacts = []
     from app import supabase_client as sc
     monkeypatch.setattr(sc, 'get_supabase', lambda: DummySupabase())
+    # Also patch the direct import used in ingestion.py
+    from app.services import ingestion
+    monkeypatch.setattr(ingestion, 'get_supabase', lambda: DummySupabase())
+    # Also patch the direct import used in planning.py
+    from app.services import planning
+    monkeypatch.setattr(planning, 'get_supabase', lambda: DummySupabase())
     # Avoid external embeddings (speed & determinism)
     from app.services import embeddings
     monkeypatch.setattr(embeddings, 'embed_texts', lambda texts, model=None: [])
@@ -73,7 +83,7 @@ def test_syllabus_upload_generates_plan(app_client):
     assert body['ok'] is True
     assert len(body['topics']) >= 2
     # Force plan fetch (should regenerate using stored topics)
-    p = client.get('/api/plan/current', headers={'X-User-Id':'00000000-0000-0000-000000000000'})
+    p = client.get('/api/plan/current', headers={'X-User-Id':'00000000-0000-0000-0000-000000000001'})
     assert p.status_code == 200
     plan = p.get_json()
     assert 'sessions' in plan
