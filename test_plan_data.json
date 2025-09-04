@@ -1,0 +1,19 @@
+{
+  "user_id": "test-user-production-123",
+  "horizon_days": 7,
+  "preferred_hours_per_day": 2.0,
+  "topics": [
+    {
+      "topic": "Linear Algebra",
+      "importance": 0.9,
+      "difficulty": 0.8,
+      "hours_needed": 8
+    },
+    {
+      "topic": "Calculus",
+      "importance": 0.8,
+      "difficulty": 0.7,
+      "hours_needed": 6
+    }
+  ]
+}
