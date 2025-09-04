@@ -4,11 +4,11 @@ const nextConfig: NextConfig = {
   /* config options here */
   output: 'standalone',
   eslint: {
-    // Disable ESLint during builds for Docker
+    // Disable ESLint during builds for production
     ignoreDuringBuilds: true,
   },
   typescript: {
-    // Disable TypeScript checks during builds for Docker  
+    // Disable TypeScript checks during builds for production  
     ignoreBuildErrors: true,
   },
   images: {

@@ -320,16 +320,9 @@ npm run build    # Production build
 npm run start    # Production server
 ```
 
-### Docker Support
-```bash
-docker build -t xenia-frontend .
-docker run -p 3000:3000 xenia-frontend
-```
-
 ### Environment Setup
 - Development: `npm run dev`
 - Production: `npm run build && npm start`
-- Docker: Multi-stage build for optimization
 
 ## 📊 Performance
 

@@ -42,7 +42,6 @@ XENIA transforms how students learn by providing AI-powered personalized study p
 - **Node.js 18+** with npm
 - **Supabase account** (free tier available)
 - **Google AI API key** for Gemini 2.0 Flash
-- **Optional**: Docker for containerized deployment
 
 ### 🛠️ Installation Guide
 
@@ -110,15 +109,6 @@ npm run dev
 - **Backend API**: http://localhost:8000
 - **Upload Interface**: http://localhost:3000/upload
 - **Study Planner**: http://localhost:3000/planner
-
-### 🐳 **Docker Deployment**
-```bash
-# Quick start with Docker Compose
-docker-compose up --build
-
-# Development with hot reloading
-docker-compose -f docker-compose.yml -f docker-compose.override.yml up --build
-```
 
 ## 📱 User Guide
 
@@ -282,16 +272,6 @@ python test_ai_filtering_demo.py
 export FLASK_ENV=production
 export GEMINI_API_KEY=your_production_key
 export SUPABASE_URL=your_production_url
-```
-
-#### 3. **Docker Deployment**
-```bash
-# Build production images
-docker build -t xenia-backend ./backend
-docker build -t xenia-frontend ./frontend
-
-# Deploy to your preferred platform
-# (Vercel, Railway, AWS, etc.)
 ```
 
 ### **Monitoring & Logs**
