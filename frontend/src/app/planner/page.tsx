@@ -24,6 +24,12 @@ export default function PlannerPage() {
   const [hoursPerDay, setHoursPerDay] = useState(1.5)
   const [deadline, setDeadline] = useState('')
   const [loading, setLoading] = useState(false)
+  
+  // Progress tracking state
+  const [completedSessions, setCompletedSessions] = useState<Set<string>>(new Set())
+  const [sessionProgress, setSessionProgress] = useState<Record<string, number>>({})
+  const [totalTimeSpent, setTotalTimeSpent] = useState(0)
+  
   const { pushError } = useErrorContext()
   
   useEffect(()=>{ 
@@ -37,6 +43,51 @@ export default function PlannerPage() {
         setPlan(p)
         setTopics(t.topics||[])
         setResources(r.resources||[])
+        
+        // Also fetch topic-specific resources for current plan topics
+        if (p?.sessions?.length > 0) {
+          const uniqueTopics = [...new Set(p.sessions.map((s:any) => s.topic))] as string[]
+          const topicResourcePromises = uniqueTopics.slice(0, 5).map(async (topic: string) => {
+            try {
+              const topicRes = await api(`/api/plan/resources/${encodeURIComponent(topic)}?learning_style=balanced`)
+              return { topic, resources: topicRes.resources || {} }
+            } catch (e) {
+              console.warn(`Failed to fetch resources for topic: ${topic}`, e)
+              return { topic, resources: {} }
+            }
+          })
+          
+          const topicResourcesResults = await Promise.allSettled(topicResourcePromises)
+          const additionalResources: any[] = []
+          
+          topicResourcesResults.forEach((result) => {
+            if (result.status === 'fulfilled' && result.value?.resources) {
+              const { topic, resources: topicRes } = result.value
+              
+              // Extract different types of resources
+              Object.entries(topicRes).forEach(([category, resourceList]: [string, any]) => {
+                if (Array.isArray(resourceList)) {
+                  resourceList.forEach((resource: any) => {
+                    additionalResources.push({
+                      ...resource,
+                      topic: topic,
+                      source: category.includes('youtube') || category.includes('videos') ? 'youtube' : 
+                             category.includes('articles') ? 'article' : 
+                             category.includes('documentation') ? 'docs' : 'general'
+                    })
+                  })
+                }
+              })
+            }
+          })
+          
+          // Merge with existing resources, avoiding duplicates
+          setResources(prev => {
+            const existingUrls = new Set(prev.map(r => r.url))
+            const newResources = additionalResources.filter(r => !existingUrls.has(r.url))
+            return [...prev, ...newResources]
+          })
+        }
       } catch(e:any){ 
         pushError({ 
           errorCode: e?.errorCode||'PLAN_400', 
@@ -62,6 +113,48 @@ export default function PlannerPage() {
       }) 
     } finally {
       setLoading(false)
+    }
+  }
+
+  // Progress tracking functions
+  const markSessionComplete = (sessionId: string, timeSpent: number = 0) => {
+    setCompletedSessions(prev => new Set([...prev, sessionId]))
+    setSessionProgress(prev => ({ ...prev, [sessionId]: 100 }))
+    setTotalTimeSpent(prev => prev + timeSpent)
+    updateProgressOnBackend()
+  }
+
+  const updateSessionProgress = (sessionId: string, percentage: number) => {
+    setSessionProgress(prev => ({ ...prev, [sessionId]: percentage }))
+    if (percentage >= 100) {
+      setCompletedSessions(prev => new Set([...prev, sessionId]))
+    }
+  }
+
+  const updateProgressOnBackend = async () => {
+    try {
+      const totalSessions = plan?.sessions?.length || 0
+      const completionPercentage = totalSessions > 0 ? (completedSessions.size / totalSessions) * 100 : 0
+      
+      const progressData = {
+        completion_percentage: completionPercentage,
+        sessions_completed: completedSessions.size,
+        time_spent_hours: totalTimeSpent,
+        completed_topics: Array.from(completedSessions),
+        preferred_pace: hoursPerDay >= 3 ? "fast" : hoursPerDay <= 1.5 ? "slow" : "normal"
+      }
+
+      const adjustedPlan = await api('/api/plan/update-progress', {
+        method: 'POST',
+        body: JSON.stringify(progressData)
+      })
+
+      if (adjustedPlan.adjusted_plan) {
+        console.log('Plan automatically adjusted based on progress!', adjustedPlan)
+        // Could update the plan here or show a notification
+      }
+    } catch (e) {
+      console.error('Failed to sync progress:', e)
     }
   }
 
@@ -158,11 +251,37 @@ export default function PlannerPage() {
                             </Badge>
                           </div>
                           <p className='text-xs text-muted-foreground mb-2'>{s.focus}</p>
+                          
+                          {/* Resource suggestions for this topic */}
+                          {resources.filter((r:any) => r.topic === s.topic || s.topic.toLowerCase().includes(r.topic.toLowerCase()) || r.topic.toLowerCase().includes(s.topic.toLowerCase())).slice(0, 2).map((resource:any, rIdx:number) => (
+                            <div key={rIdx} className="mb-2 p-2 bg-blue-50 dark:bg-blue-950 rounded border-l-2 border-blue-500">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-medium text-blue-700 dark:text-blue-300">
+                                  {resource.source === 'youtube' ? '📺' : '📖'} {resource.source.toUpperCase()}
+                                </span>
+                              </div>
+                              <a href={resource.url} target="_blank" rel="noopener noreferrer" 
+                                 className="text-xs text-blue-600 dark:text-blue-400 hover:underline block truncate">
+                                {resource.title}
+                              </a>
+                            </div>
+                          ))}
+
                           <div className="flex items-center justify-between">
                             <span className='text-xs text-muted-foreground'>{s.duration_min} min</span>
-                            <Button size="sm" variant="ghost" className="h-6 px-2" onClick={()=> markSession(s.date, s.topic, s.status==='completed'?'pending':'completed')}>
-                              <Play className="w-3 h-3" />
-                            </Button>
+                            <div className="flex gap-1">
+                              {resources.filter((r:any) => r.topic === s.topic || s.topic.toLowerCase().includes(r.topic.toLowerCase()) || r.topic.toLowerCase().includes(s.topic.toLowerCase())).length > 0 && (
+                                <Button size="sm" variant="ghost" className="h-6 px-2 text-xs" onClick={() => {
+                                  const topicResources = resources.filter((r:any) => r.topic === s.topic || s.topic.toLowerCase().includes(r.topic.toLowerCase()) || r.topic.toLowerCase().includes(s.topic.toLowerCase()))
+                                  alert(`Resources for ${s.topic}:\n\n${topicResources.map(r => `${r.source.toUpperCase()}: ${r.title}\n${r.url}`).join('\n\n')}`)
+                                }}>
+                                  📚
+                                </Button>
+                              )}
+                              <Button size="sm" variant="ghost" className="h-6 px-2" onClick={()=> markSession(s.date, s.topic, s.status==='completed'?'pending':'completed')}>
+                                <Play className="w-3 h-3" />
+                              </Button>
+                            </div>
                           </div>
                         </div>
                       ))}
@@ -187,6 +306,7 @@ export default function PlannerPage() {
                           <th className='text-left p-3 font-semibold'>Topic</th>
                           <th className='text-left p-3 font-semibold'>Focus Area</th>
                           <th className='text-left p-3 font-semibold'>Duration</th>
+                          <th className='text-left p-3 font-semibold'>Resources</th>
                           <th className='text-left p-3 font-semibold'>Status</th>
                           <th className='text-left p-3 font-semibold'>Actions</th>
                         </tr>
@@ -199,6 +319,17 @@ export default function PlannerPage() {
                             <td className='p-3 text-muted-foreground'>{s.focus}</td>
                             <td className='p-3'>
                               <Badge variant="outline">{s.duration_min} min</Badge>
+                            </td>
+                            <td className='p-3'>
+                              {resources.filter((r:any) => r.topic === s.topic || s.topic.toLowerCase().includes(r.topic.toLowerCase()) || r.topic.toLowerCase().includes(s.topic.toLowerCase())).slice(0, 1).map((resource:any, rIdx:number) => (
+                                <a key={rIdx} href={resource.url} target="_blank" rel="noopener noreferrer" 
+                                   className="text-blue-600 dark:text-blue-400 hover:underline text-xs flex items-center gap-1">
+                                  {resource.source === 'youtube' ? '📺' : '📖'} {resource.title.substring(0, 30)}...
+                                </a>
+                              ))}
+                              {resources.filter((r:any) => r.topic === s.topic || s.topic.toLowerCase().includes(r.topic.toLowerCase()) || r.topic.toLowerCase().includes(s.topic.toLowerCase())).length === 0 && (
+                                <span className="text-xs text-muted-foreground">No resources</span>
+                              )}
                             </td>
                             <td className='p-3'>
                               <Badge variant={getStatusColor(s.status || 'pending')}>
@@ -233,6 +364,28 @@ export default function PlannerPage() {
                             </Badge>
                           </div>
                           <p className="text-muted-foreground text-sm mb-2">{s.focus}</p>
+                          
+                          {/* Resource suggestions */}
+                          {resources.filter((r:any) => r.topic === s.topic || s.topic.toLowerCase().includes(r.topic.toLowerCase()) || r.topic.toLowerCase().includes(s.topic.toLowerCase())).slice(0, 3).length > 0 && (
+                            <div className="mb-3">
+                              <h4 className="text-xs font-semibold text-muted-foreground mb-2">📚 Recommended Resources:</h4>
+                              <div className="grid gap-2">
+                                {resources.filter((r:any) => r.topic === s.topic || s.topic.toLowerCase().includes(r.topic.toLowerCase()) || r.topic.toLowerCase().includes(s.topic.toLowerCase())).slice(0, 3).map((resource:any, rIdx:number) => (
+                                  <div key={rIdx} className="flex items-center gap-2 p-2 bg-blue-50 dark:bg-blue-950 rounded">
+                                    <span className="text-xs">
+                                      {resource.source === 'youtube' ? '📺' : resource.source === 'ocw' ? '🎓' : '📖'}
+                                    </span>
+                                    <a href={resource.url} target="_blank" rel="noopener noreferrer" 
+                                       className="text-xs text-blue-600 dark:text-blue-400 hover:underline flex-1 truncate">
+                                      {resource.title}
+                                    </a>
+                                    <span className="text-xs text-muted-foreground">{resource.source}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
                           <div className="flex items-center gap-4 text-sm text-muted-foreground">
                             <span className="flex items-center gap-1">
                               <Calendar className="w-3 h-3" />
@@ -272,6 +425,62 @@ export default function PlannerPage() {
                 <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
                 {loading ? 'Generating Plan...' : 'Generate Study Plan'}
               </Button>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Dedicated Resources Section */}
+        {resources.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <span>📚</span>
+                Study Resources
+              </CardTitle>
+              <CardDescription>
+                AI-curated learning materials including YouTube videos, articles, and practice resources
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {resources.slice(0, 12).map((resource:any, idx:number) => (
+                  <div key={idx} className="border rounded-lg p-4 hover:shadow-md transition-all">
+                    <div className="flex items-start gap-3">
+                      <span className="text-2xl">
+                        {resource.source === 'youtube' ? '📺' : resource.source === 'ocw' ? '🎓' : '📖'}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Badge variant="outline" className="text-xs">
+                            {resource.source.toUpperCase()}
+                          </Badge>
+                          <span className="text-xs text-muted-foreground">
+                            Topic: {resource.topic}
+                          </span>
+                        </div>
+                        <h4 className="font-medium text-sm mb-2 line-clamp-2">
+                          {resource.title}
+                        </h4>
+                        <a 
+                          href={resource.url} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="text-blue-600 dark:text-blue-400 hover:underline text-xs"
+                        >
+                          View Resource →
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {resources.length > 12 && (
+                <div className="text-center mt-4">
+                  <p className="text-sm text-muted-foreground">
+                    Showing 12 of {resources.length} resources
+                  </p>
+                </div>
+              )}
             </CardContent>
           </Card>
         )}

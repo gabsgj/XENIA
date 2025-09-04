@@ -40,6 +40,7 @@ create table if not exists syllabus_topics (
   source_artifact uuid references artifacts(id) on delete set null,
   status text default 'pending' check (status in ('pending','in-progress','completed')),
   completed_at timestamp with time zone,
+  metadata jsonb, -- AI-enhanced topic analysis data
   created_at timestamp with time zone default now()
 );
 

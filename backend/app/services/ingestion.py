@@ -105,38 +105,109 @@ def handle_upload(file_storage, user_id: str, artifact_type: str) -> Dict:
     if artifact_type == "syllabus":
         # Extract topics heuristically first
         topics = extract_topics_from_text(text)
-        # Persist topics
+        
+        # Get AI-enhanced analysis for better topic metadata
+        analysis = {}
+        try:
+            from .ai_providers import get_syllabus_analysis
+            analysis = get_syllabus_analysis("\n".join(topics)[:6000])
+            print(f"AI analysis completed: {len(analysis.get('topics', []))} enhanced topics")
+        except Exception as e:
+            print(f"AI analysis failed: {e}")
+            analysis = {"topics": [{"topic": t, "score": 5} for t in topics[:50]]}
+        
+        # AI FILTERING STEP: Filter and prioritize topics using Gemini
+        filtered_analysis = {}
+        try:
+            from .ai_providers import filter_and_prioritize_topics
+            # Pass extracted topics and original text for intelligent filtering
+            user_preferences = {}  # Could be passed from request in future
+            filtered_analysis = filter_and_prioritize_topics(topics, text, user_preferences)
+            print(f"🎯 AI filtering completed: {len(filtered_analysis.get('filtered_topics', []))} topics after intelligent filtering")
+            
+            # Update analysis with filtered results
+            if filtered_analysis.get('filtered_topics'):
+                analysis['filtered_topics'] = filtered_analysis['filtered_topics']
+                analysis['learning_path'] = filtered_analysis['learning_path']
+                analysis['filtering_insights'] = filtered_analysis['filtering_insights']
+                analysis['next_steps'] = filtered_analysis['next_steps']
+                print(f"📚 Learning path generated with {len(filtered_analysis['learning_path'])} phases")
+                
+        except Exception as e:
+            print(f"AI filtering failed: {e}")
+            # Continue with original topics if filtering fails
+        
+        # Persist topics with enhanced metadata
         rows = []
+        # Use filtered topics if available, otherwise fall back to original AI analysis
+        topics_to_store = filtered_analysis.get('filtered_topics', analysis.get("topics", []))
+        
+        # Create a lookup for enhanced topic data
+        if filtered_analysis.get('filtered_topics'):
+            # Use filtered topics with rich metadata
+            ai_topics_dict = {t.get("topic", ""): t for t in filtered_analysis['filtered_topics']}
+        else:
+            # Fall back to original AI analysis
+            ai_topics = analysis.get("topics", [])
+            ai_topics_dict = {t.get("topic", ""): t for t in ai_topics if isinstance(t, dict)}
+        
         for idx, t in enumerate(topics):
+            # Get enhanced metadata if available from AI analysis/filtering
+            if isinstance(t, str):
+                topic_name = t
+            else:
+                topic_name = t.get("topic", str(t))
+                
+            enhanced_data = ai_topics_dict.get(topic_name, {})
+            metadata = {
+                "score": enhanced_data.get("difficulty_score", enhanced_data.get("score", 5)),
+                "category": enhanced_data.get("category", "general"),
+                "estimated_hours": enhanced_data.get("estimated_hours", 3),
+                "priority": enhanced_data.get("priority", "medium"),
+                "prerequisites": enhanced_data.get("prerequisites", []),
+                "learning_objectives": enhanced_data.get("learning_objectives", []),
+                "why_important": enhanced_data.get("why_important", ""),
+                "suggested_resources": enhanced_data.get("suggested_resources", []),
+                "keywords": enhanced_data.get("keywords", [])
+            }
+            
             rows.append({
                 "user_id": norm_user_id if is_valid_uuid(norm_user_id) else None,
                 "topic": t,
                 "order_index": idx,
                 "source_artifact": artifact_id,
+                "metadata": metadata  # Store enhanced AI analysis
             })
+            
         if rows and is_valid_uuid(norm_user_id) and record.get("user_id"):
             try:
+                # Try inserting with metadata first
                 supabase.table("syllabus_topics").insert(rows).execute()
+                print(f"Enhanced topics stored in DB: {len(rows)} topics with metadata")
             except Exception as e:
-                print(f"Topic insert failed: {e}")
-                # Fallback to in-memory if constraint issues
-                store_add_topics(norm_user_id, topics)
+                print(f"Enhanced topic insert failed, trying without metadata: {e}")
+                # Fallback to basic format if metadata column doesn't exist
+                try:
+                    basic_rows = []
+                    for row in rows:
+                        basic_row = {k: v for k, v in row.items() if k != "metadata"}
+                        basic_rows.append(basic_row)
+                    supabase.table("syllabus_topics").insert(basic_rows).execute()
+                    print(f"Basic topics stored in DB: {len(basic_rows)} topics")
+                except Exception as e2:
+                    print(f"Basic topic insert also failed: {e2}")
+                    # Final fallback to in-memory
+                    store_add_topics(norm_user_id, topics)
         else:
             store_add_topics(norm_user_id, topics)
+            
         # Fetch resources asynchronously (best-effort)
-        # Only attempt DB resource persistence if we have a valid/persistable user
         if is_valid_uuid(norm_user_id) and record.get("user_id"):
             try:
                 fetch_and_store_resources_for_topics(norm_user_id, topics[:25])
             except Exception as e:
                 print(f"Resource fetch error: {e}")
-
-        # Optional AI enrichment of topic difficulty
-        try:
-            from .ai_providers import get_syllabus_analysis
-            analysis = get_syllabus_analysis("\n".join(topics)[:6000])
-        except Exception:
-            analysis = {"topics": [{"topic": t, "score": 5} for t in topics[:50]]}
+                
     elif artifact_type == "assessment":
         try:
             from .ai_providers import get_assessment_analysis

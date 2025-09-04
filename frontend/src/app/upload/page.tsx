@@ -18,7 +18,9 @@ import {
   AlertCircle,
   Download,
   Eye,
-  Trash2
+  Trash2,
+  RefreshCw,
+  Calendar
 } from 'lucide-react'
 
 export default function UploadPage() {
@@ -27,6 +29,16 @@ export default function UploadPage() {
   const [uploadProgress, setUploadProgress] = useState(0)
   const [topics,setTopics] = useState<string[]>([])
   const [resources,setResources] = useState<any[]>([])
+  const [showGeneratePlan, setShowGeneratePlan] = useState(false)
+  const [generatingPlan, setGeneratingPlan] = useState(false)
+  const [analysis, setAnalysis] = useState<any>(null)
+  
+  // New state for enhanced planning
+  const [deadline, setDeadline] = useState<string>('')
+  const [hoursPerDay, setHoursPerDay] = useState<number>(2.0)
+  const [learningStyle, setLearningStyle] = useState<string>('balanced')
+  const [showPlanSettings, setShowPlanSettings] = useState(false)
+  
   const { pushError } = useErrorContext()
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
@@ -62,9 +74,9 @@ export default function UploadPage() {
         form.append('file', f)
         const route = f.type.startsWith('image/') ? 'assessment' : 'syllabus'
         // Attach auth header if available (ensures persistence of topics -> plan regeneration)
-        let headers: Record<string,string> = {}
+        const headers: Record<string,string> = {}
         try {
-          const maybe = await (await import('@/lib/api')).api<{__noop?:boolean}>('/health',{method:'GET'}).catch(()=>null)
+          await (await import('@/lib/api')).api<{__noop?:boolean}>('/health',{method:'GET'}).catch(()=>null)
         } catch {}
         const storedUser = typeof window!=='undefined'? localStorage.getItem('supabase_user_id'): null
         if(storedUser) headers['X-User-Id'] = storedUser
@@ -80,8 +92,13 @@ export default function UploadPage() {
         setUploadProgress(Math.round(((i+1)/files.length)*100))
         // capture topics from response if available
         const foundTopics = j?.topics || j?.analysis?.topics?.map((t:any)=> t.topic) || []
+        const analysisData = j?.analysis || null
+        
         if(foundTopics.length){
           setTopics(prev=> Array.from(new Set([...prev, ...foundTopics])))
+          setAnalysis(analysisData)
+          setShowGeneratePlan(true) // Show generate plan button after successful upload
+          
           // If backend returned a plan preview use it to update client plan immediately
           if(j?.plan_preview){
             try { localStorage.setItem('latest_plan', JSON.stringify(j.plan_preview)) } catch {}
@@ -106,6 +123,42 @@ export default function UploadPage() {
       })
     } finally {
       setUploading(false)
+    }
+  }
+
+  const generateStudyPlan = async () => {
+    setGeneratingPlan(true)
+    try {
+      // Calculate deadline if provided
+      const deadlineISO = deadline ? new Date(deadline).toISOString() : null
+      
+      const planData = await api('/api/plan/generate', {
+        method: 'POST',
+        body: JSON.stringify({
+          horizon_days: deadline ? Math.max(3, Math.ceil((new Date(deadline).getTime() - Date.now()) / (1000 * 60 * 60 * 24))) : 14,
+          preferred_hours_per_day: hoursPerDay,
+          deadline: deadlineISO,
+          learning_style: learningStyle
+        })
+      })
+      
+      // Store the generated plan
+      localStorage.setItem('latest_plan', JSON.stringify(planData))
+      
+      // Show success message
+      console.log('Enhanced study plan generated with resources!', planData)
+      
+      // Navigate to planner page to show the new plan
+      window.location.href = '/planner'
+      
+    } catch (e: any) {
+      pushError({
+        errorCode: e?.errorCode || 'PLAN_GENERATION_FAIL',
+        errorMessage: e?.errorMessage || 'Failed to generate enhanced study plan',
+        details: e
+      })
+    } finally {
+      setGeneratingPlan(false)
     }
   }
 
@@ -283,27 +336,322 @@ export default function UploadPage() {
             {topics.length>0 && (
               <Card>
                 <CardHeader>
-                  <CardTitle>Extracted Topics</CardTitle>
-                  <CardDescription>{topics.length} topics</CardDescription>
+                  <CardTitle className="flex items-center justify-between">
+                    <span>Extracted Topics</span>
+                    <div className="flex gap-2">
+                      {showGeneratePlan && (
+                        <>
+                          <Button 
+                            onClick={() => setShowPlanSettings(!showPlanSettings)} 
+                            variant="outline"
+                            size="sm"
+                          >
+                            Settings
+                          </Button>
+                          <Button 
+                            onClick={generateStudyPlan} 
+                            disabled={generatingPlan}
+                            size="sm"
+                            className="ml-2"
+                          >
+                            {generatingPlan ? (
+                              <>
+                                <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                                Generating...
+                              </>
+                            ) : (
+                              <>
+                                <Calendar className="w-4 h-4 mr-2" />
+                                Generate Plan
+                              </>
+                            )}
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  </CardTitle>
+                  <CardDescription>
+                    {topics.length} topics detected
+                    {analysis?.difficulty && (
+                      <Badge variant="outline" className="ml-2 text-xs">
+                        {analysis.difficulty} difficulty
+                      </Badge>
+                    )}
+                    {analysis?.estimated_total_hours && (
+                      <Badge variant="outline" className="ml-2 text-xs">
+                        ~{analysis.estimated_total_hours}h total
+                      </Badge>
+                    )}
+                  </CardDescription>
                 </CardHeader>
+                
+                {/* Plan Settings */}
+                {showPlanSettings && (
+                  <CardContent className="space-y-4 border-t bg-muted/30">
+                    <h4 className="font-semibold text-sm">Study Plan Settings</h4>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div>
+                        <label className="text-xs font-medium text-muted-foreground">Deadline (Optional)</label>
+                        <input
+                          type="date"
+                          value={deadline}
+                          onChange={(e) => setDeadline(e.target.value)}
+                          className="w-full mt-1 px-3 py-2 text-sm border rounded-md"
+                          min={new Date().toISOString().split('T')[0]}
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="text-xs font-medium text-muted-foreground">Hours per Day</label>
+                        <select
+                          value={hoursPerDay}
+                          onChange={(e) => setHoursPerDay(Number(e.target.value))}
+                          className="w-full mt-1 px-3 py-2 text-sm border rounded-md"
+                        >
+                          <option value={1}>1 hour</option>
+                          <option value={1.5}>1.5 hours</option>
+                          <option value={2}>2 hours</option>
+                          <option value={2.5}>2.5 hours</option>
+                          <option value={3}>3 hours</option>
+                          <option value={4}>4 hours</option>
+                          <option value={5}>5+ hours</option>
+                        </select>
+                      </div>
+                      
+                      <div>
+                        <label className="text-xs font-medium text-muted-foreground">Learning Style</label>
+                        <select
+                          value={learningStyle}
+                          onChange={(e) => setLearningStyle(e.target.value)}
+                          className="w-full mt-1 px-3 py-2 text-sm border rounded-md"
+                        >
+                          <option value="balanced">Balanced</option>
+                          <option value="visual">Visual (Videos)</option>
+                          <option value="reading">Reading (Articles)</option>
+                          <option value="practical">Hands-on (Practice)</option>
+                          <option value="auditory">Audio Learning</option>
+                        </select>
+                      </div>
+                    </div>
+                    
+                    <div className="text-xs text-muted-foreground">
+                      {deadline && `Study will be planned for ${Math.max(3, Math.ceil((new Date(deadline).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))} days until deadline.`}
+                      {!deadline && `Study will be planned for 14 days (default).`}
+                    </div>
+                  </CardContent>
+                )}
+                
                 <CardContent className='flex flex-wrap gap-2'>
                   {topics.map(t=> <Badge key={t} variant='outline'>{t}</Badge>)}
+                </CardContent>
+              </Card>
+            )}
+            
+            {/* AI Filtering Insights */}
+            {analysis?.filtering_insights && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <span>🎯</span>
+                    AI Topic Filtering Results
+                  </CardTitle>
+                  <CardDescription>
+                    Gemini AI intelligently filtered and prioritized your syllabus topics
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="text-center p-3 bg-green-50 dark:bg-green-950 rounded">
+                      <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+                        {analysis.filtering_insights.topics_kept}
+                      </div>
+                      <div className="text-xs text-muted-foreground">Topics Kept</div>
+                    </div>
+                    <div className="text-center p-3 bg-red-50 dark:bg-red-950 rounded">
+                      <div className="text-2xl font-bold text-red-600 dark:text-red-400">
+                        {analysis.filtering_insights.topics_removed}
+                      </div>
+                      <div className="text-xs text-muted-foreground">Topics Filtered</div>
+                    </div>
+                    <div className="text-center p-3 bg-blue-50 dark:bg-blue-950 rounded">
+                      <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                        {Math.round(analysis.filtering_insights.time_estimate_total)}h
+                      </div>
+                      <div className="text-xs text-muted-foreground">Total Study Time</div>
+                    </div>
+                    <div className="text-center p-3 bg-purple-50 dark:bg-purple-950 rounded">
+                      <div className="text-xl font-bold text-purple-600 dark:text-purple-400">
+                        {analysis.filtering_insights.difficulty_progression}
+                      </div>
+                      <div className="text-xs text-muted-foreground">Progression</div>
+                    </div>
+                  </div>
+                  
+                  {analysis.filtering_insights.removal_reasons?.length > 0 && (
+                    <div>
+                      <h4 className="font-medium text-sm mb-2">Why topics were filtered:</h4>
+                      <div className="flex flex-wrap gap-2">
+                        {analysis.filtering_insights.removal_reasons.map((reason: string, idx: number) => (
+                          <Badge key={idx} variant="secondary" className="text-xs">
+                            {reason}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  
+                  <div>
+                    <h4 className="font-medium text-sm mb-2">Learning Strategy:</h4>
+                    <p className="text-sm text-muted-foreground">
+                      {analysis.filtering_insights.learning_sequence_rationale}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+            
+            {/* Learning Path */}
+            {analysis?.learning_path && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <span>🗺️</span>
+                    Recommended Learning Path
+                  </CardTitle>
+                  <CardDescription>
+                    AI-generated learning sequence for optimal comprehension
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {Object.entries(analysis.learning_path).map(([phase, phaseTopics]: [string, any], idx: number) => (
+                    <div key={phase} className="border rounded-lg p-4">
+                      <div className="flex items-center gap-2 mb-3">
+                        <div className="w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs font-bold flex items-center justify-center">
+                          {idx + 1}
+                        </div>
+                        <h4 className="font-medium capitalize">
+                          {phase.replace('_', ' ').replace('phase ', 'Phase ')}
+                        </h4>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {phaseTopics.map((topic: string, topicIdx: number) => (
+                          <Badge key={topicIdx} variant="outline" className="text-xs">
+                            {topic}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            )}
+            
+            {/* Next Steps */}
+            {analysis?.next_steps && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <span>🚀</span>
+                    Next Steps & Recommendations
+                  </CardTitle>
+                  <CardDescription>
+                    AI-powered action plan for your study journey
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {analysis.next_steps.immediate_actions?.length > 0 && (
+                    <div>
+                      <h4 className="font-medium text-sm mb-2 flex items-center gap-1">
+                        <span>⚡</span> Immediate Actions
+                      </h4>
+                      <ul className="space-y-1">
+                        {analysis.next_steps.immediate_actions.map((action: string, idx: number) => (
+                          <li key={idx} className="text-sm text-muted-foreground flex items-start gap-2">
+                            <span className="text-green-500 mt-1">•</span>
+                            {action}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  
+                  {analysis.next_steps.week_1_goals?.length > 0 && (
+                    <div>
+                      <h4 className="font-medium text-sm mb-2 flex items-center gap-1">
+                        <span>🎯</span> Week 1 Goals
+                      </h4>
+                      <ul className="space-y-1">
+                        {analysis.next_steps.week_1_goals.map((goal: string, idx: number) => (
+                          <li key={idx} className="text-sm text-muted-foreground flex items-start gap-2">
+                            <span className="text-blue-500 mt-1">•</span>
+                            {goal}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  
+                  {analysis.next_steps.recommended_pace && (
+                    <div className="bg-muted/50 p-3 rounded">
+                      <h4 className="font-medium text-sm mb-1">📊 Recommended Pace</h4>
+                      <p className="text-sm text-muted-foreground">
+                        {analysis.next_steps.recommended_pace}
+                      </p>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             )}
             {resources.length>0 && (
               <Card>
                 <CardHeader>
-                  <CardTitle>Resources</CardTitle>
-                  <CardDescription>{resources.length} items</CardDescription>
+                  <CardTitle className="flex items-center gap-2">
+                    <span>📚</span>
+                    Study Resources
+                  </CardTitle>
+                  <CardDescription>
+                    {resources.length} AI-curated learning materials including YouTube videos, articles, and practice resources
+                  </CardDescription>
                 </CardHeader>
-                <CardContent className='space-y-2 max-h-[320px] overflow-auto pr-2'>
+                <CardContent className='space-y-3 max-h-[400px] overflow-auto pr-2'>
                   {resources.slice(0,40).map((r:any,i:number)=> (
-                    <a key={i} href={r.url} target='_blank' rel='noreferrer' className='block p-2 rounded hover:bg-muted/50 text-xs'>
-                      <span className='font-medium'>{r.title||r.url}</span>
-                      <span className='ml-2 text-muted-foreground'>{r.topic}</span>
-                    </a>
+                    <div key={i} className='p-3 rounded border hover:bg-muted/50 transition-all'>
+                      <div className="flex items-start gap-3">
+                        <span className="text-lg">
+                          {r.source === 'youtube' ? '📺' : r.source === 'ocw' ? '🎓' : '📖'}
+                        </span>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <Badge variant="outline" className="text-xs">
+                              {r.source?.toUpperCase() || 'RESOURCE'}
+                            </Badge>
+                            <span className="text-xs text-muted-foreground">
+                              {r.topic}
+                            </span>
+                          </div>
+                          <h4 className="font-medium text-sm mb-2 line-clamp-2">
+                            {r.title || r.url}
+                          </h4>
+                          <a 
+                            href={r.url} 
+                            target='_blank' 
+                            rel='noreferrer' 
+                            className='text-blue-600 dark:text-blue-400 hover:underline text-xs'
+                          >
+                            View Resource →
+                          </a>
+                        </div>
+                      </div>
+                    </div>
                   ))}
+                  {resources.length > 40 && (
+                    <div className="text-center pt-2">
+                      <p className="text-xs text-muted-foreground">
+                        Showing 40 of {resources.length} resources
+                      </p>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             )}

@@ -8,6 +8,66 @@ TOPIC_PATTERN = re.compile(r"(?im)^(?:topic|unit|chapter|section)[\s:\-]+(.+)$")
 PREFIX_CLEAN = re.compile(r"(?i)^(?:topic|unit|chapter|section)[\s:\-]+")
 
 
+def is_administrative_content(text: str) -> bool:
+    """Check if text appears to be administrative/procedural rather than academic content."""
+    text_lower = text.lower()
+    
+    # Date patterns (e.g., "5/9/2025", "2025-05-09", "May 9, 2025")
+    date_patterns = [
+        r'\d{1,2}[/-]\d{1,2}[/-]\d{2,4}',  # 5/9/2025, 5-9-2025
+        r'\d{4}[/-]\d{1,2}[/-]\d{1,2}',    # 2025/5/9, 2025-05-09
+        r'\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d{1,2},?\s+\d{4}\b',  # May 9, 2025
+        r'\b\d{1,2}\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d{4}\b'     # 9 May 2025
+    ]
+    
+    for pattern in date_patterns:
+        if re.search(pattern, text_lower):
+            return True
+    
+    # Time/duration patterns (e.g., "45 min", "2 hours", "practice + review")
+    time_patterns = [
+        r'\d+\s*(?:min|minutes?|hrs?|hours?)\b',
+        r'\bpractice\s*\+\s*review\b',
+        r'\d+\s*(?:min|hrs?)\b'
+    ]
+    
+    for pattern in time_patterns:
+        if re.search(pattern, text_lower):
+            return True
+    
+    # Administrative keywords
+    admin_keywords = [
+        'user manual', 'instructions on', 'how to set up', 'how to run', 'how to use',
+        'continuous internal evaluation', 'evaluation marks', 'cie marks', 
+        'pending', 'marks)', '(8x2 =', 'x2 =', '= marks', '=16 marks',
+        'instructions:', 'manual:', 'setup:', 'installation:', 'configuration:',
+        'grading system', 'assessment criteria', 'evaluation criteria'
+    ]
+    
+    for keyword in admin_keywords:
+        if keyword in text_lower:
+            return True
+    
+    # Patterns that look like scoring/marking schemes
+    scoring_patterns = [
+        r'\(\d+x\d+\s*=\s*\d+\s*marks?\)',  # (8x2 = 16 marks)
+        r'\d+x\d+\s*=\s*\d+',               # 8x2 = 16
+        r'=\s*\d+\s*marks?',                 # = 16 marks
+        r'\b\d+\s*marks?\b'                  # 16 marks
+    ]
+    
+    for pattern in scoring_patterns:
+        if re.search(pattern, text_lower):
+            return True
+    
+    # Status indicators
+    status_words = ['pending', 'completed', 'in progress', 'todo', 'done']
+    if any(word in text_lower for word in status_words):
+        return True
+    
+    return False
+
+
 def extract_topics_from_text(text: str) -> List[str]:
     """Extract topics with cleaning to avoid duplicated prefixed variants.
 
@@ -25,7 +85,11 @@ def extract_topics_from_text(text: str) -> List[str]:
     exclusions = {
         'course syllabus', 'syllabus', 'advanced mathematics', 'mathematics course',
         'course outline', 'course description', 'learning objectives', 'prerequisites',
-        'textbook', 'grading', 'schedule', 'assignments', 'exams', 'final exam'
+        'textbook', 'grading', 'schedule', 'assignments', 'exams', 'final exam',
+        'user manual', 'instructions', 'how to set up', 'how to run', 'how to use',
+        'continuous internal evaluation', 'evaluation marks', 'marks', 'cie',
+        'pending', 'practice + review', 'min', 'minutes', 'hours',
+        'administration', 'setup', 'installation', 'configuration'
     }
 
     def add(topic: str):
@@ -39,6 +103,10 @@ def extract_topics_from_text(text: str) -> List[str]:
         if norm.lower() in exclusions:
             return
         if any(excl in norm.lower() for excl in ['course', 'syllabus'] if len(norm.split()) <= 3):
+            return
+        
+        # Advanced filtering for administrative/procedural content
+        if is_administrative_content(norm):
             return
             
         key = norm.lower()
@@ -62,6 +130,11 @@ def extract_topics_from_text(text: str) -> List[str]:
         raw = line.strip().lstrip("-•* \t")
         if not raw:
             continue
+        
+        # Skip obvious administrative lines early
+        if is_administrative_content(raw):
+            continue
+            
         # Skip if it's just a prefixed variant of something we already added
         if PREFIX_CLEAN.match(raw):
             cleaned = PREFIX_CLEAN.sub("", raw).strip()

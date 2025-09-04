@@ -5,6 +5,10 @@ from .weaktopics import get_weak_topics
 from .topic_store import get_topics as store_get_topics
 from ..utils import normalize_user_id, is_valid_uuid
 from ..supabase_client import get_supabase
+from .deadline_manager import DeadlineManager, StudyPlanOptimizer
+import logging
+
+logger = logging.getLogger('xenia')
 
 
 def _distribute_sessions(topics: List[Dict], days: int, hours_per_day: float) -> List[Dict]:
@@ -31,44 +35,210 @@ def _distribute_sessions(topics: List[Dict], days: int, hours_per_day: float) ->
 
 
 def generate_plan(user_id: str, horizon_days: int = 14, preferred_hours_per_day: float = 1.5, deadline: Optional[str] = None) -> Dict:
+    """Generate an intelligent, AI-optimized study plan."""
+    logger.info(f"🎯 Generating AI-optimized plan for user {user_id}")
+    
     norm_user_id = normalize_user_id(user_id)
 
-    # 1. Attempt to use syllabus topics (DB or in-memory) as primary source
+    # 1. Attempt to use enhanced syllabus topics (DB or in-memory) as primary source
     syllabus_topics: List[str] = []
-    # From DB if valid UUID
+    enhanced_topic_data: List[Dict] = []
+    
+    # From DB if valid UUID - get enhanced topic data
     if is_valid_uuid(norm_user_id):
         try:
             sb = get_supabase()
-            resp = sb.table("syllabus_topics").select("topic, order_index").eq("user_id", norm_user_id).order("order_index").limit(200).execute()
-            syllabus_topics = [r["topic"] for r in (resp.data or [])]
-        except Exception:
+            resp = sb.table("syllabus_topics").select("topic, order_index, metadata").eq("user_id", norm_user_id).order("order_index").limit(200).execute()
+            
+            for r in (resp.data or []):
+                topic_name = r["topic"]
+                syllabus_topics.append(topic_name)
+                
+                # Extract enhanced metadata if available
+                metadata = r.get("metadata", {})
+                if isinstance(metadata, dict):
+                    enhanced_topic_data.append({
+                        "topic": topic_name,
+                        "score": metadata.get("score", 5),
+                        "category": metadata.get("category", "general"),
+                        "estimated_hours": metadata.get("estimated_hours", 3),
+                        "priority": metadata.get("priority", "medium"),
+                        "prerequisites": metadata.get("prerequisites", [])
+                    })
+                else:
+                    enhanced_topic_data.append({"topic": topic_name, "score": 5, "estimated_hours": 3})
+                    
+        except Exception as e:
+            logger.warning(f"Could not load enhanced topic data from DB: {e}")
             syllabus_topics = []
+            enhanced_topic_data = []
+    
     # Fallback to in-memory store (demo users)
     if not syllabus_topics:
         syllabus_topics = store_get_topics(norm_user_id)
+        enhanced_topic_data = [{"topic": t, "score": 5, "estimated_hours": 3} for t in syllabus_topics]
 
     weak: List[Dict] = []
-    if syllabus_topics:
+    
+    # Use enhanced topic data if available, otherwise convert to weak topics format
+    if enhanced_topic_data:
+        weak = enhanced_topic_data
+        logger.info(f"   Using {len(weak)} enhanced topics for planning")
+    elif syllabus_topics:
         weak = [{"topic": t, "score": 5} for t in syllabus_topics]
+        logger.info(f"   Using {len(weak)} basic syllabus topics")
     else:
         # 2. Derive weak topics heuristically from artifacts
         try:
             weak = get_weak_topics(norm_user_id)
+            logger.info(f"   Using {len(weak)} heuristic weak topics")
         except Exception:
             weak = []
         # 3. Final fallback
         if not weak:
             weak = [{"topic": "General Review", "score": 1}]
-    # If deadline supplied, recompute horizon
+            logger.info("   Using fallback topics")
+    
+    # Smart deadline handling with advanced urgency calculation
+    urgency_level, urgency_multiplier = DeadlineManager.calculate_urgency_level(deadline, horizon_days)
+    
     if deadline:
         try:
             dd = datetime.fromisoformat(deadline).date()
             today = datetime.now(timezone.utc).date()
             delta = (dd - today).days
             if delta > 0:
+                original_horizon = horizon_days
                 horizon_days = min(horizon_days, delta)
-        except Exception:
-            pass
+                logger.info(f"   Adjusted horizon to {horizon_days} days due to deadline")
+        except Exception as e:
+            logger.warning(f"   Invalid deadline format: {e}")
+    
+    logger.info(f"   Urgency level: {urgency_level} (multiplier: {urgency_multiplier:.2f}x)")
+    
+    # Prioritize topics based on urgency and importance
+    prioritized_topics = DeadlineManager.prioritize_topics(weak, urgency_level)
+    
+    # Try advanced AI-powered intelligent scheduling first
+    try:
+        from .ai_providers import generate_enhanced_study_plan_with_resources
+        logger.info("   Attempting enhanced AI-powered study plan generation...")
+        
+        user_preferences = {
+            "hours_per_day": preferred_hours_per_day * urgency_multiplier,
+            "learning_style": "balanced",  # Could be user-configurable
+            "difficulty_preference": "intensive" if urgency_multiplier > 1.5 else "gradual",
+            "urgency_level": urgency_level
+        }
+        
+        ai_plan = generate_enhanced_study_plan_with_resources(
+            topics=prioritized_topics,
+            horizon_days=horizon_days,
+            deadline=deadline,
+            user_preferences=user_preferences
+        )
+        
+        if ai_plan and "study_sessions" in ai_plan and ai_plan["study_sessions"]:
+            logger.info(f"   ✅ Enhanced AI plan generated with {len(ai_plan['study_sessions'])} sessions")
+            
+            # Apply learning science optimizations to the enhanced sessions
+            optimized_sessions = StudyPlanOptimizer.apply_spaced_repetition(ai_plan["study_sessions"])
+            balanced_sessions = StudyPlanOptimizer.balance_cognitive_load(
+                optimized_sessions, 
+                preferred_hours_per_day * urgency_multiplier
+            )
+            
+            # Enhance plan with comprehensive metadata including resources
+            plan = {
+                "user_id": norm_user_id,
+                "generated_at": datetime.now(timezone.utc).isoformat(),
+                "horizon_days": horizon_days,
+                "preferred_hours_per_day": preferred_hours_per_day,
+                "urgency_level": urgency_level,
+                "urgency_multiplier": urgency_multiplier,
+                "deadline": deadline,
+                "weak_topics": prioritized_topics,
+                "sessions": balanced_sessions,
+                "ai_insights": ai_plan.get("optimization_insights", {}),
+                "milestones": ai_plan.get("progress_milestones", []),
+                "adaptive_guidelines": ai_plan.get("adaptive_guidelines", {}),
+                "deadline_management": ai_plan.get("deadline_management", {}),
+                "generation_method": "enhanced_ai_v3_with_resources",
+                "learning_optimizations": {
+                    "spaced_repetition": True,
+                    "cognitive_load_balanced": True,
+                    "priority_sorted": True,
+                    "resource_enhanced": True
+                }
+            }
+            
+            # Store in database if possible
+            try:
+                if is_valid_uuid(norm_user_id):
+                    sb = get_supabase()
+                    sb.table("plans").upsert({"user_id": norm_user_id, "plan": plan}).execute()
+                    logger.info(f"   Plan stored in database for user {norm_user_id}")
+            except Exception as e:
+                logger.warning(f"   Could not store plan in DB: {e}")
+            
+            return plan
+            
+    except Exception as e:
+        logger.warning(f"   AI planning failed, falling back to advanced deterministic: {e}")
+    
+    # Advanced fallback using deadline manager
+    try:
+        logger.info("   Using advanced deterministic planning with deadline management")
+        
+        optimized_sessions = DeadlineManager.calculate_optimal_session_distribution(
+            prioritized_topics, 
+            horizon_days, 
+            preferred_hours_per_day * urgency_multiplier,
+            urgency_multiplier
+        )
+        
+        # Apply learning optimizations
+        spaced_sessions = StudyPlanOptimizer.apply_spaced_repetition(optimized_sessions)
+        final_sessions = StudyPlanOptimizer.balance_cognitive_load(
+            spaced_sessions, 
+            preferred_hours_per_day * urgency_multiplier
+        )
+        
+        plan = {
+            "user_id": norm_user_id,
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "horizon_days": horizon_days,
+            "preferred_hours_per_day": preferred_hours_per_day,
+            "urgency_level": urgency_level,
+            "urgency_multiplier": urgency_multiplier,
+            "deadline": deadline,
+            "weak_topics": prioritized_topics,
+            "sessions": final_sessions,
+            "generation_method": "advanced_deterministic",
+            "learning_optimizations": {
+                "spaced_repetition": True,
+                "cognitive_load_balanced": True,
+                "priority_sorted": True,
+                "deadline_optimized": True
+            }
+        }
+        
+        # Store in database
+        try:
+            if is_valid_uuid(norm_user_id):
+                sb = get_supabase()
+                sb.table("plans").upsert({"user_id": norm_user_id, "plan": plan}).execute()
+                logger.info(f"   Advanced plan stored for user {norm_user_id}")
+        except Exception as e:
+            logger.warning(f"   Could not store advanced plan in DB: {e}")
+        
+        return plan
+        
+    except Exception as e:
+        logger.warning(f"   Advanced planning also failed: {e}")
+    
+    # Fallback to traditional distribution
+    logger.info("   Using traditional session distribution")
     sessions = _distribute_sessions(weak, horizon_days, preferred_hours_per_day)
     plan = {
         "user_id": norm_user_id,

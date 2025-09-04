@@ -1,0 +1,24 @@
+Chapter 1: Introduction to Machine Learning
+
+3. User Manual: Instructions on how to set up, run and use the system.	practice + review	45 min
+	pending
+
+5/9/2025	Continuous Internal Evaluation Marks (CIE):	practice + review	45 min
+	pending
+
+5/9/2025	(8x2 =16 marks)
+
+Topic 2: Data Preprocessing Techniques
+Unit 3: Supervised Learning Algorithms
+Topic 4: Neural Networks and Deep Learning
+Chapter 5: Natural Language Processing
+
+Setup Instructions: How to install dependencies
+16 marks total for final evaluation
+Practice session - 2 hours
+Completed assignments due May 15, 2025
+
+Chapter 6: Computer Vision
+Topic 7: Reinforcement Learning
+Evaluation Methods and Criteria
+Unsupervised Learning Methods
