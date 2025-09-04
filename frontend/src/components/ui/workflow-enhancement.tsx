@@ -170,7 +170,11 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
                   status === 'pending' && "bg-muted/30 border-muted",
                   isClickable && "hover:shadow-md cursor-pointer"
                 )}
-                onClick={() => isClickable && window.location.href = step.href}
+                onClick={() => {
+                  if (isClickable && step.href) {
+                    window.location.href = step.href;
+                  }
+                }}
               >
                 {/* Step Icon */}
                 <div className={cn(
@@ -283,7 +287,7 @@ interface SmartRecommendationsProps {
 
 export function SmartRecommendations({ userProgress }: SmartRecommendationsProps) {
   const generateRecommendations = () => {
-    const recommendations = [];
+    const recommendations: any[] = [];
     
     if (!userProgress) return recommendations;
     

@@ -31,25 +31,63 @@ export default function DashboardPage(){
   const [loading, setLoading] = useState(false);
   const { pushError } = useErrorContext();
   
+  const fetchData = async () => {
+    setLoading(true)
+    try{ 
+      const [analytics, currentPlan, topicResp, resResp] = await Promise.all([
+        api('/api/analytics/student').catch(()=> null),
+        api('/api/plan/current').catch(()=> null),
+        api('/api/resources/topics').catch(()=> ({topics:[]})),
+        api('/api/resources/list').catch(()=> ({resources:[]}))
+      ])
+      if(analytics) setData(analytics)
+      if(currentPlan) setPlan(currentPlan)
+      setTopics((topicResp as any)?.topics||[])
+      setResources((resResp as any)?.resources||[])
+    } catch(e:any){ 
+      pushError({ errorCode: e?.errorCode||'CONTENT_API_FAIL', errorMessage: e?.errorMessage, details: e }) 
+    } finally { setLoading(false) }
+  }
+
   useEffect(()=>{ 
-    (async()=>{
-      setLoading(true)
-      try{ 
-        const [analytics, currentPlan, topicResp, resResp] = await Promise.all([
-          api('/api/analytics/student').catch(()=> null),
-          api('/api/plan/current').catch(()=> null),
-          api('/api/resources/topics').catch(()=> ({topics:[]})),
-          api('/api/resources/list').catch(()=> ({resources:[]}))
-        ])
-        if(analytics) setData(analytics)
-        if(currentPlan) setPlan(currentPlan)
-        setTopics((topicResp as any)?.topics||[])
-        setResources((resResp as any)?.resources||[])
-      } catch(e:any){ 
-        pushError({ errorCode: e?.errorCode||'CONTENT_API_FAIL', errorMessage: e?.errorMessage, details: e }) 
-      } finally { setLoading(false) }
-    })() 
+    fetchData() 
   },[pushError])
+
+  // Add window focus listener to refresh data when returning to dashboard
+  useEffect(() => {
+    const handleFocus = () => {
+      fetchData()
+    }
+    
+    window.addEventListener('focus', handleFocus)
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) {
+        fetchData()
+      }
+    })
+    
+    return () => {
+      window.removeEventListener('focus', handleFocus)
+      document.removeEventListener('visibilitychange', handleFocus)
+    }
+  }, [])
+
+  const markSessionComplete = async (date: string, topic: string, currentStatus: string) => {
+    try {
+      const newStatus = currentStatus === 'completed' ? 'pending' : 'completed'
+      const resp = await api('/api/resources/progress', {
+        method: 'POST',
+        body: JSON.stringify({ sessions: [{ date, topic, status: newStatus }] })
+      })
+      if (resp.ok && resp.plan) {
+        setPlan(resp.plan)
+        // Refresh all data to update analytics
+        setTimeout(fetchData, 500) // Small delay to ensure backend processing completes
+      }
+    } catch(e:any){
+      pushError({ errorCode: e?.errorCode||'PLAN_PROGRESS_FAIL', errorMessage: e?.errorMessage, details: e })
+    }
+  }
 
   const todaysTasks = useMemo(()=>{
     if(!plan) return []
@@ -58,20 +96,12 @@ export default function DashboardPage(){
       id: idx+1,
       subject: s.topic.split(':')[0] || s.topic,
       topic: s.topic,
+      date: s.date,
       duration: s.duration_min || 45,
       progress: s.status==='completed'? 100 : s.status==='in-progress'? 50 : 0,
       status: s.status||'pending'
     }))
   },[plan])
-
-  const recentAchievements = useMemo(()=>{
-    const completed = plan?.progress?.sessions_completed ?? (plan?.sessions||[]).filter((s:any)=> s.status==='completed').length
-    return [
-      { title: 'Study Streak', description: `${data?.profile?.streak_days||0} days in a row`, icon: Award },
-      { title: 'Completed Sessions', description: `${completed} finished`, icon: TrendingUp },
-      { title: 'Active Topics', description: `${topics.length} topics tracked`, icon: Target }
-    ]
-  },[plan, data, topics])
 
   const upcomingSessions = useMemo(()=>{
     if(!plan) return []
@@ -89,6 +119,38 @@ export default function DashboardPage(){
   },[topics])
 
   const percentComplete = plan?.progress?.percent_complete ?? (()=>{ const s = plan?.sessions||[]; const c = s.filter((x:any)=> x.status==='completed').length; return s.length? Math.round(c/s.length*100):0 })()
+
+  // Enhanced calculations using both plan and analytics data
+  const enhancedStats = useMemo(()=>{
+    const planSessions = plan?.sessions || []
+    const completedPlanSessions = planSessions.filter((s:any) => s.status === 'completed')
+    const analyticsSessions = data?.sessions || []
+    
+    // Use plan data if available, fallback to analytics
+    const sessionsCompleted = plan?.progress?.sessions_completed ?? completedPlanSessions.length
+    
+    // Calculate total study time from completed plan sessions + analytics sessions
+    const planStudyTime = completedPlanSessions.reduce((total:number, session:any) => total + (session.duration_min || 0), 0)
+    const analyticsStudyTime = analyticsSessions.reduce((total:number, session:any) => total + (session.duration_min || 0), 0)
+    const totalStudyTime = Math.max(planStudyTime, analyticsStudyTime) // Use whichever is higher
+    
+    // Enhanced streak calculation
+    const streakDays = data?.profile?.streak_days || (completedPlanSessions.length > 0 ? 1 : 0)
+    
+    return {
+      sessionsCompleted,
+      totalStudyTime,
+      streakDays
+    }
+  }, [plan, data])
+
+  const recentAchievements = useMemo(()=>{
+    return [
+      { title: 'Study Streak', description: `${enhancedStats.streakDays} days in a row`, icon: Award },
+      { title: 'Completed Sessions', description: `${enhancedStats.sessionsCompleted} finished`, icon: TrendingUp },
+      { title: 'Active Topics', description: `${topics.length} topics tracked`, icon: Target }
+    ]
+  },[enhancedStats, topics])
 
   const chartColors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
 
@@ -118,7 +180,7 @@ export default function DashboardPage(){
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground">Sessions Completed</p>
-                  <p className="text-3xl font-bold">{plan?.progress?.sessions_completed ?? (plan?.sessions||[]).filter((s:any)=> s.status==='completed').length}</p>
+                  <p className="text-3xl font-bold">{enhancedStats.sessionsCompleted}</p>
                 </div>
                 <div className="w-12 h-12 bg-green-100 dark:bg-green-900/20 rounded-full flex items-center justify-center">
                   <Target className="w-6 h-6 text-green-600 dark:text-green-400" />
@@ -137,7 +199,7 @@ export default function DashboardPage(){
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground">Total Study Time</p>
-                  <p className="text-3xl font-bold">{(data?.sessions||[]).reduce((a:number,b:any)=> a+(b.duration_min||0),0)}<span className="text-lg font-normal">min</span></p>
+                  <p className="text-3xl font-bold">{enhancedStats.totalStudyTime}<span className="text-lg font-normal">min</span></p>
                 </div>
                 <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/20 rounded-full flex items-center justify-center">
                   <Clock className="w-6 h-6 text-blue-600 dark:text-blue-400" />
@@ -151,7 +213,7 @@ export default function DashboardPage(){
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground">Current Streak</p>
-                  <p className="text-3xl font-bold">{data?.profile?.streak_days || 0}<span className="text-lg font-normal">days</span></p>
+                  <p className="text-3xl font-bold">{enhancedStats.streakDays}<span className="text-lg font-normal">days</span></p>
                 </div>
                 <div className="w-12 h-12 bg-orange-100 dark:bg-orange-900/20 rounded-full flex items-center justify-center">
                   <Award className="w-6 h-6 text-orange-600 dark:text-orange-400" />
@@ -222,13 +284,17 @@ export default function DashboardPage(){
                       </div>
                       <div className="flex items-center gap-3">
                         <span className="text-xs text-muted-foreground">{task.duration} min</span>
-                        {task.status === "in-progress" ? (
-                          <Button size="sm">
+                        {task.status === "completed" ? (
+                          <Button size="sm" variant="outline" onClick={() => markSessionComplete(task.date, task.topic, task.status)}>
+                            ✓ Done
+                          </Button>
+                        ) : task.status === "in-progress" ? (
+                          <Button size="sm" onClick={() => markSessionComplete(task.date, task.topic, task.status)}>
                             <Play className="w-3 h-3 mr-1" />
-                            Continue
+                            Complete
                           </Button>
                         ) : (
-                          <Button size="sm" variant="outline">
+                          <Button size="sm" variant="outline" onClick={() => markSessionComplete(task.date, task.topic, task.status)}>
                             Start
                           </Button>
                         )}
