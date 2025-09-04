@@ -1,5 +1,7 @@
 'use client'
 
+import { api, getUserId } from "@/lib/api";
+
 import { useState, useCallback } from 'react'
 import { useDropzone } from 'react-dropzone'
 import { MainLayout } from '@/components/navigation'
@@ -163,10 +165,13 @@ export default function UploadPage() {
     try {
       const deadlineISO = deadline ? new Date(deadline).toISOString() : null
       
+      // Get user ID from Supabase authentication
+      const userId = getUserId()
+      
       const planData = await api('/api/plan/generate', {
         method: 'POST',
         body: JSON.stringify({
-          user_id: 'demo-user', // Add explicit user_id for deployment
+          user_id: userId, // Use actual user ID from authentication
           horizon_days: deadline ? Math.max(3, Math.ceil((new Date(deadline).getTime() - Date.now()) / (1000 * 60 * 60 * 24))) : 14,
           preferred_hours_per_day: hoursPerDay,
           deadline: deadlineISO,

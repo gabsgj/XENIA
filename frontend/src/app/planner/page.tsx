@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { api } from '@/lib/api'
+import { api, getUserId } from '@/lib/api'
 import { useErrorContext } from '@/lib/error-context'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -102,10 +102,13 @@ export default function PlannerPage() {
   async function regen(){
     setLoading(true)
     try {
+      // Get user ID from Supabase authentication
+      const userId = getUserId()
+      
       setPlan(await api('/api/plan/generate', { 
         method:'POST', 
         body: JSON.stringify({ 
-          user_id: 'demo-user', // Add explicit user_id for deployment
+          user_id: userId, // Use actual user ID from authentication
           horizon_days: 14, 
           preferred_hours_per_day: hoursPerDay, 
           deadline: deadline||undefined 
@@ -143,6 +146,7 @@ export default function PlannerPage() {
       const completionPercentage = totalSessions > 0 ? (completedSessions.size / totalSessions) * 100 : 0
       
       const progressData = {
+        user_id: getUserId(), // Add user ID for authentication
         completion_percentage: completionPercentage,
         sessions_completed: completedSessions.size,
         time_spent_hours: totalTimeSpent,

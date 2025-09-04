@@ -4,6 +4,23 @@ import { deriveErrorCode, ERROR_DESCRIPTIONS } from "@/lib/errors";
 
 export const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
+// Utility to get the current user ID consistently across the app
+export function getUserId(): string {
+  if (typeof window === "undefined") {
+    return crypto.randomUUID(); // Server-side fallback
+  }
+  
+  const stored = localStorage.getItem('supabase_user_id');
+  if (stored) {
+    return stored;
+  }
+  
+  // Generate new UUID and store it
+  const newId = crypto.randomUUID();
+  localStorage.setItem('supabase_user_id', newId);
+  return newId;
+}
+
 export type ApiError = Error & {
   errorCode: string;
   errorMessage: string;

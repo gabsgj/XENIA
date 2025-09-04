@@ -15,11 +15,6 @@ def track_session():
     data = request.get_json(silent=True) or {}
     
     user_id = data.get("user_id")
-    if not user_id:
-        # Use default user for deployment/demo scenarios
-        user_id = "demo-user"
-        logger.info("   No user_id provided, using demo-user")
-    
     topic = data.get("topic")
     duration_min = data.get("duration_min", 30)
     
@@ -27,6 +22,9 @@ def track_session():
     logger.info(f"   Topic: {topic}")
     logger.info(f"   Duration: {duration_min} minutes")
     
+    if not user_id:
+        logger.error("   Missing user_id in request")
+        raise ApiError("AUTH_401", "Missing user id")
     if not topic:
         logger.error("   Missing topic in request")
         raise ApiError("PLAN_400", "Missing topic")
