@@ -11,12 +11,12 @@ plan_bp = Blueprint("plan", __name__)
 @plan_bp.post("/generate")
 def generate():
     logger.info("🎯 Generate plan endpoint called")
-    uid = get_user_id_from_request(request) or ""
+    uid = get_user_id_from_request(request)
     if not uid:
-        logger.error("   Missing user_id in request")
-        raise ApiError("PLAN_400", "Missing user_id")
-    else:
-        logger.info(f"   User ID: {uid}")
+        # Use default user for deployment/demo scenarios
+        uid = "demo-user"
+        logger.info("   No user_id provided, using demo-user")
+    logger.info(f"   User ID: {uid}")
     
     try:
         if request.is_json:
@@ -112,10 +112,11 @@ def current_alias():
 def update_progress():
     """Update user progress and adjust plan accordingly."""
     logger.info("📊 Update progress endpoint called")
-    uid = get_user_id_from_request(request) or ""
+    uid = get_user_id_from_request(request)
     if not uid:
-        logger.error("   Missing user_id in request")
-        raise ApiError("PLAN_400", "Missing user_id")
+        # Use default user for deployment/demo scenarios
+        uid = "demo-user"
+        logger.info("   No user_id provided, using demo-user")
     
     try:
         data = request.get_json()
@@ -186,9 +187,11 @@ def get_topic_resources(topic: str):
 def adjust_plan():
     """Manually adjust plan based on user preferences."""
     logger.info("🔧 Adjust plan endpoint called")
-    uid = get_user_id_from_request(request) or ""
+    uid = get_user_id_from_request(request)
     if not uid:
-        raise ApiError("PLAN_400", "Missing user_id")
+        # Use default user for deployment/demo scenarios
+        uid = "demo-user"
+        logger.info("   No user_id provided, using demo-user")
     
     try:
         data = request.get_json()

@@ -104,7 +104,12 @@ export default function PlannerPage() {
     try {
       setPlan(await api('/api/plan/generate', { 
         method:'POST', 
-        body: JSON.stringify({ horizon_days: 14, preferred_hours_per_day: hoursPerDay, deadline: deadline||undefined }) 
+        body: JSON.stringify({ 
+          user_id: 'demo-user', // Add explicit user_id for deployment
+          horizon_days: 14, 
+          preferred_hours_per_day: hoursPerDay, 
+          deadline: deadline||undefined 
+        }) 
       }))
     } catch(e:any){ 
       pushError({ 

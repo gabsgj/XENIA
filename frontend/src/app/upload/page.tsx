@@ -166,6 +166,7 @@ export default function UploadPage() {
       const planData = await api('/api/plan/generate', {
         method: 'POST',
         body: JSON.stringify({
+          user_id: 'demo-user', // Add explicit user_id for deployment
           horizon_days: deadline ? Math.max(3, Math.ceil((new Date(deadline).getTime() - Date.now()) / (1000 * 60 * 60 * 24))) : 14,
           preferred_hours_per_day: hoursPerDay,
           deadline: deadlineISO,

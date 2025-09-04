@@ -13,7 +13,8 @@ resources_bp = Blueprint("resources", __name__)
 def list_topics():
     raw_user_id = request.args.get("user_id") or request.headers.get("X-User-Id") or ""
     if not raw_user_id:
-        raise ApiError("AUTH_401", "Missing user_id")
+        # Use default user for deployment/demo scenarios
+        raw_user_id = "demo-user"
     user_id = normalize_user_id(raw_user_id)
     # If invalid UUID -> use in-memory store only (demo mode)
     if not is_valid_uuid(user_id):
@@ -36,7 +37,8 @@ def list_topics():
 def list_resources():
     raw_user_id = request.args.get("user_id") or request.headers.get("X-User-Id") or ""
     if not raw_user_id:
-        raise ApiError("AUTH_401", "Missing user_id")
+        # Use default user for deployment/demo scenarios
+        raw_user_id = "demo-user"
     user_id = normalize_user_id(raw_user_id)
     if not is_valid_uuid(user_id):
         # Demo mode: we currently don't store resources for demo users (no DB). Return empty list.
@@ -50,7 +52,8 @@ def update_progress():
     data = request.get_json(silent=True) or {}
     raw_user_id = data.get("user_id") or request.headers.get("X-User-Id") or ""
     if not raw_user_id:
-        raise ApiError("AUTH_401", "Missing user_id")
+        # Use default user for deployment/demo scenarios
+        raw_user_id = "demo-user"
     user_id = normalize_user_id(raw_user_id)
     if not is_valid_uuid(user_id):
         # Demo users: progress not persisted; return optimistic success
