@@ -4,7 +4,7 @@
 # Build Command
 buildCommand: |
   cd frontend
-  npm ci
+  npm ci --include=dev
   npm run build
 
 # Start Command
@@ -13,7 +13,7 @@ startCommand: |
   npm start
 
 # Environment
-runtime: node18
+runtime: node20
 
 # Publish Directory
 publishDir: frontend/.next

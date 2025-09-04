@@ -32,10 +32,10 @@ services:
 
   - type: web
     name: xenia-frontend
-    runtime: node
+    runtime: node20
     buildCommand: |
       cd frontend
-      npm ci
+      npm ci --include=dev
       npm run build
     startCommand: |
       cd frontend

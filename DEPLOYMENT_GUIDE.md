@@ -11,6 +11,17 @@ Render provides the simplest deployment solution for XENIA with automatic scalin
 2. GitHub repository with XENIA code
 3. Supabase project for database
 
+### **Quick Deployment Steps**
+
+#### **Option 1: Using render.yaml (Recommended)**
+1. Push the latest code to your GitHub repository
+2. In Render Dashboard, click **"New +"** → **"Blueprint"**
+3. Connect your GitHub repository
+4. Render will automatically detect `render.yaml` and create both services
+5. Set the environment variables in the Render dashboard (see below)
+
+#### **Option 2: Manual Service Creation**
+
 ### **Backend Deployment**
 
 #### **1. Create Backend Service**
@@ -20,9 +31,9 @@ Render provides the simplest deployment solution for XENIA with automatic scalin
 4. Configure settings:
    - **Name**: `xenia-backend`
    - **Runtime**: `Python 3`
-   - **Build Command**: `pip install -r requirements.txt`
-   - **Start Command**: `python run.py`
-   - **Root Directory**: `backend`
+   - **Build Command**: `cd backend && pip install -r requirements.txt`
+   - **Start Command**: `cd backend && gunicorn --bind 0.0.0.0:$PORT --workers 2 --timeout 120 run:app`
+   - **Root Directory**: Leave blank (deploy from repository root)
 
 #### **2. Environment Variables**
 Set these in Render dashboard:
@@ -30,21 +41,25 @@ Set these in Render dashboard:
 SUPABASE_URL=your_supabase_url
 SUPABASE_ANON_KEY=your_supabase_anon_key
 SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
-GOOGLE_AI_API_KEY=your_gemini_api_key
+GEMINI_API_KEY=your_gemini_api_key
 ENVIRONMENT=production
 FLASK_ENV=production
+LOG_LEVEL=INFO
+EMBEDDING_PROVIDER=gemini
+EMBEDDING_MODEL=text-embedding-004
 ```
 
 ### **Frontend Deployment**
 
 #### **1. Create Frontend Service**
-1. In Render Dashboard: **"New +"** → **"Static Site"**
+1. In Render Dashboard: **"New +"** → **"Web Service"**
 2. Connect same GitHub repository
 3. Configure settings:
    - **Name**: `xenia-frontend`
-   - **Root Directory**: `frontend`
-   - **Build Command**: `npm ci && npm run build`
-   - **Publish Directory**: `out`
+   - **Runtime**: `Node 20`
+   - **Root Directory**: Leave blank
+   - **Build Command**: `cd frontend && npm ci --include=dev && npm run build`
+   - **Start Command**: `cd frontend && npm start`
 
 #### **2. Environment Variables**
 ```bash
@@ -150,6 +165,34 @@ def health_check():
 
 ### **Common Issues**
 
+#### **TypeScript Build Failures**
+**Error**: `Cannot find module 'typescript'`
+**Solution**:
+1. Ensure TypeScript is in dependencies (not just devDependencies)
+2. Use `npm ci --include=dev` in build command
+3. Updated files:
+   - `package.json`: Moved TypeScript to dependencies
+   - `render.yaml`: Updated build command
+   - `.nvmrc`: Updated to Node 20 (Node 18 is EOL)
+
+#### **Node.js Version Issues**
+**Error**: `Node.js version 18.20.8 has reached end-of-life`
+**Solution**:
+1. Update `.nvmrc` to version 20
+2. Update `package.json` engines to Node 20+
+3. Set `runtime: node20` in Render configuration
+
+#### **Build Command Issues**
+**Problem**: Dependencies not installing properly
+**Solution**:
+```bash
+# Use this build command in Render:
+cd frontend && npm ci --include=dev && npm run build
+
+# Alternative if issues persist:
+cd frontend && npm install && npm run build
+```
+
 #### **Build Failures**
 - Check build logs in Render Dashboard
 - Verify `requirements.txt` or `package.json`
@@ -170,9 +213,35 @@ def health_check():
 - Check CORS configuration
 - Ensure both services are deployed
 
+### **Deployment Debugging Steps**
+
+1. **Check Node.js Version**:
+   ```bash
+   # In your local terminal:
+   node --version  # Should be 20.x.x
+   ```
+
+2. **Test Local Build**:
+   ```bash
+   cd frontend
+   npm ci --include=dev
+   npm run build
+   ```
+
+3. **Verify Dependencies**:
+   ```bash
+   npm list typescript  # Should show typescript in dependencies
+   ```
+
+4. **Check Render Logs**:
+   - Go to Render Dashboard
+   - Select your service
+   - Check "Logs" tab for detailed error messages
+
 ### **Support Resources**
 - [Render Documentation](https://render.com/docs)
 - [Supabase Documentation](https://supabase.com/docs)
+- [Next.js Deployment Guide](https://nextjs.org/docs/deployment)
 - XENIA GitHub Issues
 
 ## 📈 Scaling & Performance
