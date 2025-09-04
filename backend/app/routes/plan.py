@@ -24,10 +24,16 @@ def generate():
             horizon = int(data.get("horizon_days", 14))
             preferred_hours = float(data.get("preferred_hours_per_day", 1.5))
             deadline = data.get("deadline")
+            learning_style = data.get("learning_style", "balanced")
+            topics = data.get("topics", [])  # Get extracted topics from frontend
+            topic_details = data.get("topic_details", [])  # Get detailed topic metadata
         else:
             horizon = int(request.values.get("horizon_days", 14))
             preferred_hours = float(request.values.get("preferred_hours_per_day", 1.5))
             deadline = request.values.get("deadline")
+            learning_style = request.values.get("learning_style", "balanced")
+            topics = []
+            topic_details = []
         
         logger.info(f"   Horizon days: {horizon}")
         
@@ -39,7 +45,16 @@ def generate():
         raise ApiError("PLAN_400", "Invalid horizon_days")
     
     logger.info(f"   Generating plan for user {uid} with {horizon} days horizon...")
-    plan = generate_plan(user_id=uid, horizon_days=horizon, preferred_hours_per_day=preferred_hours, deadline=deadline)
+    logger.info(f"   Using {len(topics)} extracted topics and learning style: {learning_style}")
+    plan = generate_plan(
+        user_id=uid, 
+        horizon_days=horizon, 
+        preferred_hours_per_day=preferred_hours, 
+        deadline=deadline,
+        learning_style=learning_style,
+        extracted_topics=topics,
+        topic_details=topic_details
+    )
     logger.info(f"   Plan generated successfully for user {uid}")
     return plan, 200
 

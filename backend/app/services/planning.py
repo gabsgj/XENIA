@@ -34,18 +34,58 @@ def _distribute_sessions(topics: List[Dict], days: int, hours_per_day: float) ->
     return sessions[: days * 6]  # cap
 
 
-def generate_plan(user_id: str, horizon_days: int = 14, preferred_hours_per_day: float = 1.5, deadline: Optional[str] = None) -> Dict:
+def generate_plan(
+    user_id: str, 
+    horizon_days: int = 14, 
+    preferred_hours_per_day: float = 1.5, 
+    deadline: Optional[str] = None,
+    learning_style: str = "balanced",
+    extracted_topics: List[str] = None,
+    topic_details: List[Dict] = None
+) -> Dict:
     """Generate an intelligent, AI-optimized study plan."""
     logger.info(f"🎯 Generating AI-optimized plan for user {user_id}")
+    logger.info(f"   Learning style: {learning_style}, Topics provided: {len(extracted_topics or [])}")
     
     norm_user_id = normalize_user_id(user_id)
 
-    # 1. Attempt to use enhanced syllabus topics (DB or in-memory) as primary source
+    # 1. Prioritize extracted topics from upload if available
     syllabus_topics: List[str] = []
     enhanced_topic_data: List[Dict] = []
     
-    # From DB if valid UUID - get enhanced topic data
-    if is_valid_uuid(norm_user_id):
+    # Use extracted topics first (from recent upload)
+    if extracted_topics and len(extracted_topics) > 0:
+        logger.info(f"   Using {len(extracted_topics)} extracted topics from upload")
+        syllabus_topics = extracted_topics
+        
+        # Use detailed topic metadata if available
+        if topic_details and len(topic_details) > 0:
+            enhanced_topic_data = []
+            for i, topic in enumerate(extracted_topics):
+                # Find matching detail or create basic entry
+                detail = None
+                if i < len(topic_details):
+                    detail = topic_details[i]
+                    if isinstance(detail, dict) and detail.get('topic'):
+                        enhanced_topic_data.append({
+                            "topic": detail.get('topic', topic),
+                            "score": detail.get('difficulty_score', detail.get('score', 5)),
+                            "category": detail.get('category', 'general'),
+                            "estimated_hours": detail.get('estimated_hours', 3),
+                            "priority": detail.get('priority', 'medium'),
+                            "prerequisites": detail.get('prerequisites', []),
+                            "learning_objectives": detail.get('learning_objectives', []),
+                            "suggested_resources": detail.get('suggested_resources', [])
+                        })
+                    else:
+                        enhanced_topic_data.append({"topic": topic, "score": 5, "estimated_hours": 3})
+                else:
+                    enhanced_topic_data.append({"topic": topic, "score": 5, "estimated_hours": 3})
+        else:
+            enhanced_topic_data = [{"topic": t, "score": 5, "estimated_hours": 3} for t in syllabus_topics]
+    
+    # 2. Fallback to database topics if no extracted topics
+    elif is_valid_uuid(norm_user_id):
         try:
             sb = get_supabase()
             resp = sb.table("syllabus_topics").select("topic, order_index, metadata").eq("user_id", norm_user_id).order("order_index").limit(200).execute()
@@ -73,7 +113,7 @@ def generate_plan(user_id: str, horizon_days: int = 14, preferred_hours_per_day:
             syllabus_topics = []
             enhanced_topic_data = []
     
-    # Fallback to in-memory store (demo users)
+    # 3. Fallback to in-memory store (demo users)
     if not syllabus_topics:
         syllabus_topics = store_get_topics(norm_user_id)
         enhanced_topic_data = [{"topic": t, "score": 5, "estimated_hours": 3} for t in syllabus_topics]
@@ -135,7 +175,9 @@ def generate_plan(user_id: str, horizon_days: int = 14, preferred_hours_per_day:
             topics=prioritized_topics,
             horizon_days=horizon_days,
             deadline=deadline,
-            user_preferences=user_preferences
+            user_preferences=user_preferences,
+            learning_style=learning_style,
+            extracted_topics=extracted_topics
         )
         
         if ai_plan and "study_sessions" in ai_plan and ai_plan["study_sessions"]:

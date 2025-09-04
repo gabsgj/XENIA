@@ -600,7 +600,9 @@ Return ONLY valid JSON:
 
 def generate_enhanced_study_plan_with_resources(topics: list, horizon_days: int = 14, 
                                               deadline: Optional[str] = None, 
-                                              user_preferences: Dict[str, Any] = None) -> Dict[str, Any]:
+                                              user_preferences: Dict[str, Any] = None,
+                                              learning_style: Optional[str] = None,
+                                              extracted_topics: Optional[list] = None) -> Dict[str, Any]:
     """Generate enhanced study plan with resources using Gemini 2.0 Flash."""
     import logging
     from datetime import datetime, timedelta
@@ -711,7 +713,10 @@ Return ONLY valid JSON:
     except Exception as e:
         logger.error(f"Enhanced study plan generation failed: {e}")
         
-        # Fallback with basic structure
+        # Import our enhanced resource fetching
+        from .resources import fetch_resources_for_topic
+        
+        # Fallback with basic structure but enhanced resources
         sessions = []
         start_date = datetime.now().date()
         
@@ -721,18 +726,70 @@ Return ONLY valid JSON:
             if isinstance(topic_data, dict):
                 topic = topic_data.get("topic", f"Topic {i+1}")
                 hours = min(preferred_hours, topic_data.get("estimated_hours", 2))
+                topic_metadata = topic_data
             else:
                 topic = str(topic_data)
                 hours = preferred_hours
+                topic_metadata = {}
             
-            sessions.append({
-                "date": session_date.isoformat(),
-                "topic": topic,
-                "duration_hours": hours,
-                "priority": "medium",
-                "difficulty_level": 5,
-                "learning_objectives": [f"Understand {topic}"],
-                "resources": {
+            # Fetch enhanced resources based on learning style and topic metadata
+            try:
+                enhanced_resources = fetch_resources_for_topic(
+                    topic, 
+                    learning_style=learning_style or preferences.get("learning_style"),
+                    topic_metadata=topic_metadata
+                )
+                
+                # Organize resources by type
+                youtube_videos = [r for r in enhanced_resources if r.get("source") == "youtube"]
+                articles = [r for r in enhanced_resources if r.get("source") in ["wikipedia", "wikibooks"]]
+                ocw_resources = [r for r in enhanced_resources if r.get("source") == "ocw"]
+                
+                # Format resources for the plan
+                resources = {
+                    "youtube_videos": [
+                        {
+                            "title": res.get("title", "Unknown Title"),
+                            "channel": res.get("metadata", {}).get("channel", "Educational Channel"),
+                            "url": res.get("url", ""),
+                            "duration": "20 min",  # Default, could enhance this
+                            "learning_style_optimized": res.get("metadata", {}).get("learning_style") == learning_style
+                        } for res in youtube_videos[:3]
+                    ],
+                    "articles": [
+                        {
+                            "title": res.get("title", "Study Guide"),
+                            "source": res.get("source", "Educational Source"),
+                            "url": res.get("url", ""),
+                            "read_time": "15 min"
+                        } for res in articles[:2]
+                    ],
+                    "practice_sites": [
+                        {
+                            "name": res.get("title", "Practice Platform"),
+                            "url": res.get("url", "https://khanacademy.org"),
+                            "type": "interactive learning"
+                        } for res in ocw_resources[:2]
+                    ]
+                }
+                
+                # Add fallback resources if none found
+                if not any(resources.values()):
+                    resources = {
+                        "youtube_videos": [
+                            {"title": f"{topic} Tutorial", "channel": "Educational Channel", "url": f"https://youtube.com/search?q={topic.replace(' ', '+')}", "duration": "20 min"}
+                        ],
+                        "articles": [
+                            {"title": f"{topic} Guide", "source": "Study Resource", "url": f"https://google.com/search?q={topic.replace(' ', '+')}", "read_time": "15 min"}
+                        ],
+                        "practice_sites": [
+                            {"name": "Practice Platform", "url": "https://khanacademy.org", "type": "exercises"}
+                        ]
+                    }
+                    
+            except Exception as res_error:
+                logger.warning(f"Resource fetching failed for {topic}: {res_error}")
+                resources = {
                     "youtube_videos": [
                         {"title": f"{topic} Tutorial", "channel": "Educational Channel", "url": f"https://youtube.com/search?q={topic.replace(' ', '+')}", "duration": "20 min"}
                     ],
@@ -742,10 +799,20 @@ Return ONLY valid JSON:
                     "practice_sites": [
                         {"name": "Practice Platform", "url": "https://khanacademy.org", "type": "exercises"}
                     ]
-                },
-                "prerequisites": [],
+                }
+            
+            sessions.append({
+                "date": session_date.isoformat(),
+                "topic": topic,
+                "duration_hours": hours,
+                "priority": topic_metadata.get("priority", "medium"),
+                "difficulty_level": topic_metadata.get("score", 5),
+                "learning_objectives": [f"Understand {topic}"],
+                "resources": resources,
+                "prerequisites": topic_metadata.get("prerequisites", []),
                 "expected_outcomes": [f"Master {topic}"],
-                "assessment_method": "self-assessment"
+                "assessment_method": "self-assessment",
+                "category": topic_metadata.get("category", "general")
             })
         
         return {

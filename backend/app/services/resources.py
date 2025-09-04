@@ -45,13 +45,24 @@ def _safe_get_json(url: str, params: Dict[str, Any] | None = None, timeout: floa
     return None
 
 
-def _youtube_search(query: str, max_results: int = 3) -> List[Dict[str, Any]]:
+def _youtube_search(query: str, max_results: int = 3, learning_style: str = None) -> List[Dict[str, Any]]:
     if not YOUTUBE_API_KEY:
         # Fallback: use ytsearch via no API key not allowed; return empty list to avoid scraping policies
         return []
+    
+    # Enhance query based on learning style
+    enhanced_query = query
+    if learning_style:
+        if learning_style.lower() in ["visual", "kinesthetic"]:
+            enhanced_query = f"{query} tutorial demonstration"
+        elif learning_style.lower() == "auditory":
+            enhanced_query = f"{query} lecture explanation"
+        elif learning_style.lower() == "reading":
+            enhanced_query = f"{query} step by step guide"
+    
     params = {
         "part": "snippet",
-        "q": query,
+        "q": enhanced_query,
         "type": "video",
         "maxResults": str(max_results),
         "key": YOUTUBE_API_KEY,
@@ -73,6 +84,8 @@ def _youtube_search(query: str, max_results: int = 3) -> List[Dict[str, Any]]:
             "metadata": {
                 "channel": snippet.get("channelTitle"),
                 "published_at": snippet.get("publishedAt"),
+                "learning_style": learning_style,
+                "enhanced_query": enhanced_query,
             },
         })
     return videos
@@ -105,21 +118,29 @@ def _doc_links(query: str) -> List[Dict[str, Any]]:
     return results
 
 
-def fetch_resources_for_topic(topic: str) -> List[Dict[str, Any]]:
+def fetch_resources_for_topic(topic: str, learning_style: str = None, topic_metadata: Dict[str, Any] = None) -> List[Dict[str, Any]]:
     resources: List[Dict[str, Any]] = []
-    # YouTube
+    
+    # Use enhanced search based on topic metadata if available
+    search_query = topic
+    if topic_metadata:
+        category = topic_metadata.get("category", "")
+        if category:
+            search_query = f"{category} {topic}"
+    
+    # YouTube with learning style enhancement
     try:
-        resources.extend(_youtube_search(topic))
+        resources.extend(_youtube_search(search_query, learning_style=learning_style))
     except Exception:
         pass
     # OCW/MOOC catalogs
     try:
-        resources.extend(_ocw_links(topic))
+        resources.extend(_ocw_links(search_query))
     except Exception:
         pass
     # Documentation style
     try:
-        resources.extend(_doc_links(topic))
+        resources.extend(_doc_links(search_query))
     except Exception:
         pass
     return resources

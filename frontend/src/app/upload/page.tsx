@@ -169,7 +169,9 @@ export default function UploadPage() {
           horizon_days: deadline ? Math.max(3, Math.ceil((new Date(deadline).getTime() - Date.now()) / (1000 * 60 * 60 * 24))) : 14,
           preferred_hours_per_day: hoursPerDay,
           deadline: deadlineISO,
-          learning_style: learningStyle
+          learning_style: learningStyle,
+          topics: topics, // Pass extracted topics to study plan generation
+          topic_details: topicDetails // Pass detailed topic metadata for enhanced planning
         })
       })
       
