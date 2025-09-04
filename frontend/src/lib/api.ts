@@ -45,6 +45,20 @@ async function getAuthHeaders(): Promise<Record<string, string>> {
 }
 
 export async function api<T = any>(path: string, opts: RequestInit = {}): Promise<T> {
+  // Simple in-memory dedupe cache (per session) to avoid fetch storms
+  // Key: method + path + body hash; TTL default 2s for GET only
+  const method = (opts.method || 'GET').toUpperCase();
+  const isGet = method === 'GET';
+  const dedupeKey = isGet ? `GET:${path}` : '';
+  const now = Date.now();
+  const g: any = globalThis as any;
+  if (isGet) {
+    g.__xeniaApiCache = g.__xeniaApiCache || new Map<string, { ts: number; data: any }>();
+    const hit = g.__xeniaApiCache.get(dedupeKey);
+    if (hit && now - hit.ts < 2000) {
+      return hit.data as T;
+    }
+  }
   const authHeaders = await getAuthHeaders();
   const hasBody = typeof (opts as any).body !== "undefined" && (opts as any).body !== null;
   const baseHeaders: Record<string, string> = { ...(opts.headers as any), ...authHeaders } as any;
@@ -71,5 +85,11 @@ export async function api<T = any>(path: string, opts: RequestInit = {}): Promis
   if (!res.ok) {
     throw buildApiError(path, res.status, text, json, correlationId);
   }
-  return (json as T) ?? (JSON.parse(text || "{}") as T);
+  const data = (json as T) ?? (JSON.parse(text || "{}") as T);
+  if (isGet) {
+    try {
+      (globalThis as any).__xeniaApiCache.set(dedupeKey, { ts: now, data });
+    } catch {}
+  }
+  return data;
 }

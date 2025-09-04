@@ -1,25 +1,28 @@
 #!/usr/bin/env python3
+"""Lightweight integration sanity checks for AI-related functionality.
+
+Run standalone:
+    python test_ai_integration.py
+
+It will (optionally) hit local endpoints if the backend is running.
 """
-Test script to verify AI integration is working properly.
-"""
+from __future__ import annotations
 import os
-import sys
-import requests
-import json
+from requests import *
 
-# Add backend to path
-sys.path.append('backend')
 
-def test_environment():
-    """Test environment variables."""
-    print("🔧 Testing environment variables...")
-    ai_mock = os.getenv("AI_MOCK", "false")
-    gemini_key = os.getenv("GEMINI_API_KEY", "")
-    
-    print(f"   AI_MOCK: {ai_mock}")
-    print(f"   GEMINI_API_KEY: {'✅ Set' if gemini_key else '❌ Missing'}")
-    
-    return ai_mock.lower() == "false" and bool(gemini_key)
+def test_environment() -> bool:
+        """Validate that at least one AI provider key is present."""
+        gemini_key = os.getenv("GEMINI_API_KEY")
+        openai_key = os.getenv("OPENAI_API_KEY")
+        anthropic_key = os.getenv("ANTHROPIC_API_KEY")
+        print("Environment Check:")
+        print(f"   GEMINI_API_KEY set: {bool(gemini_key)}")
+        print(f"   OPENAI_API_KEY set: {bool(openai_key)}")
+        print(f"   ANTHROPIC_API_KEY set: {bool(anthropic_key)}")
+        available = bool(gemini_key or openai_key or anthropic_key)
+        print(f"   At least one provider available: {available}")
+        return available
 
 def test_ai_provider():
     """Test AI provider directly."""
@@ -98,4 +101,4 @@ def main():
     return 0 if all_passed else 1
 
 if __name__ == "__main__":
-    exit(main())
+    raise SystemExit(main())

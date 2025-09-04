@@ -2,7 +2,6 @@ from __future__ import annotations
 import os
 from typing import List, Optional
 
-from .ai_mock import get_mock_provider, is_mock_enabled
 
 _provider: Optional[str] = None
 
@@ -77,11 +76,6 @@ def _embed_gemini(
 def embed_texts(
     texts: List[str], model: Optional[str] = None
 ) -> Optional[List[List[float]]]:
-    # Check if mock mode is enabled
-    if is_mock_enabled():
-        mock_provider = get_mock_provider()
-        return mock_provider.get_embeddings(texts, model)
-    
     provider = _get_provider()
     if provider == "openai":
         return _embed_openai(texts, model)

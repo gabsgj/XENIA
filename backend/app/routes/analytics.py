@@ -2,145 +2,87 @@ import logging
 from flask import Blueprint, request
 from ..errors import ApiError
 from ..supabase_client import get_supabase
+from ..utils import normalize_user_id, is_valid_uuid
 
 logger = logging.getLogger('xenia')
 analytics_bp = Blueprint("analytics", __name__)
 
 
+@analytics_bp.get("/me")
+def whoami():
+    """Return normalized user id and persistence capability.
+
+    Uses X-User-Id header or user_id query param (legacy) then normalizes.
+    Indicates whether the id is a valid UUID (can persist) or demo/hashed.
+    """
+    raw_user_id = request.headers.get("X-User-Id") or request.args.get("user_id") or ""
+    if not raw_user_id:
+        return {"raw_user_id": None, "normalized_user_id": None, "persist": False}
+    normalized = normalize_user_id(raw_user_id)
+    return {
+        "raw_user_id": raw_user_id,
+        "normalized_user_id": normalized,
+        "persist": is_valid_uuid(normalized)
+    }
+
+
 @analytics_bp.get("/student")
 def student_analytics():
+    """Return per-student analytics (sessions, tasks, profile).
+
+    Query param: user_id (optional) or X-User-Id header.
+    If user id missing or invalid -> return empty sets.
+    """
     logger.info("📊 Student analytics endpoint called")
     sb = get_supabase()
-    user_id = request.args.get("user_id", "")
-    if not user_id:
-        # Generate a valid UUID for demo purposes
-        import uuid
-        user_id = str(uuid.uuid4())
-        logger.info(f"   No user_id provided, generating demo UUID: {user_id}")
-    else:
-        logger.info(f"   User ID: {user_id}")
-        
-    # Validate UUID format
+    raw_user_id = request.args.get("user_id") or request.headers.get("X-User-Id") or ""
+    user_id = normalize_user_id(raw_user_id) if raw_user_id else ""
+    logger.debug(f"analytics.student raw={raw_user_id} normalized={user_id}")
+
+    sessions = []
+    tasks = []
+    profile = {}
+    if not is_valid_uuid(user_id):
+        return {"sessions": sessions, "tasks": tasks, "profile": profile}
+
     try:
-        import uuid
-        if user_id == "demo-user":
-            # Convert demo-user to a valid UUID
-            user_id = str(uuid.uuid4())
-            logger.info(f"   Converting demo-user to valid UUID: {user_id}")
-        else:
-            # Validate existing UUID
-            uuid.UUID(user_id)
-    except ValueError:
-        # Generate valid UUID if invalid format
-        user_id = str(uuid.uuid4())
-        logger.info(f"   Invalid UUID format, generating new one: {user_id}")
-    
-    try:
-        logger.info("   Fetching sessions data...")
-        sessions = (
+        sessions_resp = (
             sb.table("sessions")
             .select("duration_min, topic, created_at")
             .eq("user_id", user_id)
             .limit(200)
             .execute()
-            .data
-            or []
         )
-        logger.info(f"   Found {len(sessions)} sessions")
-        
-        logger.info("   Fetching tasks data...")
-        tasks = (
+        sessions = sessions_resp.data or []
+    except Exception as e:
+        logger.warning(f"sessions fetch failed: {e}")
+
+    try:
+        tasks_resp = (
             sb.table("tasks")
             .select("status, topic, created_at")
             .eq("user_id", user_id)
             .limit(200)
             .execute()
-            .data
-            or []
         )
-        logger.info(f"   Found {len(tasks)} tasks")
-        
-        logger.info("   Fetching profile data...")
-        xp = (
+        tasks = tasks_resp.data or []
+    except Exception as e:
+        logger.warning(f"tasks fetch failed: {e}")
+
+    try:
+        prof_resp = (
             sb.table("profiles")
             .select("xp, level, streak_days")
             .eq("user_id", user_id)
             .limit(1)
             .execute()
-            .data
         )
-        profile = xp[0] if xp else {}
-        logger.info(f"   Profile data: {profile}")
-        
-        result = {"sessions": sessions, "tasks": tasks, "profile": profile}
-        logger.info(f"   Returning analytics data for user {user_id}")
-        return result
+        prof_data = prof_resp.data or []
+        profile = prof_data[0] if prof_data else {}
     except Exception as e:
-        logger.warning(f"   Database error, returning mock data: {str(e)}")
-        # Return mock data if there's an error
-        return {
-            "sessions": [
-                {"duration_min": 45, "topic": "Mathematics", "created_at": "2024-01-15T10:00:00Z"},
-                {"duration_min": 30, "topic": "Physics", "created_at": "2024-01-14T14:30:00Z"},
-                {"duration_min": 60, "topic": "Chemistry", "created_at": "2024-01-13T09:15:00Z"}
-            ],
-            "tasks": [
-                {"status": "done", "topic": "Calculus", "created_at": "2024-01-15T08:00:00Z"},
-                {"status": "done", "topic": "Algebra", "created_at": "2024-01-14T16:00:00Z"},
-                {"status": "pending", "topic": "Trigonometry", "created_at": "2024-01-13T10:00:00Z"}
-            ],
-            "profile": {"xp": 1250, "level": 5, "streak_days": 7}
-        }
+        logger.warning(f"profile fetch failed: {e}")
 
-
-@analytics_bp.get("/teacher")
-def teacher_analytics():
-    logger.info("👨‍🏫 Teacher analytics endpoint called")
-    sb = get_supabase()
-    class_id = request.args.get("class_id", "")
-    if not class_id:
-        logger.error("   Missing class_id parameter")
-        raise ApiError("CONTENT_NOT_FOUND", "Missing class_id")
-    
-    logger.info(f"   Class ID: {class_id}")
-    
-    try:
-        logger.info("   Fetching student enrollments...")
-        students = (
-            sb.table("enrollments")
-            .select("user_id")
-            .eq("class_id", class_id)
-            .execute()
-            .data
-            or []
-        )
-        user_ids = [s["user_id"] for s in students]
-        logger.info(f"   Found {len(user_ids)} students in class")
-        
-        logger.info("   Fetching student profiles...")
-        profiles = (
-            sb.table("profiles")
-            .select("user_id, xp, level, streak_days")
-            .in_("user_id", user_ids)
-            .execute()
-            .data
-            or []
-        )
-        logger.info(f"   Found {len(profiles)} student profiles")
-        
-        result = {"class_id": class_id, "profiles": profiles}
-        logger.info(f"   Returning teacher analytics for class {class_id}")
-        return result
-    except Exception as e:
-        logger.warning(f"   Database error, returning mock data: {str(e)}")
-        # Return mock data if there's an error
-        return {
-            "class_id": class_id,
-            "profiles": [
-                {"user_id": "student1", "xp": 1200, "level": 4, "streak_days": 5},
-                {"user_id": "student2", "xp": 800, "level": 3, "streak_days": 3}
-            ]
-        }
+    return {"sessions": sessions, "tasks": tasks, "profile": profile}
 
 
 @analytics_bp.get("/parent")
@@ -182,12 +124,5 @@ def parent_analytics():
         logger.info(f"   Returning parent analytics for parent {parent_id}")
         return result
     except Exception as e:
-        logger.warning(f"   Database error, returning mock data: {str(e)}")
-        # Return mock data if there's an error
-        return {
-            "parent_id": parent_id,
-            "profiles": [
-                {"user_id": "child1", "xp": 1000, "level": 4, "streak_days": 6},
-                {"user_id": "child2", "xp": 750, "level": 3, "streak_days": 4}
-            ]
-        }
+        logger.warning(f"   Database error, returning empty parent analytics: {str(e)}")
+        return {"parent_id": parent_id, "profiles": []}

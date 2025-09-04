@@ -19,13 +19,24 @@ import {
 
 export default function PlannerPage() {
   const [plan, setPlan] = useState<any>(null)
+  const [topics, setTopics] = useState<any[]>([])
+  const [resources, setResources] = useState<any[]>([])
+  const [hoursPerDay, setHoursPerDay] = useState(1.5)
+  const [deadline, setDeadline] = useState('')
   const [loading, setLoading] = useState(false)
   const { pushError } = useErrorContext()
   
   useEffect(()=>{ 
     (async ()=>{ 
       try{ 
-        setPlan(await api('/api/plan/current?user_id=demo-user')) 
+        const [p, t, r] = await Promise.all([
+          api('/api/plan/current'),
+          api('/api/resources/topics'),
+          api('/api/resources/list')
+        ])
+        setPlan(p)
+        setTopics(t.topics||[])
+        setResources(r.resources||[])
       } catch(e:any){ 
         pushError({ 
           errorCode: e?.errorCode||'PLAN_400', 
@@ -41,7 +52,7 @@ export default function PlannerPage() {
     try {
       setPlan(await api('/api/plan/generate', { 
         method:'POST', 
-        body: JSON.stringify({ user_id:'demo-user', horizon_days: 14 }) 
+        body: JSON.stringify({ horizon_days: 14, preferred_hours_per_day: hoursPerDay, deadline: deadline||undefined }) 
       }))
     } catch(e:any){ 
       pushError({ 
@@ -51,6 +62,18 @@ export default function PlannerPage() {
       }) 
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function markSession(date: string, topic: string, status: string){
+    try {
+      const resp = await api('/api/resources/progress', {
+        method: 'POST',
+        body: JSON.stringify({ sessions: [{ date, topic, status }] })
+      })
+      setPlan(resp.plan)
+    } catch(e:any){
+      pushError({ errorCode: e?.errorCode||'PLAN_PROGRESS_FAIL', errorMessage: e?.errorMessage, details: e })
     }
   }
 
@@ -72,7 +95,17 @@ export default function PlannerPage() {
             <h1 className='text-3xl md:text-4xl font-bold tracking-tight'>Study Planner</h1>
             <p className='text-muted-foreground'>Your personalized AI-generated study schedule</p>
           </div>
-          <div className='flex items-center gap-3'>
+          <div className='flex flex-wrap items-center gap-3'>
+            <div className='flex items-center gap-2'>
+              <label className='text-xs text-muted-foreground'>Hours/day</label>
+              <input type='number' step='0.5' min='0.5' className='w-20 px-2 py-1 border rounded bg-background text-sm'
+                value={hoursPerDay} onChange={e=> setHoursPerDay(parseFloat(e.target.value)||1.5)} />
+            </div>
+            <div className='flex items-center gap-2'>
+              <label className='text-xs text-muted-foreground'>Deadline</label>
+              <input type='date' className='px-2 py-1 border rounded bg-background text-sm'
+                value={deadline} onChange={e=> setDeadline(e.target.value)} />
+            </div>
             <Button variant="outline" size="sm">
               <Filter className="w-4 h-4 mr-2" />
               Filter
@@ -127,7 +160,7 @@ export default function PlannerPage() {
                           <p className='text-xs text-muted-foreground mb-2'>{s.focus}</p>
                           <div className="flex items-center justify-between">
                             <span className='text-xs text-muted-foreground'>{s.duration_min} min</span>
-                            <Button size="sm" variant="ghost" className="h-6 px-2">
+                            <Button size="sm" variant="ghost" className="h-6 px-2" onClick={()=> markSession(s.date, s.topic, s.status==='completed'?'pending':'completed')}>
                               <Play className="w-3 h-3" />
                             </Button>
                           </div>
@@ -212,9 +245,9 @@ export default function PlannerPage() {
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
-                          <Button size="sm" variant="outline">
+                          <Button size="sm" variant="outline" onClick={()=> markSession(s.date, s.topic, s.status==='completed'?'pending':'completed')}>
                             <Play className="w-3 h-3 mr-1" />
-                            Start
+                            {s.status==='completed'? 'Undo' : 'Complete'}
                           </Button>
                           <Button size="sm" variant="ghost">
                             <MoreHorizontal className="w-4 h-4" />

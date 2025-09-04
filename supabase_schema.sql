@@ -30,6 +30,36 @@ create table if not exists plans (
   updated_at timestamp with time zone default now()
 );
 
+-- Extracted syllabus topics
+create table if not exists syllabus_topics (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references auth.users(id) on delete cascade,
+  topic text not null,
+  parent_topic text,
+  order_index int,
+  source_artifact uuid references artifacts(id) on delete set null,
+  status text default 'pending' check (status in ('pending','in-progress','completed')),
+  completed_at timestamp with time zone,
+  created_at timestamp with time zone default now()
+);
+
+-- External learning resources linked to topics
+create table if not exists resources (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references auth.users(id) on delete cascade,
+  topic text not null,
+  source text not null,
+  title text,
+  url text not null,
+  metadata jsonb,
+  created_at timestamp with time zone default now()
+);
+
+-- Indexes / constraints to reduce duplicates
+create unique index if not exists uniq_syllabus_topic on syllabus_topics(user_id, topic);
+create index if not exists idx_resources_user_topic on resources(user_id, topic);
+create unique index if not exists uniq_resource_dedup on resources(user_id, topic, url);
+
 create table if not exists sessions (
   id uuid primary key default gen_random_uuid(),
   user_id uuid references auth.users(id) on delete cascade,
@@ -45,6 +75,16 @@ create table if not exists tasks (
   topic text,
   status text default 'todo' check (status in ('todo','doing','done')),
   due_date date,
+  created_at timestamp with time zone default now()
+);
+
+-- Persisted tutor chat messages
+create table if not exists tutor_messages (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references auth.users(id) on delete cascade,
+  role text not null check (role in ('user','ai')),
+  content text not null,
+  steps jsonb,
   created_at timestamp with time zone default now()
 );
 
@@ -132,31 +172,63 @@ $$;
 alter table profiles enable row level security;
 alter table artifacts enable row level security;
 alter table plans enable row level security;
+-- (syllabus_topics & resources RLS already enabled above; duplicates removed)
 alter table sessions enable row level security;
 alter table tasks enable row level security;
+alter table tutor_messages enable row level security;
 alter table achievements enable row level security;
 alter table enrollments enable row level security;
 alter table manual_tags enable row level security;
 alter table parents_children enable row level security;
 alter table reports enable row level security;
+alter table syllabus_topics enable row level security;
+alter table resources enable row level security;
 
 -- Policies (simplified)
+-- Idempotent policy (re)creation: drop if exists then create
+drop policy if exists profiles_self on profiles;
 create policy profiles_self on profiles for select using (auth.uid() = user_id);
+drop policy if exists profiles_self_ins on profiles;
 create policy profiles_self_ins on profiles for insert with check (auth.uid() = user_id);
+drop policy if exists profiles_self_upd on profiles;
 create policy profiles_self_upd on profiles for update using (auth.uid() = user_id);
 
+drop policy if exists artifacts_self on artifacts;
 create policy artifacts_self on artifacts for select using (auth.uid() = user_id);
+drop policy if exists artifacts_self_ins on artifacts;
 create policy artifacts_self_ins on artifacts for insert with check (auth.uid() = user_id);
 
+drop policy if exists plans_self on plans;
 create policy plans_self on plans for select using (auth.uid() = user_id);
+drop policy if exists plans_self_upd on plans;
 create policy plans_self_upd on plans for insert with check (auth.uid() = user_id);
 
+drop policy if exists syllabus_topics_self on syllabus_topics;
+create policy syllabus_topics_self on syllabus_topics for select using (auth.uid() = user_id);
+drop policy if exists syllabus_topics_self_ins on syllabus_topics;
+create policy syllabus_topics_self_ins on syllabus_topics for insert with check (auth.uid() = user_id);
+
+drop policy if exists resources_self on resources;
+create policy resources_self on resources for select using (auth.uid() = user_id);
+drop policy if exists resources_self_ins on resources;
+create policy resources_self_ins on resources for insert with check (auth.uid() = user_id);
+
+drop policy if exists sessions_self on sessions;
 create policy sessions_self on sessions for select using (auth.uid() = user_id);
+drop policy if exists sessions_self_ins on sessions;
 create policy sessions_self_ins on sessions for insert with check (auth.uid() = user_id);
 
+drop policy if exists tasks_self on tasks;
 create policy tasks_self on tasks for select using (auth.uid() = user_id);
+drop policy if exists tasks_self_ins on tasks;
 create policy tasks_self_ins on tasks for insert with check (auth.uid() = user_id);
+drop policy if exists tasks_self_upd on tasks;
 create policy tasks_self_upd on tasks for update using (auth.uid() = user_id);
+
+drop policy if exists tutor_messages_self on tutor_messages;
+create policy tutor_messages_self on tutor_messages for select using (auth.uid() = user_id);
+drop policy if exists tutor_messages_self_ins on tutor_messages;
+create policy tutor_messages_self_ins on tutor_messages for insert with check (auth.uid() = user_id);
 
 -- Parent/teacher policies can be added per app roles in a production deployment
 

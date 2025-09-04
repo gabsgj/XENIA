@@ -11,6 +11,27 @@ export async function getSupabaseClient(): Promise<any> {
   }
   const { createClient } = await import("@supabase/supabase-js");
   supabaseSingleton = createClient(url || "", key || "");
+  try {
+    // Persist user id whenever auth state changes (requirement: save as supabase_user_id)
+    supabaseSingleton.auth.onAuthStateChange(async (_event: string, session: any) => {
+      try {
+        if (typeof window === 'undefined') return;
+        const uid = session?.user?.id;
+        if (uid) {
+          localStorage.setItem('supabase_user_id', uid);
+        } else {
+          localStorage.removeItem('supabase_user_id');
+        }
+      } catch {/* ignore */}
+    });
+    // Seed immediately if session exists
+    if (typeof window !== 'undefined') {
+      supabaseSingleton.auth.getSession().then(({ data }: any) => {
+        const uid = data?.session?.user?.id;
+        if (uid) localStorage.setItem('supabase_user_id', uid);
+      }).catch(()=>{});
+    }
+  } catch {/* ignore listener errors */}
   return supabaseSingleton;
 }
 

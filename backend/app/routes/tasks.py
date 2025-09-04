@@ -46,12 +46,8 @@ def track_session():
         logger.info(f"   Session tracking completed for user {user_id}")
         return result
     except Exception as e:
-        logger.warning(f"   Database error, returning mock response: {str(e)}")
-        # Return success even if database operation fails in mock mode
-        xp = max(5, (duration_min // 30) * 10)
-        result = {"ok": True, "awarded_xp": xp, "mock": True}
-        logger.info(f"   Mock session tracking completed for user {user_id}")
-        return result
+        logger.warning(f"   Session tracking failed: {str(e)}")
+        raise ApiError("DB_WRITE_FAIL", "Unable to store session")
 
 
 @tasks_bp.post("/complete")
@@ -83,8 +79,5 @@ def complete_task():
         logger.info(f"   Task completion processed for task {task_id}")
         return result
     except Exception as e:
-        logger.warning(f"   Database error, returning mock response: {str(e)}")
-        # Return success even if database operation fails in mock mode
-        result = {"ok": True, "mock": True}
-        logger.info(f"   Mock task completion processed for task {task_id}")
-        return result
+        logger.warning(f"   Task completion failed: {str(e)}")
+        raise ApiError("DB_WRITE_FAIL", "Unable to complete task")

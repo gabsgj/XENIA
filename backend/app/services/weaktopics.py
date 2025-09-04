@@ -1,34 +1,82 @@
 from typing import List, Dict
 import re
 from ..supabase_client import get_supabase
-from .ai_mock import get_mock_provider, is_mock_enabled
 
 
 # Simple heuristic fallback weak-topic extraction
-TOPIC_PATTERN = re.compile(r"(?im)^(?:topic|unit|chapter|section)[:\-\s]+(.+)$")
+TOPIC_PATTERN = re.compile(r"(?im)^(?:topic|unit|chapter|section)[\s:\-]+(.+)$")
+PREFIX_CLEAN = re.compile(r"(?i)^(?:topic|unit|chapter|section)[\s:\-]+")
 
 
 def extract_topics_from_text(text: str) -> List[str]:
-    topics: List[str] = []
-    for line in text.splitlines():
+    """Extract topics with cleaning to avoid duplicated prefixed variants.
+
+    Rules:
+      1. Capture lines starting with Topic/Section/Chapter/Unit and strip the prefix.
+      2. Include bullet / dash lines (>=2 words) if they don't duplicate an existing topic (case-insensitive).
+      3. Discard raw lines that are *only* the prefixed form when cleaned version already exists.
+      4. Length bounds 3..80 chars after cleaning.
+      5. Filter out common non-topic phrases.
+    """
+    collected: List[str] = []
+    seen_ci = set()
+
+    # Common phrases to filter out (not actual topics)
+    exclusions = {
+        'course syllabus', 'syllabus', 'advanced mathematics', 'mathematics course',
+        'course outline', 'course description', 'learning objectives', 'prerequisites',
+        'textbook', 'grading', 'schedule', 'assignments', 'exams', 'final exam'
+    }
+
+    def add(topic: str):
+        norm = topic.strip()
+        if not norm:
+            return
+        if not (3 <= len(norm) <= 80):
+            return
+        
+        # Filter out common non-topic phrases
+        if norm.lower() in exclusions:
+            return
+        if any(excl in norm.lower() for excl in ['course', 'syllabus'] if len(norm.split()) <= 3):
+            return
+            
+        key = norm.lower()
+        if key in seen_ci:
+            return
+        collected.append(norm)
+        seen_ci.add(key)
+
+    lines = text.splitlines()
+    # First pass: explicit prefixed lines
+    for line in lines:
         m = TOPIC_PATTERN.search(line)
         if m:
-            name = m.group(1).strip()
-            if name and name not in topics:
-                topics.append(name)
-    # fallback: split by bullets
-    for line in text.splitlines():
-        t = line.strip().lstrip("-•* ")
-        if len(t.split()) >= 2 and 3 <= len(t) <= 80 and t not in topics:
-            topics.append(t)
-    # dedupe while preserving order
-    seen = set()
-    ordered = []
-    for t in topics:
-        if t not in seen:
-            ordered.append(t)
-            seen.add(t)
-    return ordered[:200]
+            cleaned = m.group(1).strip()
+            # Clean up common topic number prefixes like "1:", "Topic 1:"
+            cleaned = re.sub(r'^(topic\s+)?(\d+[\s:.-]+)', '', cleaned, flags=re.IGNORECASE).strip()
+            add(cleaned)
+
+    # Second pass: bullets / general lines
+    for line in lines:
+        raw = line.strip().lstrip("-•* \t")
+        if not raw:
+            continue
+        # Skip if it's just a prefixed variant of something we already added
+        if PREFIX_CLEAN.match(raw):
+            cleaned = PREFIX_CLEAN.sub("", raw).strip()
+            # Clean up topic number prefixes
+            cleaned = re.sub(r'^(topic\s+)?(\d+[\s:.-]+)', '', cleaned, flags=re.IGNORECASE).strip()
+            if cleaned.lower() in {c.lower() for c in collected}:
+                continue
+            add(cleaned)
+            continue
+        # Heuristic: at least two words, not too long
+        if len(raw.split()) >= 2 and 3 <= len(raw) <= 80:
+            if raw.lower() not in {c.lower() for c in collected}:
+                add(raw)
+
+    return collected[:200]
 
 
 def get_weak_topics(user_id: str) -> List[Dict]:
@@ -63,13 +111,11 @@ def get_weak_topics(user_id: str) -> List[Dict]:
 
 
 def get_remediation_steps(user_id: str, question_text: str) -> List[Dict]:
-    # Check if mock mode is enabled
-    if is_mock_enabled():
-        mock_provider = get_mock_provider()
-        response = mock_provider.get_tutor_response(question_text)
-        return response.get("steps", [])
+    """Get step-by-step solution using AI"""
+    import logging
+    logger = logging.getLogger('xenia')
     
-    # Use real AI for tutor responses when not in mock mode
+    # Use real AI for tutor responses
     from .ai_providers import get_ai_response
     
     try:
@@ -77,7 +123,7 @@ def get_remediation_steps(user_id: str, question_text: str) -> List[Dict]:
         prompt = f"""
 You are an AI tutor. A student has asked: "{question_text}"
 
-Provide a step-by-step solution in JSON format with this structure:
+Provide a step-by-step solution in JSON format with this exact structure:
 {{
   "steps": [
     {{
@@ -87,30 +133,41 @@ Provide a step-by-step solution in JSON format with this structure:
   ]
 }}
 
-Focus on:
-1. Understanding the problem
-2. Identifying key concepts
-3. Breaking down the solution
-4. Providing clear explanations
-
-Keep each step concise but educational.
+For the question "{question_text}", provide clear steps to solve it.
+Return ONLY the JSON, no additional text.
 """
         
+        logger.info(f"🤖 Sending tutor prompt to AI...")
         response = get_ai_response(prompt)
+        logger.info(f"🤖 AI response received: {response[:200]}...")
         
         # Try to parse JSON response
         import json
         try:
-            parsed = json.loads(response)
-            if "steps" in parsed and isinstance(parsed["steps"], list):
+            # Clean response - sometimes AI adds markdown code blocks
+            clean_response = response.strip()
+            if clean_response.startswith('```json'):
+                clean_response = clean_response.replace('```json', '').replace('```', '').strip()
+            elif clean_response.startswith('```'):
+                clean_response = clean_response.replace('```', '').strip()
+                
+            parsed = json.loads(clean_response)
+            if "steps" in parsed and isinstance(parsed["steps"], list) and parsed["steps"]:
+                logger.info(f"✅ Successfully parsed AI steps: {len(parsed['steps'])} steps")
                 return parsed["steps"]
-        except json.JSONDecodeError:
-            pass
+            else:
+                logger.warning("⚠️ AI response missing 'steps' array")
+        except json.JSONDecodeError as e:
+            logger.error(f"❌ JSON parse error: {e}")
+            logger.error(f"   Response content: {response}")
             
     except Exception as e:
-        print(f"AI tutor error: {e}")
+        logger.error(f"❌ AI tutor error: {e}")
+        import traceback
+        logger.error(f"   Full traceback: {traceback.format_exc()}")
     
     # Fallback to simple deterministic steps
+    logger.info("🔄 Using fallback steps")
     concepts = [
         w.strip(",.;:!?") for w in question_text.split() if len(w) > 4
     ]

@@ -22,8 +22,12 @@ def generate():
         if request.is_json:
             data = request.get_json(silent=True) or {}
             horizon = int(data.get("horizon_days", 14))
+            preferred_hours = float(data.get("preferred_hours_per_day", 1.5))
+            deadline = data.get("deadline")
         else:
             horizon = int(request.values.get("horizon_days", 14))
+            preferred_hours = float(request.values.get("preferred_hours_per_day", 1.5))
+            deadline = request.values.get("deadline")
         
         logger.info(f"   Horizon days: {horizon}")
         
@@ -34,25 +38,10 @@ def generate():
         logger.error("   Invalid horizon_days parameter")
         raise ApiError("PLAN_400", "Invalid horizon_days")
     
-    try:
-        logger.info(f"   Generating plan for user {uid} with {horizon} days horizon...")
-        plan = generate_plan(user_id=uid, horizon_days=horizon)
-        logger.info(f"   Plan generated successfully for user {uid}")
-        return plan, 200
-    except Exception as e:
-        logger.warning(f"   Plan generation failed, returning fallback plan: {str(e)}")
-        # Return a basic plan even if generation fails
-        fallback_plan = {
-            "user_id": uid,
-            "generated_at": "2024-01-15T10:00:00Z",
-            "horizon_days": horizon,
-            "weak_topics": [{"topic": "General Review", "score": 1}],
-            "sessions": [
-                {"date": "2024-01-15", "topic": "General Review", "focus": "practice + review", "duration_min": 45}
-            ]
-        }
-        logger.info(f"   Returning fallback plan for user {uid}")
-        return fallback_plan, 200
+    logger.info(f"   Generating plan for user {uid} with {horizon} days horizon...")
+    plan = generate_plan(user_id=uid, horizon_days=horizon, preferred_hours_per_day=preferred_hours, deadline=deadline)
+    logger.info(f"   Plan generated successfully for user {uid}")
+    return plan, 200
 
 
 @plan_bp.get("/current")
@@ -68,7 +57,18 @@ def current():
     
     try:
         logger.info(f"   Retrieving current plan for user {uid}...")
-        plan = get_current_plan(user_id=uid)
+        # Allow regeneration if prior plan generic (objective C)
+        plan = get_current_plan(user_id=uid, allow_regenerate=True)
+        # augment with progress metrics
+        sessions = plan.get("sessions", [])
+        completed = sum(1 for s in sessions if s.get("status") == "completed")
+        in_progress = sum(1 for s in sessions if s.get("status") == "in-progress")
+        total = len(sessions) or 1
+        plan["progress"] = {
+            "sessions_completed": completed,
+            "sessions_in_progress": in_progress,
+            "percent_complete": round(completed / total * 100, 2)
+        }
         logger.info(f"   Current plan retrieved successfully for user {uid}")
         return plan, 200
     except Exception as e:
@@ -85,3 +85,9 @@ def current():
         }
         logger.info(f"   Returning fallback plan for user {uid}")
         return fallback_plan, 200
+
+
+@plan_bp.get("")
+def current_alias():
+    """Alias /api/plan -> /api/plan/current (objective D)."""
+    return current()

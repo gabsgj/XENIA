@@ -31,7 +31,7 @@ export default function TasksPage(){
   useEffect(()=>{
     (async()=>{
       try{
-        const data = await api('/api/analytics/student?user_id=demo-user')
+  const data = await api('/api/analytics/student')
         setTasks(data.tasks||[])
         setSessions(data.sessions||[])
       }catch(e:any){
@@ -78,7 +78,7 @@ export default function TasksPage(){
     try {
       await api('/api/tasks/track', { 
         method:'POST', 
-        body: JSON.stringify({ user_id:'demo-user', topic, duration_min: minutes }) 
+        body: JSON.stringify({ topic, duration_min: minutes }) 
       })
       setStatus('Session logged successfully!')
     } catch(e:any){ 

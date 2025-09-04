@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
-import { API_BASE } from '@/lib/api'
+import { API_BASE, api } from '@/lib/api'
 import { useErrorContext } from '@/lib/error-context'
 
 import { 
@@ -25,6 +25,8 @@ export default function UploadPage() {
   const [files, setFiles] = useState<File[]>([])
   const [uploading, setUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
+  const [topics,setTopics] = useState<string[]>([])
+  const [resources,setResources] = useState<any[]>([])
   const { pushError } = useErrorContext()
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
@@ -58,9 +60,15 @@ export default function UploadPage() {
         const f = files[i]
         const form = new FormData()
         form.append('file', f)
-        form.append('user_id', 'demo-user')
         const route = f.type.startsWith('image/') ? 'assessment' : 'syllabus'
-        const res = await fetch(`${API_BASE}/api/upload/${route}`, { method: 'POST', body: form })
+        // Attach auth header if available (ensures persistence of topics -> plan regeneration)
+        let headers: Record<string,string> = {}
+        try {
+          const maybe = await (await import('@/lib/api')).api<{__noop?:boolean}>('/health',{method:'GET'}).catch(()=>null)
+        } catch {}
+        const storedUser = typeof window!=='undefined'? localStorage.getItem('supabase_user_id'): null
+        if(storedUser) headers['X-User-Id'] = storedUser
+        const res = await fetch(`${API_BASE}/api/upload/${route}`, { method: 'POST', body: form, headers })
         const j = await res.json().catch(()=> null)
         if(!res.ok){
           throw {
@@ -70,6 +78,24 @@ export default function UploadPage() {
           }
         }
         setUploadProgress(Math.round(((i+1)/files.length)*100))
+        // capture topics from response if available
+        const foundTopics = j?.topics || j?.analysis?.topics?.map((t:any)=> t.topic) || []
+        if(foundTopics.length){
+          setTopics(prev=> Array.from(new Set([...prev, ...foundTopics])))
+          // If backend returned a plan preview use it to update client plan immediately
+          if(j?.plan_preview){
+            try { localStorage.setItem('latest_plan', JSON.stringify(j.plan_preview)) } catch {}
+          }
+          // refresh resources after short delay
+          setTimeout(async()=>{
+            try {
+              const r = await api('/api/resources/list')
+              setResources(r.resources||[])
+              // Refresh current plan to pick up regenerated one
+              try { await api('/api/plan/current') } catch {}
+            } catch {}
+          }, 800)
+        }
       }
       setFiles([])
     } catch (e:any) {
@@ -134,7 +160,7 @@ export default function UploadPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+  <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Upload Area */}
           <div className="lg:col-span-2 space-y-6">
             <Card>
@@ -254,6 +280,33 @@ export default function UploadPage() {
                 </div>
               </CardContent>
             </Card>
+            {topics.length>0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Extracted Topics</CardTitle>
+                  <CardDescription>{topics.length} topics</CardDescription>
+                </CardHeader>
+                <CardContent className='flex flex-wrap gap-2'>
+                  {topics.map(t=> <Badge key={t} variant='outline'>{t}</Badge>)}
+                </CardContent>
+              </Card>
+            )}
+            {resources.length>0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Resources</CardTitle>
+                  <CardDescription>{resources.length} items</CardDescription>
+                </CardHeader>
+                <CardContent className='space-y-2 max-h-[320px] overflow-auto pr-2'>
+                  {resources.slice(0,40).map((r:any,i:number)=> (
+                    <a key={i} href={r.url} target='_blank' rel='noreferrer' className='block p-2 rounded hover:bg-muted/50 text-xs'>
+                      <span className='font-medium'>{r.title||r.url}</span>
+                      <span className='ml-2 text-muted-foreground'>{r.topic}</span>
+                    </a>
+                  ))}
+                </CardContent>
+              </Card>
+            )}
           </div>
         </div>
 

@@ -26,7 +26,8 @@ def get_ai_response(prompt: str, model: Optional[str] = None) -> str:
             genai.configure(api_key=gemini_key.strip())
             
             logger.info("   Creating Gemini model...")
-            model_instance = genai.GenerativeModel('gemini-pro')
+            gemini_model = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
+            model_instance = genai.GenerativeModel(gemini_model)
             
             logger.info("   Generating content...")
             response = model_instance.generate_content(

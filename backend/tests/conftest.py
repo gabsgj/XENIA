@@ -1,6 +1,20 @@
 import pytest
 import os
+import sys
+from pathlib import Path
 from unittest.mock import Mock, patch
+
+# Ensure backend root on sys.path so `import app` resolves when running from repo root
+BACKEND_ROOT = Path(__file__).resolve().parents[1]
+if str(BACKEND_ROOT) not in sys.path:
+    sys.path.insert(0, str(BACKEND_ROOT))
+
+try:
+    from dotenv import load_dotenv  # type: ignore
+    load_dotenv(BACKEND_ROOT.parent / '.env')  # load project .env if exists
+except Exception:
+    pass
+
 from app import create_app
 
 
@@ -26,7 +40,6 @@ def client(mock_supabase):
     os.environ['SUPABASE_URL'] = 'https://test.supabase.co'
     os.environ['SUPABASE_ANON_KEY'] = 'test-anon-key'
     os.environ['SUPABASE_SERVICE_ROLE_KEY'] = 'test-service-key'
-    os.environ['AI_MOCK'] = 'true'
     
     app = create_app()
     app.config['TESTING'] = True

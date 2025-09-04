@@ -5,37 +5,22 @@ from typing import Optional
 
 logger = logging.getLogger('xenia')
 _supabase: Optional[Client] = None
-_mock_mode: bool = False
 
 
 def get_supabase() -> Client:
-    global _supabase, _mock_mode
-    
+    global _supabase
     if _supabase is None:
         url = os.getenv("SUPABASE_URL", "")
-        key = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv(
-            "SUPABASE_ANON_KEY", ""
-        )
-        
-        # Check if we're in mock mode or if Supabase config is missing
-        if os.getenv("AI_MOCK", "false").lower() == "true" or not url or not key:
-            _mock_mode = True
-            logger.info("🔧 Using MOCK Supabase client (AI_MOCK=true or missing config)")
-            # Return a mock client that won't actually connect
-            return _create_mock_client()
-        
+        key = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_ANON_KEY", "")
+        if not url or not key:
+            raise RuntimeError("Supabase configuration missing (SUPABASE_URL / KEY)")
         try:
-            logger.info("🔗 Attempting to connect to real Supabase...")
+            logger.info("🔗 Connecting to Supabase ...")
             _supabase = create_client(url, key)
-            # Test the connection
             _supabase.table("profiles").select("count", count="exact").limit(1).execute()
-            logger.info("✅ Successfully connected to Supabase")
+            logger.info("✅ Supabase connection ok")
         except Exception as e:
-            logger.warning(f"❌ Supabase connection failed: {e}")
-            logger.info("🔧 Falling back to MOCK Supabase client")
-            _mock_mode = True
-            return _create_mock_client()
-    
+            raise RuntimeError(f"Supabase connection failed: {e}")
     return _supabase
 
 

@@ -14,6 +14,7 @@ from .routes.plan import plan_bp
 from .routes.tasks import tasks_bp
 from .routes.teacher import teacher_bp
 from .routes.tutor import tutor_bp
+from .routes.resources import resources_bp
 
 # Suppress NumPy runtime warnings for floating-point precision issues
 warnings.filterwarnings("ignore", category=RuntimeWarning, module="numpy")
@@ -102,11 +103,21 @@ def create_app() -> Flask:
     app.register_blueprint(analytics_bp, url_prefix="/api/analytics")
     app.register_blueprint(teacher_bp, url_prefix="/api/teacher")
     app.register_blueprint(parent_bp, url_prefix="/api/parent")
+    app.register_blueprint(resources_bp, url_prefix="/api/resources")
 
     @app.get("/health")
     def health():
         logger.info("🏥 Health check requested")
-        return {"status": "ok"}
+        from .supabase_client import get_supabase
+        status = {"status": "ok"}
+        try:
+            sb = get_supabase()
+            # lightweight check
+            sb.table("plans").select("user_id").limit(1).execute()
+            status["supabase"] = "up"
+        except Exception as e:
+            status["supabase"] = f"down: {e}" 
+        return status
 
     logger.info("🚀 Flask app initialized successfully")
     return app

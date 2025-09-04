@@ -37,7 +37,7 @@ export default function AnalyticsPage() {
   useEffect(() => {
     (async () => {
       try {
-        const res = await api('/api/analytics/student?user_id=demo-user')
+  const res = await api('/api/analytics/student')
         setData(res)
       } catch (e: any) {
         pushError({
@@ -80,6 +80,7 @@ export default function AnalyticsPage() {
       weakTopics: ['Organic Chemistry', 'Calculus Integration', 'Quantum Physics'],
       strongTopics: ['Linear Algebra', 'Cell Biology', 'Thermodynamics']
     }
+  }
 
 
   // Derive metrics from data when available

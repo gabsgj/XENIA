@@ -6,7 +6,7 @@ services:
     environment:
       - FLASK_ENV=development
       - FLASK_DEBUG=true
-      - AI_MOCK=true
+      - LOG_LEVEL=DEBUG
 
   frontend:
     command: npm run dev

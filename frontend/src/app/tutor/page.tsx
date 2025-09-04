@@ -19,7 +19,16 @@ import {
 export default function TutorPage(){
   const [question, setQuestion] = useState('')
   const [file, setFile] = useState<File | null>(null)
-  const [messages, setMessages] = useState<any[]>([
+  interface TutorMessage {
+    id: number
+    type: 'user' | 'ai'
+    content: string
+    steps?: { title: string; detail: string }[]
+    file?: File | null
+    timestamp: Date
+  }
+
+  const [messages, setMessages] = useState<TutorMessage[]>([
     {
       id: 1,
       type: 'ai',
@@ -28,18 +37,63 @@ export default function TutorPage(){
     }
   ])
   const [loading, setLoading] = useState(false)
+  const [userId, setUserId] = useState<string>('')
   const { pushError } = useErrorContext()
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Load authenticated user id if available (Supabase); fallback to demo-user implicitly handled backend
+  useEffect(() => {
+    let active = true
+    ;(async () => {
+      try {
+        const { getSupabaseClient } = await import('@/lib/supabaseClient')
+        const supabase = await getSupabaseClient()
+        const { data } = await supabase.auth.getSession()
+        if (!active) return
+        if (data.session?.user?.id) setUserId(data.session.user.id)
+      } catch {/* ignore */}
+    })()
+    return () => { active = false }
+  }, [])
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
+  // Fetch history after we have a user id
+  useEffect(() => {
+    if (!userId) return
+    let cancelled = false
+    ;(async () => {
+      try {
+        const r = await fetch(`${API_BASE}/api/tutor/history`, {
+          headers: { 'X-User-Id': userId }
+        })
+        const j = await r.json().catch(()=> null)
+        if (!cancelled && j?.history && Array.isArray(j.history) && j.history.length){
+          const hist: TutorMessage[] = j.history.map((h: any) => ({
+            id: Date.parse(h.created_at) || Math.random(),
+            type: h.role === 'user' ? 'user' : 'ai',
+            content: h.content,
+            steps: h.steps || undefined,
+            timestamp: new Date(h.created_at)
+          }))
+          setMessages(prev => {
+            // keep initial greeting then add history (avoid duplicates if already loaded)
+            const base = prev.length && prev[0].id === 1 ? [prev[0]] : []
+            return [...base, ...hist]
+          })
+        }
+      } catch {/* ignore */}
+    })()
+  return () => { cancelled = true }
+  }, [userId])
+
   async function ask(){
     if (!question.trim() && !file) return
 
-    const userMessage = {
+    const userMessage: TutorMessage = {
       id: Date.now(),
       type: 'user',
       content: question,
@@ -52,12 +106,17 @@ export default function TutorPage(){
     setLoading(true)
 
     try {
-      let response
+      let response: any
       if (file){
         const form = new FormData()
         form.append('file', file)
-        form.append('user_id','demo-user')
-        const r = await fetch(`${API_BASE}/api/tutor/ask`, { method:'POST', body: form })
+        // only send user_id if we truly have one; backend will normalize demo implicitly
+        if (userId) form.append('user_id', userId)
+        const r = await fetch(`${API_BASE}/api/tutor/ask`, { 
+          method:'POST', 
+          body: form,
+          headers: userId ? { 'X-User-Id': userId } : undefined
+        })
         const j = await r.json().catch(()=> null)
         if(!r.ok){ 
           pushError({ errorCode: 'TUTOR_API_DOWN', errorMessage: j?.error || 'Tutor failed', details: j })
@@ -67,8 +126,11 @@ export default function TutorPage(){
       } else {
         const r = await fetch(`${API_BASE}/api/tutor/ask`, { 
           method:'POST', 
-          headers:{'Content-Type':'application/json'}, 
-          body: JSON.stringify({ question, user_id:'demo-user' }) 
+          headers:{
+            'Content-Type':'application/json',
+            ...(userId ? { 'X-User-Id': userId } : {})
+          }, 
+          body: JSON.stringify({ question, ...(userId ? { user_id: userId } : {}) }) 
         })
         const j = await r.json().catch(()=> null)
         if(!r.ok){ 
@@ -78,13 +140,13 @@ export default function TutorPage(){
         response = j
       }
 
-      const aiMessage = {
+      const aiMessage: TutorMessage = {
         id: Date.now() + 1,
         type: 'ai',
-        content: response.answer || JSON.stringify(response),
+        content: response.answer || 'Here are your steps:',
+        steps: Array.isArray(response.steps) ? response.steps : undefined,
         timestamp: new Date()
       }
-
       setMessages(prev => [...prev, aiMessage])
     } catch (error) {
       pushError({ 
@@ -143,7 +205,17 @@ export default function TutorPage(){
                         <span className='text-sm'>{message.file.name}</span>
                       </div>
                     )}
-                    <p className='whitespace-pre-wrap'>{message.content}</p>
+                    <p className='whitespace-pre-wrap font-medium'>{message.content}</p>
+                    {message.steps && message.steps.length > 0 && (
+                      <div className='mt-3 space-y-3'>
+                        {message.steps.map((s, i) => (
+                          <div key={i} className='p-3 rounded border bg-background/50'>
+                            <div className='font-semibold text-sm mb-1'>{i+1}. {s.title}</div>
+                            <div className='text-sm leading-relaxed whitespace-pre-wrap'>{s.detail}</div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
                 <p className={`text-xs text-muted-foreground mt-1 ${message.type === 'user' ? 'text-right' : 'text-left'}`}>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { api } from "@/lib/api";
 import { useErrorContext } from "@/lib/error-context";
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, PieChart, Pie, Cell } from "recharts";
@@ -24,34 +24,70 @@ import {
 
 export default function DashboardPage(){
   const [data, setData] = useState<any>(null);
+  const [plan, setPlan] = useState<any>(null);
+  const [topics, setTopics] = useState<any[]>([]);
+  const [resources, setResources] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
   const { pushError } = useErrorContext();
   
   useEffect(()=>{ 
     (async()=>{
+      setLoading(true)
       try{ 
-        setData(await api('/api/analytics/student?user_id=demo-user')) 
-      }
-      catch(e:any){ 
-        pushError({ 
-          errorCode: e?.errorCode||'CONTENT_API_FAIL', 
-          errorMessage: e?.errorMessage, 
-          details: e
-        }) 
-      }
+        const [analytics, currentPlan, topicResp, resResp] = await Promise.all([
+          api('/api/analytics/student').catch(()=> null),
+          api('/api/plan/current').catch(()=> null),
+          api('/api/resources/topics').catch(()=> ({topics:[]})),
+          api('/api/resources/list').catch(()=> ({resources:[]}))
+        ])
+        if(analytics) setData(analytics)
+        if(currentPlan) setPlan(currentPlan)
+        setTopics((topicResp as any)?.topics||[])
+        setResources((resResp as any)?.resources||[])
+      } catch(e:any){ 
+        pushError({ errorCode: e?.errorCode||'CONTENT_API_FAIL', errorMessage: e?.errorMessage, details: e }) 
+      } finally { setLoading(false) }
     })() 
   },[pushError])
 
-  const todaysTasks = [
-    { id: 1, subject: "Organic Chemistry", topic: "Molecular Structures", duration: 45, progress: 60, status: "in-progress" },
-    { id: 2, subject: "Calculus", topic: "Derivatives", duration: 30, progress: 30, status: "pending" },
-    { id: 3, subject: "Physics", topic: "Kinematics", duration: 60, progress: 0, status: "pending" },
-  ];
+  const todaysTasks = useMemo(()=>{
+    if(!plan) return []
+    const today = new Date().toISOString().slice(0,10)
+    return (plan.sessions||[]).filter((s:any)=> s.date === today).map((s:any, idx:number)=> ({
+      id: idx+1,
+      subject: s.topic.split(':')[0] || s.topic,
+      topic: s.topic,
+      duration: s.duration_min || 45,
+      progress: s.status==='completed'? 100 : s.status==='in-progress'? 50 : 0,
+      status: s.status||'pending'
+    }))
+  },[plan])
 
-  const recentAchievements = [
-    { title: "Study Streak", description: "7 days in a row!", icon: Award },
-    { title: "Quick Learner", description: "Completed 5 topics this week", icon: TrendingUp },
-    { title: "Consistent", description: "Met daily goals", icon: Target },
-  ];
+  const recentAchievements = useMemo(()=>{
+    const completed = plan?.progress?.sessions_completed ?? (plan?.sessions||[]).filter((s:any)=> s.status==='completed').length
+    return [
+      { title: 'Study Streak', description: `${data?.profile?.streak_days||0} days in a row`, icon: Award },
+      { title: 'Completed Sessions', description: `${completed} finished`, icon: TrendingUp },
+      { title: 'Active Topics', description: `${topics.length} topics tracked`, icon: Target }
+    ]
+  },[plan, data, topics])
+
+  const upcomingSessions = useMemo(()=>{
+    if(!plan) return []
+    const todayStr = new Date().toISOString().slice(0,10)
+    return (plan.sessions||[])
+      .filter((s:any)=> s.date >= todayStr)
+      .sort((a:any,b:any)=> a.date.localeCompare(b.date))
+      .slice(0,9)
+  },[plan])
+
+  const topicStatusCounts = useMemo(()=>{
+    const counts: Record<string, number> = { pending:0, 'in-progress':0, completed:0 }
+    topics.forEach(t=> { counts[t.status||'pending'] = (counts[t.status||'pending']||0)+1 })
+    return counts
+  },[topics])
+
+  const percentComplete = plan?.progress?.percent_complete ?? (()=>{ const s = plan?.sessions||[]; const c = s.filter((x:any)=> x.status==='completed').length; return s.length? Math.round(c/s.length*100):0 })()
 
   const chartColors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
 
@@ -61,7 +97,7 @@ export default function DashboardPage(){
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
-            <h1 className="text-3xl md:text-4xl font-bold tracking-tight">Welcome back, Student!</h1>
+            <h1 className="text-3xl md:text-4xl font-bold tracking-tight">Welcome back!</h1>
             <p className="text-muted-foreground">Keep your streak alive and level up your learning.</p>
           </div>
           <div className="flex items-center gap-3">
@@ -80,13 +116,18 @@ export default function DashboardPage(){
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground">Tasks Completed</p>
-                  <p className="text-3xl font-bold">{data ? (data.tasks||[]).filter((t:any)=> t.status==='done').length : '12'}</p>
+                  <p className="text-sm text-muted-foreground">Sessions Completed</p>
+                  <p className="text-3xl font-bold">{plan?.progress?.sessions_completed ?? (plan?.sessions||[]).filter((s:any)=> s.status==='completed').length}</p>
                 </div>
                 <div className="w-12 h-12 bg-green-100 dark:bg-green-900/20 rounded-full flex items-center justify-center">
                   <Target className="w-6 h-6 text-green-600 dark:text-green-400" />
                 </div>
               </div>
+              {plan && (
+                <div className="mt-4 space-y-1">
+                  <Progress value={percentComplete} className="h-2" />
+                  <p className="text-xs text-muted-foreground">{percentComplete}% complete</p>
+                </div>) }
             </CardContent>
           </Card>
 
@@ -94,8 +135,8 @@ export default function DashboardPage(){
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground">Study Time</p>
-                  <p className="text-3xl font-bold">{data ? (data.sessions||[]).reduce((a:number,b:any)=> a+(b.duration_min||0),0) : '245'}<span className="text-lg font-normal">min</span></p>
+                  <p className="text-sm text-muted-foreground">Total Study Time</p>
+                  <p className="text-3xl font-bold">{(data?.sessions||[]).reduce((a:number,b:any)=> a+(b.duration_min||0),0)}<span className="text-lg font-normal">min</span></p>
                 </div>
                 <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/20 rounded-full flex items-center justify-center">
                   <Clock className="w-6 h-6 text-blue-600 dark:text-blue-400" />
@@ -109,7 +150,7 @@ export default function DashboardPage(){
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground">Current Streak</p>
-                  <p className="text-3xl font-bold">{data?.profile?.streak_days || '7'}<span className="text-lg font-normal">days</span></p>
+                  <p className="text-3xl font-bold">{data?.profile?.streak_days || 0}<span className="text-lg font-normal">days</span></p>
                 </div>
                 <div className="w-12 h-12 bg-orange-100 dark:bg-orange-900/20 rounded-full flex items-center justify-center">
                   <Award className="w-6 h-6 text-orange-600 dark:text-orange-400" />
@@ -122,12 +163,30 @@ export default function DashboardPage(){
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground">Level Progress</p>
-                  <p className="text-3xl font-bold">85<span className="text-lg font-normal">%</span></p>
+                  <p className="text-sm text-muted-foreground">Topics Tracked</p>
+                  <p className="text-3xl font-bold">{topics.length}</p>
                 </div>
                 <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900/20 rounded-full flex items-center justify-center">
                   <TrendingUp className="w-6 h-6 text-purple-600 dark:text-purple-400" />
                 </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="hover:shadow-md transition-all">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Topic Status</p>
+                  <p className="text-3xl font-bold">{topicStatusCounts.completed}/{topics.length}</p>
+                </div>
+                <div className="w-12 h-12 bg-teal-100 dark:bg-teal-900/20 rounded-full flex items-center justify-center">
+                  <BookOpen className="w-6 h-6 text-teal-600 dark:text-teal-400" />
+                </div>
+              </div>
+              <div className="mt-4 space-y-2">
+                <div className="flex items-center gap-2 text-xs"><span className="w-2 h-2 rounded-full bg-muted-foreground/60" /> Pending {topicStatusCounts['pending']}</div>
+                <div className="flex items-center gap-2 text-xs"><span className="w-2 h-2 rounded-full bg-amber-500" /> In Progress {topicStatusCounts['in-progress']}</div>
+                <div className="flex items-center gap-2 text-xs"><span className="w-2 h-2 rounded-full bg-green-500" /> Completed {topicStatusCounts['completed']}</div>
               </div>
             </CardContent>
           </Card>
@@ -153,7 +212,7 @@ export default function DashboardPage(){
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
-                {todaysTasks.map((task) => (
+                {todaysTasks.map((task: any) => (
                   <div key={task.id} className="bg-muted/50 p-4 rounded-lg">
                     <div className="flex items-center justify-between mb-3">
                       <div>
@@ -291,42 +350,25 @@ export default function DashboardPage(){
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                       <Pie
-                        data={[
-                          { name: 'Math', value: 35, color: chartColors[0] },
-                          { name: 'Science', value: 30, color: chartColors[1] },
-                          { name: 'English', value: 20, color: chartColors[2] },
-                          { name: 'History', value: 15, color: chartColors[3] },
-                        ]}
+                        data={Object.values((data?.sessions||[]).reduce((acc:any, s:any)=> { const k = s.topic||'General'; acc[k] = acc[k]||{ name:k, value:0, color: chartColors[Object.keys(acc).length % chartColors.length] }; acc[k].value += s.duration_min||0; return acc; }, {})) as any}
                         cx="50%"
                         cy="50%"
                         innerRadius={30}
                         outerRadius={70}
                         dataKey="value"
                       >
-                        {[
-                          { name: 'Math', value: 35, color: chartColors[0] },
-                          { name: 'Science', value: 30, color: chartColors[1] },
-                          { name: 'English', value: 20, color: chartColors[2] },
-                          { name: 'History', value: 15, color: chartColors[3] },
-                        ].map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
+                        {(Object.values((data?.sessions||[]).reduce((acc:any, s:any)=> { const k = s.topic||'General'; acc[k] = acc[k]||{ name:k, value:0, color: chartColors[Object.keys(acc).length % chartColors.length] }; acc[k].value += s.duration_min||0; return acc; }, {})) as any).map((entry:any, index:number) => (<Cell key={`cell-${index}`} fill={entry.color} />))}
                       </Pie>
                       <Tooltip />
                     </PieChart>
                   </ResponsiveContainer>
                 </div>
                 <div className="grid grid-cols-2 gap-2 mt-4">
-                  {[
-                    { name: 'Math', value: 35, color: chartColors[0] },
-                    { name: 'Science', value: 30, color: chartColors[1] },
-                    { name: 'English', value: 20, color: chartColors[2] },
-                    { name: 'History', value: 15, color: chartColors[3] },
-                  ].map((item) => (
+                  {(Object.values((data?.sessions||[]).reduce((acc:any, s:any)=> { const k = s.topic||'General'; acc[k] = acc[k]||{ name:k, value:0, color: chartColors[Object.keys(acc).length % chartColors.length] }; acc[k].value += s.duration_min||0; return acc; }, {})) as any).map((item:any) => (
                     <div key={item.name} className="flex items-center gap-2">
                       <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }}></div>
                       <span className="text-sm">{item.name}</span>
-                      <span className="text-sm text-muted-foreground ml-auto">{item.value}%</span>
+                      <span className="text-sm text-muted-foreground ml-auto">{item.value}m</span>
                     </div>
                   ))}
                 </div>
@@ -341,7 +383,7 @@ export default function DashboardPage(){
             <div className="flex items-center justify-between">
               <div>
                 <CardTitle>Upcoming Sessions</CardTitle>
-                <CardDescription>Your scheduled study sessions for the week</CardDescription>
+                <CardDescription>{upcomingSessions.length ? 'Your next scheduled sessions' : 'No future sessions yet'}</CardDescription>
               </div>
               <Link href="/planner">
                 <Button variant="outline" size="sm">
@@ -352,23 +394,30 @@ export default function DashboardPage(){
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {[
-                { subject: "Mathematics", topic: "Linear Algebra", date: "Tomorrow", time: "2:00 PM", duration: "60 min" },
-                { subject: "Physics", topic: "Thermodynamics", date: "Wed", time: "10:00 AM", duration: "45 min" },
-                { subject: "Chemistry", topic: "Organic Reactions", date: "Thu", time: "3:00 PM", duration: "90 min" },
-              ].map((session, index) => (
-                <div key={index} className="border rounded-lg p-4 hover:bg-muted/50 transition-all">
-                  <div className="flex items-center justify-between mb-2">
-                    <h4 className="font-semibold">{session.subject}</h4>
-                    <Badge variant="outline">{session.duration}</Badge>
+              {upcomingSessions.map((s:any, idx:number)=> {
+                const dateObj = new Date(s.date)
+                const today = new Date(); today.setHours(0,0,0,0)
+                let label = dateObj.toLocaleDateString('en-US',{ month:'short', day:'numeric'})
+                const diff = (dateObj.getTime()-today.getTime())/(1000*60*60*24)
+                if(diff===0) label = 'Today'
+                else if (diff===1) label = 'Tomorrow'
+                return (
+                  <div key={idx} className="border rounded-lg p-4 hover:bg-muted/50 transition-all">
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="font-semibold truncate max-w-[160px]" title={s.topic}>{s.topic.split(':')[0]}</h4>
+                      <Badge variant="outline">{s.duration_min} min</Badge>
+                    </div>
+                    <p className="text-sm text-muted-foreground mb-2 line-clamp-2">{s.focus}</p>
+                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                      <span>{label}</span>
+                      <span>{dateObj.toLocaleDateString()}</span>
+                    </div>
                   </div>
-                  <p className="text-sm text-muted-foreground mb-2">{session.topic}</p>
-                  <div className="flex items-center justify-between text-xs text-muted-foreground">
-                    <span>{session.date}</span>
-                    <span>{session.time}</span>
-                  </div>
-                </div>
-              ))}
+                )
+              })}
+              {!upcomingSessions.length && !loading && (
+                <div className="col-span-full text-sm text-muted-foreground">Generate a plan to see upcoming sessions.</div>
+              )}
             </div>
           </CardContent>
         </Card>

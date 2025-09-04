@@ -41,13 +41,12 @@ AI-powered personalized learning platform. Ingest syllabi and assessments (PDF/T
    npm install
    ```
 
-5. **Run with AI Mocks (No API Keys Required)**
+5. **Run Backend & Frontend**
    ```bash
    # Terminal 1 - Backend
    cd backend
-   export AI_MOCK=true
    python run.py
-   
+
    # Terminal 2 - Frontend
    cd frontend
    npm run dev
@@ -75,7 +74,6 @@ AI-powered personalized learning platform. Ingest syllabi and assessments (PDF/T
 ### Backend Tests
 ```bash
 cd backend
-export AI_MOCK=true
 python -m pytest tests/ -v
 ```
 
@@ -89,7 +87,7 @@ npm run build
 ### Run All Tests
 ```bash
 # Backend
-cd backend && export AI_MOCK=true && python -m pytest tests/ -v
+cd backend && python -m pytest tests/ -v
 
 # Frontend
 cd frontend && npm run lint && npm run build
@@ -101,29 +99,28 @@ cd frontend && npm run lint && npm run build
 
 #### Backend (.env)
 ```bash
-# Supabase Configuration
+# Supabase
 SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_ANON_KEY=your-anon-key
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 
-# AI Provider Configuration
+# AI Providers (at least one recommended)
 GEMINI_API_KEY=your-gemini-api-key
 OPENAI_API_KEY=your-openai-api-key
 ANTHROPIC_API_KEY=your-anthropic-api-key
+YOUTUBE_API_KEY=your-youtube-api-key
 
-# AI Mock Configuration (set to true to use mocks)
-AI_MOCK=false
-
-# Embedding Configuration
+# Embeddings
 EMBEDDING_PROVIDER=gemini
 EMBEDDING_MODEL=text-embedding-004
 
-# Storage Configuration
+# Storage
 ARTIFACTS_BUCKET=artifacts
 
-# Backend Configuration
+# Backend Runtime
 FLASK_ENV=development
 FLASK_DEBUG=true
+LOG_LEVEL=INFO
 ```
 
 #### Frontend (.env.local)
@@ -175,7 +172,7 @@ All endpoints return consistent error responses:
 ### Backend (Flask)
 - **Routes**: API endpoints organized by feature
 - **Services**: Business logic for AI, planning, analytics
-- **Mock System**: Deterministic AI responses for testing
+- **AI Providers**: Multi-provider fallback (Gemini → OpenAI → Anthropic)
 - **Error Handling**: Global error contract with codes
 
 ### Frontend (Next.js)
@@ -237,11 +234,11 @@ This project is provided as-is for educational purposes. Review dependencies' li
 1. **OCR fails**: Ensure `tesseract-ocr` is installed
 2. **PDF parsing fails**: Install `poppler-utils`
 3. **Supabase connection fails**: Check environment variables
-4. **AI features not working**: Set `AI_MOCK=true` for testing
+4. **AI features not working**: Ensure at least one of GEMINI_API_KEY / OPENAI_API_KEY / ANTHROPIC_API_KEY is set
 
 ### Getting Help
 
 - Check the logs for error messages
 - Verify environment variables are set correctly
 - Run tests to ensure everything is working
-- Use AI mock mode for development without API keys
+- Provide at least one valid AI key; no mock mode available now
