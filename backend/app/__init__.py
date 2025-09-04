@@ -96,7 +96,7 @@ def create_app() -> Flask:
     register_error_handlers(app)
 
     # Register blueprints
-    app.register_blueprint(ingest_bp, url_prefix="/api/upload")
+    app.register_blueprint(ingest_bp, url_prefix="/api/ingest")
     app.register_blueprint(tutor_bp, url_prefix="/api/tutor")
     app.register_blueprint(plan_bp, url_prefix="/api/plan")
     app.register_blueprint(tasks_bp, url_prefix="/api/tasks")

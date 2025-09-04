@@ -22,7 +22,7 @@ export function deriveErrorCode(path: string, status: number, serverCode?: strin
     if (status >= 500) return "PLAN_500";
     return "PLAN_400";
   }
-  if (path.startsWith("/api/upload")) {
+  if (path.startsWith("/api/ingest")) {
     return status >= 500 ? "SYLLABUS_PARSE_FAIL" : "SYLLABUS_INVALID_FORMAT";
   }
   if (path.startsWith("/api/tutor")) {
