@@ -200,13 +200,16 @@ Return ONLY valid JSON:
 """
 
     try:
-        # Attempt Gemini API call
+        # Attempt Gemini API call with demo detection
         gemini_key = os.getenv("GEMINI_API_KEY")
-        logger.info(f"🤖 Attempting Gemini API call with key: {'✅ Present' if gemini_key else '❌ Missing'}")
+        is_demo_gemini = (gemini_key and ("demo" in gemini_key.lower() or 
+                                          gemini_key.startswith("AIzaSyDemo_")))
         
-        if gemini_key:
+        logger.info(f"🤖 Filter function - Gemini API key: {'✅ Real' if gemini_key and not is_demo_gemini else '🎭 Demo/Missing' if gemini_key else '❌ Missing'}")
+        
+        if gemini_key and not is_demo_gemini:
             import google.generativeai as genai
-            logger.info("    Configuring Gemini API...")
+            logger.info("    Configuring real Gemini API...")
             genai.configure(api_key=gemini_key)
             
             logger.info("    Creating Gemini model...")
