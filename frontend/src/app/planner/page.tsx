@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { LoadingButton, LoadingOverlay, SkeletonCard } from '@/components/ui/loading'
 
 import { MainLayout } from '@/components/navigation'
 import { 
@@ -203,10 +204,14 @@ export default function PlannerPage() {
               <Filter className="w-4 h-4 mr-2" />
               Filter
             </Button>
-            <Button onClick={regen} disabled={loading}>
-              <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-              {loading ? 'Generating...' : 'Regenerate Plan'}
-            </Button>
+            <LoadingButton
+              loading={loading}
+              loadingText="Generating..."
+              onClick={regen}
+              icon={RefreshCw}
+            >
+              Regenerate Plan
+            </LoadingButton>
           </div>
         </div>
 
@@ -421,10 +426,14 @@ export default function PlannerPage() {
               <p className="text-muted-foreground mb-6">
                 Generate your first AI-powered study plan to get started
               </p>
-              <Button onClick={regen} disabled={loading}>
-                <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-                {loading ? 'Generating Plan...' : 'Generate Study Plan'}
-              </Button>
+              <LoadingButton
+                loading={loading}
+                loadingText="Generating Plan..."
+                onClick={regen}
+                icon={RefreshCw}
+              >
+                Generate Study Plan
+              </LoadingButton>
             </CardContent>
           </Card>
         )}

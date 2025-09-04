@@ -1,0 +1,32 @@
+# Render Deployment Configuration for XENIA Frontend  
+# This file tells Render how to build and deploy the Next.js frontend
+
+# Build Command
+buildCommand: |
+  cd frontend
+  npm ci
+  npm run build
+
+# Start Command
+startCommand: |
+  cd frontend
+  npm start
+
+# Environment
+runtime: node18
+
+# Publish Directory
+publishDir: frontend/.next
+
+# Health Check Path  
+healthCheckPath: /
+
+# Auto-Deploy
+autoDeploy: true
+
+# Environment Variables (set these in Render dashboard)
+# NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+# NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+# NEXT_PUBLIC_API_URL=https://your-backend-service.onrender.com
+# NODE_ENV=production
+# NEXT_TELEMETRY_DISABLED=1

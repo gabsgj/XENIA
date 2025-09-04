@@ -1,0 +1,53 @@
+services:
+  - type: web
+    name: xenia-backend
+    runtime: python3.11
+    buildCommand: |
+      cd backend
+      pip install -r requirements.txt
+    startCommand: |
+      cd backend
+      gunicorn --bind 0.0.0.0:$PORT --workers 2 --timeout 120 --keep-alive 5 run:app
+    healthCheckPath: /health
+    plan: starter
+    envVars:
+      - key: FLASK_ENV
+        value: production
+      - key: LOG_LEVEL
+        value: INFO
+      - key: EMBEDDING_PROVIDER  
+        value: gemini
+      - key: EMBEDDING_MODEL
+        value: text-embedding-004
+      - key: ARTIFACTS_BUCKET
+        value: artifacts
+      # Add your secret environment variables in Render dashboard:
+      # GEMINI_API_KEY
+      # SUPABASE_URL
+      # SUPABASE_ANON_KEY
+      # SUPABASE_SERVICE_ROLE_KEY
+      # OPENAI_API_KEY (optional)
+      # ANTHROPIC_API_KEY (optional)
+      # YOUTUBE_API_KEY (optional)
+
+  - type: web
+    name: xenia-frontend
+    runtime: node18
+    buildCommand: |
+      cd frontend
+      npm ci
+      npm run build
+    startCommand: |
+      cd frontend
+      npm start
+    healthCheckPath: /
+    plan: starter
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NEXT_TELEMETRY_DISABLED
+        value: "1"
+      # Add your environment variables in Render dashboard:
+      # NEXT_PUBLIC_SUPABASE_URL
+      # NEXT_PUBLIC_SUPABASE_ANON_KEY  
+      # NEXT_PUBLIC_API_URL (should be your backend service URL)

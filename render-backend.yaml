@@ -1,0 +1,35 @@
+# Render Deployment Configuration for XENIA Backend
+# This file tells Render how to build and deploy the Flask backend
+
+# Build Command
+buildCommand: |
+  cd backend
+  pip install -r requirements.txt
+
+# Start Command  
+startCommand: |
+  cd backend
+  gunicorn --bind 0.0.0.0:$PORT --workers 2 --timeout 120 run:app
+
+# Environment
+runtime: python3.11
+
+# Health Check Path
+healthCheckPath: /health
+
+# Auto-Deploy
+autoDeploy: true
+
+# Environment Variables (set these in Render dashboard)
+# GEMINI_API_KEY=your_gemini_api_key
+# SUPABASE_URL=your_supabase_url  
+# SUPABASE_ANON_KEY=your_supabase_anon_key
+# SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+# OPENAI_API_KEY=your_openai_key (optional)
+# ANTHROPIC_API_KEY=your_anthropic_key (optional)
+# YOUTUBE_API_KEY=your_youtube_key (optional)
+# FLASK_ENV=production
+# LOG_LEVEL=INFO
+# EMBEDDING_PROVIDER=gemini
+# EMBEDDING_MODEL=text-embedding-004
+# ARTIFACTS_BUCKET=artifacts
