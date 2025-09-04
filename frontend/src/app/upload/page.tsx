@@ -32,6 +32,8 @@ export default function UploadPage() {
   const [uploading, setUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
   const [topics,setTopics] = useState<string[]>([])
+  // Raw topic objects (rich metadata) preserved separately so display list can stay string-only
+  const [topicDetails, setTopicDetails] = useState<any[]>([])
   const [resources,setResources] = useState<any[]>([])
   const [showGeneratePlan, setShowGeneratePlan] = useState(false)
   const [generatingPlan, setGeneratingPlan] = useState(false)
@@ -111,12 +113,30 @@ export default function UploadPage() {
       // Extract topics
       if (result.analysis) {
         setAnalysis(result.analysis)
-        setTopics(result.analysis.prioritized_topics || result.analysis.filtered_topics || result.topics || [])
-        
-        // Show generate plan button after topics are extracted
-        if (result.analysis.prioritized_topics || result.analysis.filtered_topics || result.topics) {
-          setShowGeneratePlan(true)
-        }
+        const rawTopicList = (
+          result.analysis.prioritized_topics ||
+          result.analysis.filtered_topics ||
+          result.topics || []
+        )
+
+        // Preserve detailed structures
+        setTopicDetails(rawTopicList)
+
+        // Normalize for badge display
+        const normalized = rawTopicList.map((t: any) => {
+          if (t == null) return 'Untitled'
+            // If already a string
+          if (typeof t === 'string') return t.trim() || 'Untitled'
+          // If object with a topic field
+          if (typeof t === 'object') {
+            const topicName = (t.topic || t.name || '').toString().trim()
+            return topicName || 'Untitled'
+          }
+          return String(t)
+        })
+        setTopics(normalized)
+
+  if (rawTopicList && rawTopicList.length > 0) setShowGeneratePlan(true)
       }
       
       setProcessingTopics(false)
@@ -441,13 +461,14 @@ export default function UploadPage() {
                 
                 <CardContent>
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
-                    {topics.map((topic, index) => (
-                      <Badge 
-                        key={index} 
-                        variant="outline" 
+                    {topics.map((label: string, index: number) => (
+                      <Badge
+                        key={index}
+                        variant="outline"
                         className="justify-center text-center py-2 px-3 text-xs"
+                        title={label}
                       >
-                        {topic}
+                        {label}
                       </Badge>
                     ))}
                   </div>
