@@ -47,7 +47,8 @@ services:
         value: production
       - key: NEXT_TELEMETRY_DISABLED
         value: "1"
+      - key: NEXT_PUBLIC_API_URL
+        value: https://xenia-backend-1f0z.onrender.com
       # Add your environment variables in Render dashboard:
       # NEXT_PUBLIC_SUPABASE_URL
-      # NEXT_PUBLIC_SUPABASE_ANON_KEY  
-      # NEXT_PUBLIC_API_URL (should be your backend service URL)
+      # NEXT_PUBLIC_SUPABASE_ANON_KEY
