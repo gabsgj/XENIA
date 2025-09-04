@@ -337,7 +337,7 @@ export function ProgressTrendChart({ data }: ProgressTrendChartProps) {
                     return (
                       <div className="bg-background border rounded-lg p-3 shadow-lg">
                         <p className="font-medium">
-                          {new Date(label).toLocaleDateString()}
+                          {label ? new Date(label).toLocaleDateString() : ''}
                         </p>
                         <div className="space-y-1 mt-2">
                           <p className="text-sm text-blue-600">

@@ -62,12 +62,38 @@ def update_progress():
             raise ApiError("PLAN_404", "Plan not found", status=404)
         plan = plan_resp.data[0]["plan"]
         session_map = {(s.get("date"), s.get("topic")): s for s in plan.get("sessions", [])}
+        completed_sessions = []
+        
         for upd in session_updates:
             key = (upd.get("date"), upd.get("topic"))
             if key in session_map:
-                session_map[key]["status"] = upd.get("status", "completed")
+                old_status = session_map[key].get("status", "pending")
+                new_status = upd.get("status", "completed")
+                session_map[key]["status"] = new_status
+                
+                # If session was just completed, record it in analytics
+                if old_status != "completed" and new_status == "completed":
+                    session_data = session_map[key]
+                    completed_sessions.append({
+                        "user_id": user_id,
+                        "topic": session_data.get("topic"),
+                        "duration_min": session_data.get("duration_min", 45),
+                        "status": "completed",
+                        "created_at": f"{upd.get('date')}T12:00:00Z"  # Use session date
+                    })
+        
         plan["sessions"] = list(session_map.values())
         sb.table("plans").upsert({"user_id": user_id, "plan": plan}).execute()
+        
+        # Record completed sessions in analytics database
+        if completed_sessions:
+            try:
+                for session in completed_sessions:
+                    sb.table("sessions").upsert(session).execute()
+                logger.info(f"Recorded {len(completed_sessions)} completed sessions in analytics")
+            except Exception as e:
+                logger.warning(f"Failed to record sessions in analytics: {e}")
+        
         return {"ok": True, "plan": plan}
     except ApiError:
         raise
