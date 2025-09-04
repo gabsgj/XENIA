@@ -1,6 +1,6 @@
 'use client'
 
-import { api, getUserId } from "@/lib/api";
+import { API_BASE, api, getUserId } from "@/lib/api";
 
 import { useState, useCallback } from 'react'
 import { useDropzone } from 'react-dropzone'
@@ -10,7 +10,6 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { LoadingButton, LoadingOverlay, TopicsSkeleton, ProgressIndicator } from '@/components/ui/loading'
-import { API_BASE, api } from '@/lib/api'
 import { useErrorContext } from '@/lib/error-context'
 
 import { 
