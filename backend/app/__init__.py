@@ -15,6 +15,7 @@ from .routes.tasks import tasks_bp
 from .routes.teacher import teacher_bp
 from .routes.tutor import tutor_bp
 from .routes.resources import resources_bp
+from .routes.upload import upload_bp
 
 # Suppress NumPy runtime warnings for floating-point precision issues
 warnings.filterwarnings("ignore", category=RuntimeWarning, module="numpy")
@@ -97,6 +98,7 @@ def create_app() -> Flask:
 
     # Register blueprints
     app.register_blueprint(ingest_bp, url_prefix="/api/ingest")
+    app.register_blueprint(upload_bp, url_prefix="/api/upload")
     app.register_blueprint(tutor_bp, url_prefix="/api/tutor")
     app.register_blueprint(plan_bp, url_prefix="/api/plan")
     app.register_blueprint(tasks_bp, url_prefix="/api/tasks")
