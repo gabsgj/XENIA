@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Logo } from "@/components/ui/logo";
 import { useState } from "react";
 import { 
   Calendar, 
@@ -29,9 +28,12 @@ export default function Home() {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="py-6 px-8 md:px-16 lg:px-24 flex justify-between items-center border-b border-border">
-        <Link href="/" className="flex items-center gap-2">
-          <Logo size="md" />
-        </Link>
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
+            <span className="text-primary-foreground font-bold text-sm">X</span>
+          </div>
+          <h1 className="font-bold text-2xl tracking-tighter">XENIA</h1>
+        </div>
         <nav className="hidden md:flex items-center gap-8">
           <a href="#features" className="text-sm font-medium hover:underline transition-all">Features</a>
           <a href="#how-it-works" className="text-sm font-medium hover:underline transition-all">How it Works</a>
