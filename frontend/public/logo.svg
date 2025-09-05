@@ -1,0 +1,11 @@
+<!-- Placeholder logo SVG. Replace the contents with the provided svglogo.svg if different. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="XENIA Logo">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#6366F1" />
+      <stop offset="100%" stop-color="#8B5CF6" />
+    </linearGradient>
+  </defs>
+  <rect x="4" y="4" width="56" height="56" rx="14" fill="url(#g)" />
+  <path d="M22 20 L32 34 L42 20 L50 20 L36 40 L36 44 L28 44 L28 40 L14 20 Z" fill="#fff" fill-rule="evenodd" />
+</svg>

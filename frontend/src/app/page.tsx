@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
+import Logo from "@/components/logo";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Card, CardContent } from "@/components/ui/card";
@@ -28,12 +29,7 @@ export default function Home() {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="py-6 px-8 md:px-16 lg:px-24 flex justify-between items-center border-b border-border">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-            <span className="text-primary-foreground font-bold text-sm">X</span>
-          </div>
-          <h1 className="font-bold text-2xl tracking-tighter">XENIA</h1>
-        </div>
+        <Logo />
         <nav className="hidden md:flex items-center gap-8">
           <a href="#features" className="text-sm font-medium hover:underline transition-all">Features</a>
           <a href="#how-it-works" className="text-sm font-medium hover:underline transition-all">How it Works</a>
@@ -526,11 +522,8 @@ export default function Home() {
       <footer className="bg-primary text-primary-foreground py-16 px-8 md:px-16 lg:px-24">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-12">
           <div>
-            <div className="flex items-center gap-2 mb-6">
-              <div className="w-6 h-6 bg-primary-foreground rounded flex items-center justify-center">
-                <span className="text-primary font-bold text-xs">X</span>
-              </div>
-              <h1 className="font-bold text-xl tracking-tighter">XENIA</h1>
+            <div className="mb-6">
+              <Logo withText />
             </div>
             <p className="text-primary-foreground/80 mb-4">
               Your AI-powered personal study planner and tutor.
