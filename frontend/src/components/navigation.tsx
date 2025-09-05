@@ -19,6 +19,7 @@ import {
   X,
   BookOpen
 } from "lucide-react";
+import { Logo } from "@/components/ui/logo";
 
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
@@ -43,10 +44,7 @@ export function Navigation() {
         <div className="flex flex-col flex-1 min-h-0">
           <div className="flex items-center h-16 px-6 border-b border-sidebar-border">
             <Link href="/" className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-                <span className="text-primary-foreground font-bold text-sm">X</span>
-              </div>
-              <span className="font-bold text-xl tracking-tight">XENIA</span>
+              <Logo size="md" />
             </Link>
           </div>
           <nav className="flex-1 px-4 py-6 space-y-1">
@@ -82,10 +80,7 @@ export function Navigation() {
       <div className="lg:hidden">
         <div className="flex items-center justify-between h-16 px-4 border-b border-border bg-background">
           <Link href="/" className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-              <span className="text-primary-foreground font-bold text-sm">X</span>
-            </div>
-            <span className="font-bold text-xl tracking-tight">XENIA</span>
+            <Logo size="md" />
           </Link>
           <div className="flex items-center gap-2">
             <ThemeToggle />

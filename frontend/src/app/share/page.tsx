@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { Input } from '@/components/ui/input'
+import { Logo } from '@/components/ui/logo'
 import { 
   Share2, 
   Copy, 
@@ -69,12 +70,7 @@ export default function SharePage() {
       {/* Header */}
       <header className="py-6 px-8 md:px-16 lg:px-24 border-b border-border">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-              <span className="text-primary-foreground font-bold text-sm">X</span>
-            </div>
-            <h1 className="font-bold text-2xl tracking-tighter">XENIA</h1>
-          </div>
+          <Logo size="md" />
           <div className="flex items-center gap-3">
             <Button variant="outline" onClick={copyToClipboard}>
               {copied ? <CheckCircle className="w-4 h-4 mr-2" /> : <Copy className="w-4 h-4 mr-2" />}

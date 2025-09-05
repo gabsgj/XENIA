@@ -9,6 +9,11 @@ export const metadata: Metadata = {
   description: "Your personal AI-powered study planner and tutor. Generate personalized study plans, get help from AI tutors, and track your progress with powerful analytics.",
   keywords: ["AI", "study planner", "education", "tutoring", "learning", "analytics"],
   authors: [{ name: "XENIA Team" }],
+  icons: {
+    icon: '/favicon.svg',
+    shortcut: '/favicon.svg',
+    apple: '/favicon.svg',
+  },
 };
 
 export default function RootLayout({

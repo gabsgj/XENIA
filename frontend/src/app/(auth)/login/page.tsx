@@ -12,6 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { useErrorContext } from "@/lib/error-context";
 import Link from "next/link";
 import { Eye, EyeOff, Mail, Lock } from "lucide-react";
+import { Logo } from "@/components/ui/logo";
 
 const LoginSchema = z.object({
   email: z.string().email(),
@@ -49,10 +50,7 @@ export default function LoginPage() {
         {/* Header */}
         <div className="text-center mb-8">
           <Link href="/" className="inline-flex items-center gap-2 mb-6">
-            <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
-              <span className="text-primary-foreground font-bold">X</span>
-            </div>
-            <span className="font-bold text-2xl tracking-tight">XENIA</span>
+            <Logo size="lg" />
           </Link>
         </div>
 
