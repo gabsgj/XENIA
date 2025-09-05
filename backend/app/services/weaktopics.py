@@ -69,23 +69,25 @@ def is_administrative_content(text: str) -> bool:
 
 
 def extract_topics_from_text(text: str) -> List[str]:
-    """Extract topics with cleaning to avoid duplicated prefixed variants.
+    """Extract topics with enhanced patterns to capture more academic content.
 
-    Rules:
+    Enhanced Rules:
       1. Capture lines starting with Topic/Section/Chapter/Unit and strip the prefix.
-      2. Include bullet / dash lines (>=2 words) if they don't duplicate an existing topic (case-insensitive).
-      3. Discard raw lines that are *only* the prefixed form when cleaned version already exists.
-      4. Length bounds 3..80 chars after cleaning.
-      5. Filter out common non-topic phrases.
+      2. Include bullet / dash lines (>=2 words) if they don't duplicate an existing topic.
+      3. Extract numbered list items and subtopics.
+      4. Capture colon-separated content indicating topics.
+      5. Include mathematical concepts, formulas, and equations.
+      6. Extract programming concepts and technical terms.
+      7. Length bounds 2..100 chars after cleaning (expanded from 3..80).
+      8. More permissive filtering to include academic content.
     """
     collected: List[str] = []
     seen_ci = set()
 
-    # Common phrases to filter out (not actual topics)
+    # Reduced exclusions - only truly administrative content
     exclusions = {
-        'course syllabus', 'syllabus', 'advanced mathematics', 'mathematics course',
-        'course outline', 'course description', 'learning objectives', 'prerequisites',
-        'textbook', 'grading', 'schedule', 'assignments', 'exams', 'final exam',
+        'course syllabus', 'syllabus', 'course outline', 'course description', 
+        'learning objectives', 'prerequisites', 'textbook', 'grading', 'schedule',
         'user manual', 'instructions', 'how to set up', 'how to run', 'how to use',
         'continuous internal evaluation', 'evaluation marks', 'marks', 'cie',
         'pending', 'practice + review', 'min', 'minutes', 'hours',
@@ -96,16 +98,18 @@ def extract_topics_from_text(text: str) -> List[str]:
         norm = topic.strip()
         if not norm:
             return
-        if not (3 <= len(norm) <= 80):
+        # Expanded length bounds: 2..100 chars (was 3..80)
+        if not (2 <= len(norm) <= 100):
             return
         
         # Filter out common non-topic phrases
         if norm.lower() in exclusions:
             return
-        if any(excl in norm.lower() for excl in ['course', 'syllabus'] if len(norm.split()) <= 3):
+        # More permissive filtering - only exclude very generic course-related terms
+        if any(excl in norm.lower() for excl in ['course syllabus', 'syllabus overview'] if len(norm.split()) <= 2):
             return
         
-        # Advanced filtering for administrative/procedural content
+        # Keep administrative content filtering but be more lenient
         if is_administrative_content(norm):
             return
             
@@ -116,6 +120,13 @@ def extract_topics_from_text(text: str) -> List[str]:
         seen_ci.add(key)
 
     lines = text.splitlines()
+    
+    # Enhanced patterns for topic extraction
+    numbered_pattern = re.compile(r"^\s*(\d+[\.\)]\s+)(.+)$")  # 1. Topic or 1) Topic
+    colon_pattern = re.compile(r"^([^:]+):\s*(.+)$")  # Title: Description
+    math_pattern = re.compile(r"(?i)\b(?:equation|formula|theorem|lemma|proof|derivative|integral|matrix|vector|algebra|geometry|calculus|trigonometry|statistics|probability)\b")
+    programming_pattern = re.compile(r"(?i)\b(?:algorithm|data structure|function|method|class|object|variable|loop|conditional|recursion|sorting|searching|array|list|tree|graph|database|sql|programming|coding|development)\b")
+    
     # First pass: explicit prefixed lines
     for line in lines:
         m = TOPIC_PATTERN.search(line)
@@ -125,9 +136,27 @@ def extract_topics_from_text(text: str) -> List[str]:
             cleaned = re.sub(r'^(topic\s+)?(\d+[\s:.-]+)', '', cleaned, flags=re.IGNORECASE).strip()
             add(cleaned)
 
-    # Second pass: bullets / general lines
+    # Second pass: numbered items
     for line in lines:
-        raw = line.strip().lstrip("-•* \t")
+        m = numbered_pattern.match(line)
+        if m:
+            topic = m.group(2).strip()
+            add(topic)
+
+    # Third pass: colon-separated content
+    for line in lines:
+        m = colon_pattern.match(line.strip())
+        if m and len(m.group(1).strip()) >= 2:
+            title = m.group(1).strip()
+            description = m.group(2).strip()
+            # Add both title and description if they're substantial
+            add(title)
+            if len(description) >= 10:  # Only add description if it's substantial
+                add(description)
+
+    # Fourth pass: bullets / general lines with enhanced detection
+    for line in lines:
+        raw = line.strip().lstrip("-•*→▸◦▪▫ \t")
         if not raw:
             continue
         
@@ -144,12 +173,26 @@ def extract_topics_from_text(text: str) -> List[str]:
                 continue
             add(cleaned)
             continue
-        # Heuristic: at least two words, not too long
-        if len(raw.split()) >= 2 and 3 <= len(raw) <= 80:
+            
+        # Enhanced heuristic: include mathematical and programming concepts
+        is_math_concept = math_pattern.search(raw)
+        is_programming_concept = programming_pattern.search(raw)
+        
+        # More permissive word count: at least 1 word for math/programming concepts, 2 for others
+        min_words = 1 if (is_math_concept or is_programming_concept) else 2
+        
+        if len(raw.split()) >= min_words and 2 <= len(raw) <= 100:
             if raw.lower() not in {c.lower() for c in collected}:
                 add(raw)
 
-    return collected[:200]
+    # Fifth pass: single-word technical terms and concepts
+    technical_terms = re.findall(r'\b(?:algebra|calculus|geometry|trigonometry|statistics|probability|physics|chemistry|biology|literature|history|geography|economics|psychology|sociology|philosophy|mathematics|science|english|art|music|drama|physical education|computer science|programming|database|algorithm|function|method|class|object|variable|array|list|matrix|vector|equation|formula|theorem|proof|integral|derivative|limit|logarithm|polynomial|quadratic|linear|exponential|sine|cosine|tangent|atom|molecule|cell|organism|ecosystem|photosynthesis|respiration|genetics|evolution|democracy|republic|monarchy|capitalism|socialism|renaissance|revolution|war|peace|culture|civilization)\b', text, re.IGNORECASE)
+    
+    for term in technical_terms:
+        if term and len(term) >= 3 and term.lower() not in {c.lower() for c in collected}:
+            add(term.title())
+
+    return collected[:300]  # Increased limit from 200 to 300
 
 
 def get_weak_topics(user_id: str) -> List[Dict]:

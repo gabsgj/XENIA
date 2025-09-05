@@ -103,25 +103,28 @@ def handle_upload(file_storage, user_id: str, artifact_type: str) -> Dict:
 
     topics = []
     if artifact_type == "syllabus":
-        # Extract topics heuristically first
+        # Extract topics with enhanced extraction for more comprehensive coverage
         topics = extract_topics_from_text(text)
+        print(f"📚 Enhanced topic extraction: {len(topics)} topics extracted")
         
         # Get AI-enhanced analysis for better topic metadata
         analysis = {}
         try:
             from .ai_providers import get_syllabus_analysis
-            analysis = get_syllabus_analysis("\n".join(topics)[:6000])
+            # Use more text for analysis to capture more topics
+            analysis = get_syllabus_analysis(text[:8000])  # Increased from 6000
             print(f"AI analysis completed: {len(analysis.get('topics', []))} enhanced topics")
         except Exception as e:
             print(f"AI analysis failed: {e}")
-            analysis = {"topics": [{"topic": t, "score": 5} for t in topics[:50]]}
+            # Enhanced fallback with more topics
+            analysis = {"topics": [{"topic": t, "score": 5} for t in topics[:75]]}  # Increased from 50
         
         # AI FILTERING STEP: Filter and prioritize topics using Gemini
         filtered_analysis = {}
         try:
             from .ai_providers import filter_and_prioritize_topics
-            # Pass extracted topics and original text for intelligent filtering
-            user_preferences = {}  # Could be passed from request in future
+            # Pass more topics for filtering
+            user_preferences = {"comprehensive_coverage": True}  # Flag for more inclusive filtering
             filtered_analysis = filter_and_prioritize_topics(topics, text, user_preferences)
             print(f"🎯 AI filtering completed: {len(filtered_analysis.get('filtered_topics', []))} topics after intelligent filtering")
             
@@ -131,7 +134,7 @@ def handle_upload(file_storage, user_id: str, artifact_type: str) -> Dict:
                 analysis['learning_path'] = filtered_analysis['learning_path']
                 analysis['filtering_insights'] = filtered_analysis['filtering_insights']
                 analysis['next_steps'] = filtered_analysis['next_steps']
-                print(f"📚 Learning path generated with {len(filtered_analysis['learning_path'])} phases")
+                print(f"📚 Comprehensive learning path generated with {len(filtered_analysis['learning_path'])} phases")
                 
         except Exception as e:
             print(f"AI filtering failed: {e}")
@@ -201,10 +204,10 @@ def handle_upload(file_storage, user_id: str, artifact_type: str) -> Dict:
         else:
             store_add_topics(norm_user_id, topics)
             
-        # Fetch resources asynchronously (best-effort)
+        # Fetch resources for more topics (increased coverage)
         if is_valid_uuid(norm_user_id) and record.get("user_id"):
             try:
-                fetch_and_store_resources_for_topics(norm_user_id, topics[:25])
+                fetch_and_store_resources_for_topics(norm_user_id, topics[:50])  # Increased from 25
             except Exception as e:
                 print(f"Resource fetch error: {e}")
                 

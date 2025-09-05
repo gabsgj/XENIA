@@ -4,7 +4,7 @@ Supports OpenAI, Anthropic, and Gemini APIs.
 """
 import os
 import json
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -135,11 +135,13 @@ def filter_and_prioritize_topics(extracted_topics: list, syllabus_content: str, 
     difficulty_level = user_prefs.get("difficulty_level", "intermediate")
     time_available = user_prefs.get("time_available", "moderate")
     
-    topics_text = "\n".join([f"- {topic}" for topic in extracted_topics[:30]])
+    topics_text = "\n".join([f"- {topic}" for topic in extracted_topics[:50]])  # Increased from 30
     focus_areas_text = ", ".join(focus_areas) if focus_areas else "No specific focus areas"
     
     prompt = f"""
 You are an expert educational AI. Analyze and intelligently filter the extracted syllabus topics.
+IMPORTANT: Be GENEROUS in topic inclusion. Err on the side of including MORE topics rather than fewer.
+Include specialized terminology, subtopics, and detailed concepts for comprehensive learning coverage.
 
 EXTRACTED TOPICS:
 {topics_text}
@@ -153,6 +155,17 @@ USER PREFERENCES:
 - Difficulty Level: {difficulty_level}
 - Time Available: {time_available}
 
+FILTERING GUIDELINES:
+1. INCLUDE MORE TOPICS: Be generous in topic inclusion - prefer keeping topics over excluding them
+2. Remove only obvious administrative content (grading, policies, schedules)
+3. Keep all academic topics, even if they seem minor or specialized
+4. Include subtopics and detailed concepts for thorough coverage
+5. Preserve technical terminology and specialized vocabulary
+6. Group related topics into logical learning sequences
+7. Prioritize based on importance but include lower-priority topics too
+8. Estimate learning difficulty and time requirements realistically
+9. Create a comprehensive learning path with detailed coverage
+
 FILTERING TASKS:
 1. Remove redundant, administrative, or non-essential topics
 2. Identify core foundational topics vs. advanced topics
@@ -160,6 +173,9 @@ FILTERING TASKS:
 4. Prioritize based on importance and prerequisites
 5. Estimate learning difficulty and time requirements
 6. Suggest optimal learning order
+7. INCLUDE MORE TOPICS: Be generous in topic inclusion - prefer keeping topics over excluding them
+8. Preserve specialized terminology and technical concepts
+9. Include subtopics and detailed concepts for comprehensive learning
 
 Return ONLY valid JSON:
 {{
@@ -240,44 +256,44 @@ Return ONLY valid JSON:
     except Exception as e:
         logger.error(f"AI topic filtering failed: {str(e)}")
         
-        # Fallback: Basic filtering logic
-        logger.info("🔄 Using fallback topic filtering...")
+        # Fallback: More permissive filtering logic
+        logger.info("🔄 Using enhanced fallback topic filtering...")
         
-        # Remove common administrative topics
-        admin_keywords = ['syllabus', 'schedule', 'exam', 'grade', 'policy', 'attendance', 'office hours']
+        # Remove only clearly administrative topics (more permissive)
+        admin_keywords = ['syllabus overview', 'course policies', 'grading system', 'attendance policy', 'office hours schedule']
         filtered = [topic for topic in extracted_topics 
                    if not any(keyword in topic.lower() for keyword in admin_keywords)]
         
-        # Basic prioritization
+        # Enhanced prioritization - include more topics
         priority_topics = []
-        for i, topic in enumerate(filtered[:20]):
+        for i, topic in enumerate(filtered[:40]):  # Increased from 20 to 40
             priority_topics.append({
                 "topic": topic,
-                "category": "foundational" if i < 5 else "intermediate" if i < 15 else "advanced",
-                "priority": "high" if i < 10 else "medium",
-                "estimated_hours": 3.0,
-                "difficulty_score": min(i + 3, 8),
+                "category": "foundational" if i < 8 else "intermediate" if i < 25 else "advanced",  # More generous categorization
+                "priority": "critical" if i < 5 else "high" if i < 15 else "medium" if i < 30 else "low",
+                "estimated_hours": 2.5 + (i % 4),  # Varied time estimates
+                "difficulty_score": min(i // 3 + 3, 9),  # More gradual difficulty progression
                 "prerequisites": [],
-                "learning_objectives": [f"Understand {topic}"],
-                "why_important": "Core curriculum topic",
+                "learning_objectives": [f"Understand {topic}", f"Apply {topic} concepts"],
+                "why_important": "Essential curriculum topic" if i < 15 else "Important supporting topic",
                 "suggested_resources": []
             })
         
         return {
             "filtered_topics": priority_topics,
             "learning_path": {
-                "phase_1_foundation": [t["topic"] for t in priority_topics[:5]],
-                "phase_2_core": [t["topic"] for t in priority_topics[5:12]],
-                "phase_3_advanced": [t["topic"] for t in priority_topics[12:]],
-                "phase_4_application": ["Final project", "Review and integration"]
+                "phase_1_foundation": [t["topic"] for t in priority_topics[:8]],  # Increased from 5
+                "phase_2_core": [t["topic"] for t in priority_topics[8:20]],      # Increased coverage
+                "phase_3_advanced": [t["topic"] for t in priority_topics[20:32]], # More advanced topics
+                "phase_4_application": [t["topic"] for t in priority_topics[32:]] + ["Final project", "Review and integration"]
             },
             "filtering_insights": {
                 "topics_removed": len(extracted_topics) - len(priority_topics),
                 "topics_kept": len(priority_topics),
-                "removal_reasons": ["Administrative content filtered"],
-                "learning_sequence_rationale": "Basic sequential ordering",
-                "time_estimate_total": len(priority_topics) * 3.0,
-                "difficulty_progression": "gradual"
+                "removal_reasons": ["Only clearly administrative content filtered"],
+                "learning_sequence_rationale": "Comprehensive coverage with gradual progression",
+                "time_estimate_total": sum(t["estimated_hours"] for t in priority_topics),
+                "difficulty_progression": "gradual with comprehensive coverage"
             },
             "next_steps": {
                 "immediate_actions": ["Review filtered topics", "Begin with foundation"],
@@ -411,17 +427,27 @@ def get_syllabus_analysis(text: str) -> Dict[str, Any]:
     """Advanced AI-powered syllabus analysis with topic filtering and prioritization."""
     prompt = f"""
 You are an expert educational AI analyzing a syllabus document. Extract and filter the most important academic topics.
+GOAL: Comprehensive topic extraction - include as many relevant academic topics as possible.
 
 SYLLABUS CONTENT:
 {text}
 
-Perform the following analysis:
+Perform the following analysis with COMPREHENSIVE COVERAGE:
 
-1. TOPIC EXTRACTION: Identify core academic topics (exclude administrative content)
+1. TOPIC EXTRACTION: Identify ALL core academic topics (exclude only administrative content)
 2. DIFFICULTY SCORING: Rate each topic 1-10 based on complexity
 3. PREREQUISITE ANALYSIS: Identify topic dependencies  
 4. TIME ESTIMATION: Estimate study hours per topic
 5. PRIORITY RANKING: Rank topics by importance and urgency
+6. COMPREHENSIVE INCLUSION: Include specialized terms, subtopics, and detailed concepts
+
+GUIDELINES:
+- Include MORE topics rather than fewer
+- Preserve technical terminology and specialized vocabulary
+- Include both broad concepts and specific subtopics
+- Cover mathematical formulas, equations, and technical terms
+- Include programming concepts, algorithms, and methodologies
+- Extract both theoretical and practical topics
 
 Return ONLY valid JSON in this exact format:
 {{
@@ -473,7 +499,7 @@ Return ONLY valid JSON in this exact format:
                     }
                     valid_topics.append(enhanced_topic)
             
-            parsed["topics"] = valid_topics[:20]  # Limit to 20 topics max
+            parsed["topics"] = valid_topics[:30]  # Increased limit from 20 to 30 topics
             return parsed
             
     except Exception as e:
@@ -484,18 +510,18 @@ Return ONLY valid JSON in this exact format:
     # Enhanced fallback analysis with topic extraction
     try:
         from .weaktopics import extract_topics_from_text
-        extracted_topics = extract_topics_from_text(text)[:10]
+        extracted_topics = extract_topics_from_text(text)[:20]  # Increased from 10
         
         fallback_topics = []
         for i, topic in enumerate(extracted_topics):
             fallback_topics.append({
                 "topic": topic,
-                "score": 5 + (i % 3),  # Vary difficulty scores
-                "category": "general",
+                "score": 4 + (i % 4),  # Vary difficulty scores (4-7)
+                "category": "foundational" if i < 5 else "intermediate" if i < 12 else "advanced",
                 "prerequisites": [],
-                "estimated_hours": 3 + (i % 5),
-                "priority": "medium" if i < 5 else "low",
-                "keywords": topic.lower().split()[:3]
+                "estimated_hours": 2 + (i % 6),  # More varied time estimates
+                "priority": "high" if i < 8 else "medium" if i < 15 else "low",
+                "keywords": topic.lower().split()[:4]  # More keywords
             })
         
         return {
@@ -503,7 +529,7 @@ Return ONLY valid JSON in this exact format:
             "difficulty": "intermediate",
             "estimated_total_hours": sum(t["estimated_hours"] for t in fallback_topics),
             "subject_area": "General Studies",
-            "learning_objectives": ["Understanding core concepts"],
+            "learning_objectives": ["Comprehensive understanding of all topics"],
             "filtered_administrative": []
         }
     except:
@@ -969,79 +995,132 @@ Return ONLY valid JSON with the adjusted plan:
         }
 
 
-def get_topic_resources(topic: str, learning_style: str = "balanced") -> Dict[str, Any]:
-    """Get comprehensive resources for a specific topic using Gemini 2.0 Flash."""
+def get_topic_resources(topic: str, learning_style: str = "balanced", difficulty_level: str = "intermediate",
+                      user_preferences: Dict[str, Any] = None) -> Dict[str, Any]:
+    """Get comprehensive resources for a specific topic using Gemini 2.0 Flash with enhanced personalization."""
     import logging
     
     logger = logging.getLogger('xenia')
-    logger.info(f"🔍 Finding resources for topic: {topic}")
+    logger.info(f"🔍 Finding personalized resources for topic: {topic}")
     
-    prompt = f"""You are a resource discovery expert. Find the best learning resources for the topic: "{topic}".
+    # Extract user preferences
+    user_prefs = user_preferences or {}
+    preferred_formats = user_prefs.get("preferred_formats", ["video", "article", "practice"])
+    time_available = user_prefs.get("time_available", "moderate")
+    free_resources_only = user_prefs.get("free_resources_only", True)
+    
+    prompt = f"""You are an expert educational resource curator. Find the best, most current learning resources for: "{topic}".
 
-LEARNING STYLE: {learning_style}
+PERSONALIZATION REQUIREMENTS:
+- Learning Style: {learning_style}
+- Difficulty Level: {difficulty_level}
+- Preferred Formats: {', '.join(preferred_formats)}
+- Time Available: {time_available}
+- Free Resources Only: {free_resources_only}
 
-Find comprehensive, high-quality resources. Return ONLY valid JSON:
+QUALITY CRITERIA:
+1. Prioritize well-known educational platforms and creators
+2. Include diverse learning formats (visual, text, interactive, practice)
+3. Ensure resources are current and actively maintained
+4. Focus on comprehensive, beginner-friendly explanations
+5. Include hands-on practice opportunities
+
+Return ONLY valid JSON with REAL, SPECIFIC resources (not generic examples):
 {{
   "topic": "{topic}",
+  "personalization_summary": {{
+    "learning_style_optimization": "How resources match the {learning_style} learning style",
+    "difficulty_progression": "Resource ordering from {difficulty_level} level",
+    "time_estimate": "Total estimated learning time based on {time_available} availability"
+  }},
   "youtube_videos": [
     {{
-      "title": "Complete {topic} Tutorial",
+      "title": "Specific Video Title (not generic)",
       "channel": "Actual Channel Name",
-      "url": "https://youtube.com/watch?v=actual_video_id",
-      "duration": "25 minutes",
+      "url": "https://youtube.com/watch?v=REAL_VIDEO_ID",
+      "duration": "exact minutes",
       "difficulty": "beginner|intermediate|advanced",
       "rating": 4.8,
-      "description": "Brief description of what this video covers"
+      "description": "What specifically this video covers",
+      "why_recommended": "Why this matches user preferences",
+      "learning_outcomes": ["Specific skill 1", "Specific skill 2"]
     }}
   ],
   "articles_and_guides": [
     {{
-      "title": "Comprehensive {topic} Guide",
-      "source": "Educational Website",
-      "url": "https://actual-site.com/guide",
-      "read_time": "15 minutes",
-      "type": "tutorial|reference|explanation",
-      "quality_score": 9
+      "title": "Specific Article/Guide Title",
+      "source": "Actual Website/Platform Name",
+      "url": "https://actual-domain.com/specific-path",
+      "read_time": "X minutes",
+      "type": "tutorial|reference|explanation|interactive",
+      "quality_score": 9,
+      "author": "Expert Author Name",
+      "updated": "2024 or recent",
+      "key_concepts": ["Concept 1", "Concept 2"]
     }}
   ],
   "practice_platforms": [
     {{
-      "name": "Interactive Practice Site",
-      "url": "https://practice-site.com",
-      "type": "exercises|quizzes|simulations",
+      "name": "Platform Name",
+      "url": "https://platform.com",
+      "type": "exercises|quizzes|simulations|coding",
       "free": true,
-      "features": ["Step-by-step solutions", "Progress tracking"]
+      "features": ["Specific feature 1", "Specific feature 2"],
+      "difficulty_levels": ["beginner", "intermediate", "advanced"],
+      "estimated_completion": "X hours"
     }}
   ],
   "documentation": [
     {{
-      "title": "Official {topic} Documentation",
-      "url": "https://docs.example.com",
-      "type": "reference",
-      "completeness": "comprehensive"
+      "title": "Official Documentation/Reference",
+      "url": "https://official-docs.com",
+      "type": "reference|api_docs|specification",
+      "completeness": "comprehensive|partial",
+      "maintenance": "actively_maintained|stable",
+      "best_for": "Quick reference|Deep learning|Examples"
     }}
   ],
   "books_and_papers": [
     {{
-      "title": "Essential {topic} Textbook",
-      "author": "Expert Author",
-      "type": "textbook|research_paper|guide",
-      "availability": "free|paid|library",
-      "relevance_score": 9
+      "title": "Specific Book/Paper Title",
+      "author": "Author Name",
+      "type": "textbook|research_paper|guide|handbook",
+      "availability": "free|paid|library|open_access",
+      "relevance_score": 9,
+      "publication_year": 2023,
+      "pages": 200,
+      "level": "undergraduate|graduate|professional"
     }}
   ],
   "interactive_tools": [
     {{
-      "name": "Topic Simulator",
-      "url": "https://simulator.com",
-      "type": "simulation|calculator|visualizer",
-      "description": "Interactive tool for hands-on learning"
+      "name": "Tool Name",
+      "url": "https://tool-site.com",
+      "type": "simulation|calculator|visualizer|sandbox",
+      "description": "What this tool helps you do",
+      "supported_features": ["Feature 1", "Feature 2"],
+      "browser_based": true
     }}
   ],
+  "study_strategies": [
+    {{
+      "strategy": "Specific learning strategy",
+      "description": "How to implement this strategy",
+      "time_required": "X minutes/hours",
+      "effectiveness": "high|medium|low",
+      "best_for": "Visual learners|Beginners|Practice"
+    }}
+  ],
+  "learning_path": {{
+    "beginner": ["Resource 1", "Resource 2"],
+    "intermediate": ["Resource 3", "Resource 4"], 
+    "advanced": ["Resource 5", "Resource 6"],
+    "practice": ["Practice resource 1", "Practice resource 2"]
+  }},
   "study_tips": [
-    "Start with conceptual understanding before diving into details",
-    "Practice regularly with varied examples",
-    "Connect concepts to real-world applications"
+    "Specific, actionable tip for learning {topic}",
+    "Another concrete strategy for mastering this topic",
+    "How to avoid common pitfalls when studying {topic}"
   ]
 }}
 """
@@ -1055,75 +1134,206 @@ Find comprehensive, high-quality resources. Return ONLY valid JSON:
             clean_response = clean_response[:-3]
         
         parsed = json.loads(clean_response.strip())
-        logger.info(f"✅ Found {len(parsed.get('youtube_videos', []))} videos and {len(parsed.get('articles_and_guides', []))} articles")
+        
+        # Enhance parsed response with quality metrics
+        if "youtube_videos" in parsed:
+            for video in parsed["youtube_videos"]:
+                video["recommendation_reason"] = video.get("why_recommended", "Matches search criteria")
+                video["personalization_match"] = _calculate_video_match_score(video, learning_style, difficulty_level)
+        
+        if "articles_and_guides" in parsed:
+            for article in parsed["articles_and_guides"]:
+                article["recommendation_reason"] = f"High-quality {article.get('type', 'resource')} content"
+                article["personalization_match"] = _calculate_article_match_score(article, learning_style)
+        
+        logger.info(f"✅ Found comprehensive resources: {len(parsed.get('youtube_videos', []))} videos, {len(parsed.get('articles_and_guides', []))} articles")
         return parsed
         
     except Exception as e:
-        logger.error(f"Resource discovery failed: {e}")
+        logger.error(f"Enhanced resource discovery failed: {e}")
         
-        # Fallback with search-based resources
+        # Enhanced fallback with better personalization
         topic_encoded = topic.replace(" ", "+")
+        
+        # Generate learning style specific recommendations
+        video_recommendations = _generate_learning_style_videos(topic, learning_style, difficulty_level)
+        article_recommendations = _generate_learning_style_articles(topic, learning_style)
+        practice_recommendations = _generate_practice_resources(topic, difficulty_level)
+        
         return {
             "topic": topic,
-            "youtube_videos": [
-                {
-                    "title": f"{topic} - Complete Tutorial",
-                    "channel": "Educational Channel",
-                    "url": f"https://youtube.com/results?search_query={topic_encoded}+tutorial",
-                    "duration": "20 minutes",
-                    "difficulty": "intermediate",
-                    "rating": 4.5,
-                    "description": f"Comprehensive introduction to {topic}"
-                }
-            ],
-            "articles_and_guides": [
-                {
-                    "title": f"Ultimate {topic} Guide",
-                    "source": "Study Resource",
-                    "url": f"https://google.com/search?q={topic_encoded}+guide+tutorial",
-                    "read_time": "15 minutes",
-                    "type": "tutorial",
-                    "quality_score": 8
-                }
-            ],
-            "practice_platforms": [
-                {
-                    "name": "Khan Academy",
-                    "url": "https://khanacademy.org",
-                    "type": "exercises",
-                    "free": True,
-                    "features": ["Interactive exercises", "Progress tracking"]
-                }
-            ],
+            "personalization_summary": {
+                "learning_style_optimization": f"Resources curated for {learning_style} learning style",
+                "difficulty_progression": f"Starting at {difficulty_level} level with clear progression",
+                "time_estimate": "2-4 hours for comprehensive coverage"
+            },
+            "youtube_videos": video_recommendations,
+            "articles_and_guides": article_recommendations,
+            "practice_platforms": practice_recommendations,
             "documentation": [
                 {
-                    "title": f"{topic} Reference",
-                    "url": f"https://google.com/search?q={topic_encoded}+documentation",
+                    "title": f"{topic} Reference Documentation",
+                    "url": f"https://google.com/search?q={topic_encoded}+documentation+reference",
                     "type": "reference",
-                    "completeness": "partial"
+                    "completeness": "partial",
+                    "best_for": "Quick reference and examples"
                 }
             ],
             "books_and_papers": [
                 {
                     "title": f"Introduction to {topic}",
-                    "author": "Various Authors",
+                    "author": "Academic Authors",
                     "type": "textbook",
                     "availability": "library",
-                    "relevance_score": 7
+                    "relevance_score": 7,
+                    "level": difficulty_level
                 }
             ],
             "interactive_tools": [
                 {
-                    "name": f"{topic} Practice Tool",
-                    "url": f"https://google.com/search?q={topic_encoded}+interactive+tool",
+                    "name": f"{topic} Interactive Practice",
+                    "url": f"https://google.com/search?q={topic_encoded}+interactive+tool+practice",
                     "type": "practice",
-                    "description": f"Interactive exercises for {topic}"
+                    "description": f"Interactive exercises and simulations for {topic}",
+                    "browser_based": True
                 }
             ],
+            "study_strategies": [
+                {
+                    "strategy": f"Spaced repetition for {topic}",
+                    "description": "Review key concepts at increasing intervals",
+                    "time_required": "15 minutes daily",
+                    "effectiveness": "high",
+                    "best_for": f"{learning_style} learners"
+                }
+            ],
+            "learning_path": {
+                "beginner": [f"Basic {topic} concepts", "Foundational principles"],
+                "intermediate": [f"Applied {topic}", "Real-world examples"],
+                "advanced": [f"Advanced {topic} techniques", "Expert-level applications"],
+                "practice": ["Hands-on exercises", "Project-based learning"]
+            },
             "study_tips": [
-                f"Break down {topic} into smaller, manageable concepts",
-                "Practice with real examples and applications",
-                "Review regularly to reinforce understanding",
-                "Connect new concepts to previously learned material"
+                f"Start with the fundamentals before diving into advanced {topic} concepts",
+                f"Practice {topic} regularly with hands-on exercises and real examples",
+                f"Connect {topic} concepts to practical applications in your field",
+                "Use active recall techniques to reinforce your understanding",
+                "Join study groups or online communities focused on this topic"
             ]
         }
+
+
+def _calculate_video_match_score(video: Dict[str, Any], learning_style: str, difficulty_level: str) -> float:
+    """Calculate how well a video matches user preferences."""
+    score = 5.0
+    
+    # Learning style match
+    if learning_style == "visual" and "tutorial" in video.get("title", "").lower():
+        score += 2
+    elif learning_style == "auditory" and "lecture" in video.get("title", "").lower():
+        score += 2
+    
+    # Difficulty match
+    video_difficulty = video.get("difficulty", "intermediate")
+    if video_difficulty == difficulty_level:
+        score += 1.5
+    
+    # Quality indicators
+    if video.get("rating", 0) >= 4.5:
+        score += 1
+    
+    return min(score, 10)
+
+
+def _calculate_article_match_score(article: Dict[str, Any], learning_style: str) -> float:
+    """Calculate how well an article matches user preferences."""
+    score = 5.0
+    
+    # Learning style match
+    if learning_style == "reading" and article.get("type") in ["tutorial", "guide"]:
+        score += 2
+    
+    # Quality indicators
+    if article.get("quality_score", 0) >= 8:
+        score += 1
+    
+    return min(score, 10)
+
+
+def _generate_learning_style_videos(topic: str, learning_style: str, difficulty_level: str) -> List[Dict[str, Any]]:
+    """Generate learning style optimized video recommendations."""
+    topic_encoded = topic.replace(" ", "+")
+    
+    if learning_style == "visual":
+        search_terms = ["tutorial", "demonstration", "animated", "visual"]
+    elif learning_style == "auditory":
+        search_terms = ["lecture", "explanation", "podcast", "discussion"]
+    else:
+        search_terms = ["tutorial", "guide", "walkthrough"]
+    
+    videos = []
+    for i, term in enumerate(search_terms[:3]):
+        videos.append({
+            "title": f"{topic} - {term.title()} for {difficulty_level.title()} Learners",
+            "channel": "Educational Channel",
+            "url": f"https://youtube.com/results?search_query={topic_encoded}+{term}+{difficulty_level}",
+            "duration": f"{15 + i*5} minutes",
+            "difficulty": difficulty_level,
+            "rating": 4.5 + i*0.1,
+            "description": f"Comprehensive {term} covering {topic} fundamentals",
+            "why_recommended": f"Optimized for {learning_style} learning style",
+            "personalization_match": 8 + i
+        })
+    
+    return videos
+
+
+def _generate_learning_style_articles(topic: str, learning_style: str) -> List[Dict[str, Any]]:
+    """Generate learning style optimized article recommendations."""
+    topic_encoded = topic.replace(" ", "+")
+    
+    articles = []
+    if learning_style == "reading":
+        article_types = ["comprehensive guide", "step-by-step tutorial", "reference documentation"]
+    else:
+        article_types = ["quick start guide", "visual tutorial", "interactive examples"]
+    
+    for i, article_type in enumerate(article_types):
+        articles.append({
+            "title": f"{topic} - {article_type.title()}",
+            "source": "Educational Platform",
+            "url": f"https://google.com/search?q={topic_encoded}+{article_type.replace(' ', '+')}",
+            "read_time": f"{10 + i*5} minutes",
+            "type": "tutorial" if "tutorial" in article_type else "guide",
+            "quality_score": 8 + i,
+            "author": "Expert Contributors",
+            "key_concepts": [f"{topic} fundamentals", "Practical applications"],
+            "recommendation_reason": f"Matches {learning_style} learning preferences"
+        })
+    
+    return articles
+
+
+def _generate_practice_resources(topic: str, difficulty_level: str) -> List[Dict[str, Any]]:
+    """Generate practice resources based on difficulty level."""
+    
+    if difficulty_level == "beginner":
+        practice_types = ["guided exercises", "interactive tutorials"]
+    elif difficulty_level == "intermediate":
+        practice_types = ["coding challenges", "practical projects"]
+    else:
+        practice_types = ["advanced simulations", "expert challenges"]
+    
+    platforms = []
+    for practice_type in practice_types:
+        platforms.append({
+            "name": f"{topic} {practice_type.title()}",
+            "url": f"https://google.com/search?q={topic.replace(' ', '+')}+{practice_type.replace(' ', '+')}",
+            "type": "exercises" if "exercise" in practice_type else "projects",
+            "free": True,
+            "features": ["Progress tracking", "Instant feedback", "Solution explanations"],
+            "difficulty_levels": [difficulty_level],
+            "estimated_completion": f"{2 + len(practice_types)} hours"
+        })
+    
+    return platforms

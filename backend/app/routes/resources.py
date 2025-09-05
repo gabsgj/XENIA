@@ -1,8 +1,9 @@
 import logging
-from flask import Blueprint, request
+from flask import Blueprint, request, jsonify
 from ..supabase_client import get_supabase
 from ..errors import ApiError
-from ..services.resources import get_resources
+from ..services.resources import get_resources, fetch_resources_for_topic
+from ..services.ai_providers import get_topic_resources
 from ..utils import normalize_user_id, is_valid_uuid
 from ..services.topic_store import get_topics as store_get_topics
 
@@ -156,3 +157,142 @@ def bulk_topic_status():
         except Exception as e:
             logger.error(f"Bulk topic update error for {topic}: {e}")
     return {"ok": True, "updated": changed}
+
+
+@resources_bp.get("/recommendations/<topic>")
+def get_topic_recommendations(topic):
+    """Get AI-enhanced personalized recommendations for a specific topic."""
+    try:
+        # Get query parameters
+        learning_style = request.args.get("learning_style", "balanced")
+        difficulty_level = request.args.get("difficulty", "intermediate")
+        free_only = request.args.get("free_only", "true").lower() == "true"
+        
+        # Get user preferences from query params
+        user_preferences = {
+            "free_resources_only": free_only,
+            "preferred_formats": request.args.getlist("formats") or ["video", "article", "practice"],
+            "time_available": request.args.get("time", "moderate")
+        }
+        
+        logger.info(f"Getting recommendations for topic: {topic}, style: {learning_style}, difficulty: {difficulty_level}")
+        
+        # Get AI-powered recommendations
+        recommendations = get_topic_resources(
+            topic=topic,
+            learning_style=learning_style,
+            difficulty_level=difficulty_level,
+            user_preferences=user_preferences
+        )
+        
+        return jsonify({
+            "success": True,
+            "topic": topic,
+            "recommendations": recommendations,
+            "personalization": {
+                "learning_style": learning_style,
+                "difficulty_level": difficulty_level,
+                "user_preferences": user_preferences
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting topic recommendations: {e}")
+        return jsonify({
+            "success": False,
+            "error": str(e),
+            "topic": topic
+        }), 500
+
+
+@resources_bp.post("/discover")
+def discover_resources():
+    """Discover resources for multiple topics with personalization."""
+    try:
+        data = request.get_json() or {}
+        topics = data.get("topics", [])
+        learning_style = data.get("learning_style", "balanced")
+        user_preferences = data.get("user_preferences", {})
+        
+        if not topics:
+            raise ApiError("RESOURCES_400", "No topics provided")
+        
+        logger.info(f"Discovering resources for {len(topics)} topics")
+        
+        all_resources = []
+        for topic in topics[:10]:  # Limit to 10 topics
+            try:
+                # Get topic metadata if available
+                topic_metadata = data.get("topic_metadata", {}).get(topic, {})
+                
+                # Fetch enhanced resources
+                resources = fetch_resources_for_topic(
+                    topic=topic,
+                    learning_style=learning_style,
+                    topic_metadata=topic_metadata,
+                    user_preferences=user_preferences
+                )
+                
+                all_resources.append({
+                    "topic": topic,
+                    "resources": resources,
+                    "count": len(resources)
+                })
+                
+            except Exception as e:
+                logger.error(f"Error fetching resources for topic {topic}: {e}")
+                all_resources.append({
+                    "topic": topic,
+                    "resources": [],
+                    "error": str(e)
+                })
+        
+        return jsonify({
+            "success": True,
+            "results": all_resources,
+            "total_topics": len(topics),
+            "processed_topics": len(all_resources)
+        })
+        
+    except Exception as e:
+        logger.error(f"Error in resource discovery: {e}")
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+
+@resources_bp.get("/quality-score/<topic>")
+def get_resource_quality_scores(topic):
+    """Get quality scores and explanations for topic resources."""
+    try:
+        learning_style = request.args.get("learning_style", "balanced")
+        
+        # Get basic resources
+        resources = fetch_resources_for_topic(topic, learning_style=learning_style)
+        
+        # Calculate quality metrics
+        quality_analysis = {
+            "topic": topic,
+            "total_resources": len(resources),
+            "quality_distribution": {
+                "high_quality": len([r for r in resources if r.get("quality_score", 5) >= 8]),
+                "medium_quality": len([r for r in resources if 5 <= r.get("quality_score", 5) < 8]),
+                "low_quality": len([r for r in resources if r.get("quality_score", 5) < 5])
+            },
+            "source_diversity": len(set(r.get("source") for r in resources)),
+            "personalization_match": sum(r.get("recommendation_score", 5) for r in resources) / len(resources) if resources else 0,
+            "resources": resources
+        }
+        
+        return jsonify({
+            "success": True,
+            "quality_analysis": quality_analysis
+        })
+        
+    except Exception as e:
+        logger.error(f"Error analyzing resource quality: {e}")
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
