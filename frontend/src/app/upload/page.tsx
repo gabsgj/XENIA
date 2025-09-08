@@ -46,6 +46,7 @@ export default function UploadPage() {
   const [hoursPerDay, setHoursPerDay] = useState<number>(2.0)
   const [learningStyle, setLearningStyle] = useState<string>('balanced')
   const [showPlanSettings, setShowPlanSettings] = useState(false)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
   
   const { pushError } = useErrorContext()
 
@@ -76,6 +77,7 @@ export default function UploadPage() {
     setUploading(true)
     setUploadProgress(0)
     setProcessingTopics(false)
+    setErrorMessage(null) // Reset error
 
     try {
       const formData = new FormData()
@@ -103,7 +105,8 @@ export default function UploadPage() {
       setUploadProgress(100)
 
       if (!response.ok) {
-        throw new Error('Upload failed')
+        const errorText = await response.text()
+        throw new Error('Upload failed: ' + errorText)
       }
 
       const result = await response.json()
@@ -145,6 +148,7 @@ export default function UploadPage() {
       console.log('Upload successful:', result)
       
     } catch (error: any) {
+      setErrorMessage(error.message) // Show error
       pushError({
         errorCode: 'UPLOAD_FAILED',
         errorMessage: 'Failed to upload files: ' + error.message,
@@ -226,6 +230,13 @@ export default function UploadPage() {
   return (
     <MainLayout>
       <div className="container mx-auto px-4 py-8 max-w-7xl">
+        {/* Show error message */}
+        {errorMessage && (
+          <div className="mb-4 p-3 bg-red-100 text-red-700 rounded">
+            {errorMessage}
+          </div>
+        )}
+
         {/* Progress Indicator */}
         <div className="mb-8">
           <ProgressIndicator 
