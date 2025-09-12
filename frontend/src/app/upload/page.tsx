@@ -610,36 +610,6 @@ export default function UploadPage() {
                 </div>
               </CardContent>
             </Card>
-
-            {/* Recent Uploads */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Recent Uploads</CardTitle>
-                <CardDescription>Your recently uploaded files</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {[
-                    { name: "Chemistry Syllabus.pdf", type: "syllabus", date: "2024-01-10", status: "processed" },
-                    { name: "Physics Test.jpg", type: "assessment", date: "2024-01-08", status: "processed" },
-                    { name: "Math Notes.pdf", type: "notes", date: "2024-01-05", status: "processing" }
-                  ].map((file, index) => (
-                    <div key={index} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
-                      <div className="flex items-center gap-3 flex-1 min-w-0">
-                        <FileText className="w-4 h-4 text-blue-500" />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium truncate">{file.name}</p>
-                          <p className="text-xs text-muted-foreground">{file.date}</p>
-                        </div>
-                      </div>
-                      <Badge variant="outline" className="text-xs">
-                        {file.status}
-                      </Badge>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
           </div>
         </div>
       </div>
