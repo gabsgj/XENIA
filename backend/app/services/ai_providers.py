@@ -4,7 +4,9 @@ Supports OpenAI, Anthropic, and Gemini APIs.
 """
 import os
 import json
+import re
 from typing import Optional, Dict, Any, List
+from datetime import datetime, timedelta
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -35,7 +37,7 @@ def get_ai_response(prompt: str, model: Optional[str] = None) -> str:
             genai.configure(api_key=gemini_key.strip())
             
             logger.info("   Creating Gemini model...")
-            gemini_model = os.getenv("GEMINI_MODEL", "gemini-2.0-flash-exp")
+            gemini_model = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
             model_instance = genai.GenerativeModel(gemini_model)
             
             logger.info("   Generating content...")
@@ -229,7 +231,7 @@ Return ONLY valid JSON:
             genai.configure(api_key=gemini_key)
             
             logger.info("    Creating Gemini model...")
-            model = genai.GenerativeModel('gemini-2.0-flash-exp')
+            model = genai.GenerativeModel('gemini-1.5-flash')
             
             logger.info("    Generating content...")
             response = model.generate_content(prompt)
@@ -374,7 +376,6 @@ Return ONLY valid JSON:
         
     except Exception as e:
         import logging
-        from datetime import datetime, timedelta
         logger = logging.getLogger('xenia')
         logger.error(f"AI study plan generation failed: {e}")
         
@@ -1337,3 +1338,173 @@ def _generate_practice_resources(topic: str, difficulty_level: str) -> List[Dict
         })
     
     return platforms
+
+def filter_syllabus_content(extracted_text: str) -> str:
+    """Use Gemini AI to filter out unnecessary content from extracted syllabus text.
+    
+    Removes administrative content, headers/footers, grading policies, etc.
+    Keeps only academic content relevant for topic extraction.
+    """
+    import logging
+    logger = logging.getLogger('xenia')
+    
+    # If text is too short, return as-is
+    if len(extracted_text) < 500:
+        return extracted_text
+    
+    try:
+        # Use Gemini for advanced content filtering
+        if os.getenv("GEMINI_API_KEY"):
+            import google.generativeai as genai
+            logger.info("🤖 Using Gemini for advanced content filtering...")
+            
+            genai.configure(api_key=os.getenv("GEMINI_API_KEY").strip())
+            model = genai.GenerativeModel(os.getenv("GEMINI_MODEL", "gemini-2.5-flash"))
+
+            prompt = f"""
+            Analyze the following syllabus text and extract ONLY the core academic topics and their descriptions.
+            
+            **Instructions:**
+            1.  **KEEP:** Main topics, sub-topics, chapter titles, and brief descriptions of academic content.
+            2.  **REMOVE:** All administrative information, such as instructor names, contact details (email, phone), office hours, course codes, prerequisites, grading policies, textbook lists, and university names.
+            3.  **FORMAT:** Return the cleaned text, preserving the original structure of the topics as much as possible. Do not add any extra formatting or commentary.
+
+            **Syllabus Text:**
+            ---
+            {extracted_text}
+            ---
+            """
+            
+            response = model.generate_content(
+                prompt,
+                generation_config=genai.types.GenerationConfig(
+                    temperature=0.1,  # Low temperature for consistent filtering
+                    max_output_tokens=2000,
+                )
+            )
+            
+            if response and response.text:
+                filtered_text = response.text.strip()
+                logger.info(f"✅ Content filtered: {len(extracted_text)} -> {len(filtered_text)} characters")
+                return filtered_text
+            else:
+                logger.warning("⚠️ Gemini filtering returned empty response")
+                return extracted_text
+        else:
+            logger.info("🎭 Using fallback content filtering...")
+            
+    except Exception as e:
+        logger.error(f"❌ Content filtering failed: {e}")
+        return extracted_text
+    
+    # Fallback filtering logic
+    lines = extracted_text.split('\n')
+    filtered_lines = []
+    
+    # Simple heuristic filtering
+    exclude_patterns = [
+        r'(?i)\b(?:grading|grade|marks?|points?|attendance|office hours?)\b',
+        r'(?i)\b(?:prerequisites?|textbooks?|materials?|resources?)\b',
+        r'(?i)\b(?:policies?|procedures?|administrative)\b',
+        r'(?i)\b(?:contact|email|phone|address|instructor|dr\.)\b',
+        r'(?i)\b(?:copyright|disclaimer|notice)\b',
+        r'(?i)\b(?:page \d+|table of contents)\b',
+        r'(?i)\b(?:university|college|department|school)\b',
+        r'(?i)\b(?:course description|learning objectives)\b'
+    ]
+    
+    for line in lines:
+        line_lower = line.lower().strip()
+        if not line_lower:
+            continue
+            
+        # Skip if matches exclusion patterns
+        should_exclude = False
+        for pattern in exclude_patterns:
+            if re.search(pattern, line_lower):
+                should_exclude = True
+                break
+        
+        if not should_exclude and len(line.strip()) > 10:
+            filtered_lines.append(line)
+    
+    filtered_text = '\n'.join(filtered_lines)
+    logger.info(f"🔄 Fallback filtering: {len(extracted_text)} -> {len(filtered_text)} characters")
+    return filtered_text
+
+
+def extract_topics_with_gemini(text: str) -> Dict[str, Any]:
+    """Extracts topics from text using Gemini with a structured JSON output."""
+    import logging
+    logger = logging.getLogger('xenia')
+    
+    try:
+        if os.getenv("GEMINI_API_KEY"):
+            import google.generativeai as genai
+            logger.info("🤖 Using Gemini for topic extraction...")
+            
+            genai.configure(api_key=os.getenv("GEMINI_API_KEY").strip())
+            model = genai.GenerativeModel(os.getenv("GEMINI_MODEL", "gemini-2.5-flash"))
+
+            prompt = f"""
+            Analyze the following academic text and extract the main topics.
+
+            **Instructions:**
+            1.  Identify the key topics and sub-topics.
+            2.  Organize the output as a nested JSON object.
+            3.  Each main topic should be a key, and its value should be a list of strings representing the subtopics.
+
+            **Example Output:**
+            ```json
+            {{
+                "topics": {{
+                    "Main Topic 1": [
+                        "Subtopic 1.1",
+                        "Subtopic 1.2"
+                    ],
+                    "Main Topic 2": [
+                        "Subtopic 2.1",
+                        "Subtopic 2.2"
+                    ]
+                }}
+            }}
+            ```
+
+            **Academic Text:**
+            ---
+            {text}
+            ---
+            """
+            
+            response = model.generate_content(
+                prompt,
+                generation_config=genai.types.GenerationConfig(
+                    temperature=0.2,
+                    max_output_tokens=2000,
+                )
+            )
+            
+            if response and response.text:
+                logger.info("✅ Topics extracted from Gemini.")
+                # Clean the response to handle potential markdown
+                clean_response = response.text.strip().replace("```json", "").replace("```", "")
+                try:
+                    return json.loads(clean_response)
+                except json.JSONDecodeError:
+                    logger.warning("⚠️ Failed to parse JSON directly, attempting regex extraction.")
+                    # Fallback to regex to find the topics list
+                    topic_matches = re.findall(r'"(.*?)"', clean_response)
+                    if topic_matches:
+                        return {"topics": topic_matches}
+                    else:
+                        return {"topics": []}
+            else:
+                logger.warning("⚠️ Gemini topic extraction returned empty response.")
+                return {"topics": []}
+        else:
+            logger.info("🎭 GEMINI_API_KEY not found, skipping topic extraction.")
+            return {"topics": []}
+            
+    except Exception as e:
+        logger.error(f"❌ Gemini topic extraction failed: {e}")
+        return {"topics": []}

@@ -15,11 +15,10 @@ def normalize_user_id(raw: Optional[str]) -> str:
     """Return a deterministic UUID for any raw user identifier.
 
     - If raw is a valid UUID -> return as-is
-    - If raw is missing or equals 'demo-user' -> stable UUID5
     - Else hash via UUID5 for stability
     """
-    if not raw or raw == "demo-user":
-        return str(uuid.uuid5(uuid.NAMESPACE_URL, "xenia-demo-user"))
+    if not raw:
+        return str(uuid.uuid5(uuid.NAMESPACE_URL, "xenia-anonymous-user"))
     try:
         uuid.UUID(raw)
         return raw

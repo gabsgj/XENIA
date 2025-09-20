@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useErrorContext } from "@/lib/error-context";
+import Logo from "@/components/logo";
 import Link from "next/link";
 import { Eye, EyeOff, Mail, Lock } from "lucide-react";
 
@@ -48,11 +49,8 @@ export default function LoginPage() {
       <div className="w-full max-w-md">
         {/* Header */}
         <div className="text-center mb-8">
-          <Link href="/" className="inline-flex items-center gap-2 mb-6">
-            <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
-              <span className="text-primary-foreground font-bold">X</span>
-            </div>
-            <span className="font-bold text-2xl tracking-tight">XENIA</span>
+          <Link href="/" className="inline-flex flex-col items-center gap-2 mb-6">
+            <Logo withText={true} size={56} className="!flex-col items-center text-center" />
           </Link>
         </div>
 

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { api } from '@/lib/api'
+import { api, getUserId } from '@/lib/api'
 import { MainLayout } from '@/components/navigation'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -19,6 +19,7 @@ import {
   Target,
   Award
 } from 'lucide-react'
+import ContentCreationTools from './content-tools'
 
 export default function TeacherPage(){
   const [topic, setTopic] = useState('')
@@ -29,9 +30,10 @@ export default function TeacherPage(){
   
   async function tagIt(){
     try {
+      const userId = getUserId();
       await api('/api/teacher/tag',{ 
         method:'POST', 
-        body: JSON.stringify({ user_id:'demo-user', teacher_id:'demo-teacher', topic, tag }) 
+        body: JSON.stringify({ user_id: userId, teacher_id:'teacher-001', topic, tag }) 
       })
       setStatus('Topic tagged successfully!')
       setTopic('')
@@ -245,6 +247,9 @@ export default function TeacherPage(){
             </Card>
           </div>
         </div>
+
+        {/* Content Creation Tools */}
+        <ContentCreationTools />
       </div>
     </MainLayout>
   )

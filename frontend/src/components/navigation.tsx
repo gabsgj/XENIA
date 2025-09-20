@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
+import Logo from "@/components/logo";
 import { cn } from "@/lib/utils";
 import { 
   LayoutDashboard, 
@@ -17,7 +18,8 @@ import {
   Settings,
   Menu,
   X,
-  BookOpen
+  BookOpen,
+  Brain
 } from "lucide-react";
 
 const navigation = [
@@ -25,6 +27,7 @@ const navigation = [
   { name: "Planner", href: "/planner", icon: Calendar },
   { name: "AI Tutor", href: "/tutor", icon: MessageSquare },
   { name: "Tasks", href: "/tasks", icon: BookOpen },
+  { name: "Quiz", href: "/quiz", icon: Brain },
   { name: "Upload", href: "/upload", icon: Upload },
   { name: "Analytics", href: "/analytics", icon: BarChart3 },
   { name: "Teacher View", href: "/teacher", icon: Users },
@@ -39,14 +42,11 @@ export function Navigation() {
   return (
     <>
       {/* Desktop Sidebar */}
-      <div className="hidden lg:flex lg:w-64 lg:flex-col lg:fixed lg:inset-y-0 lg:z-50 lg:bg-sidebar lg:border-r lg:border-sidebar-border">
+  <div className="hidden lg:flex lg:w-64 lg:flex-col lg:fixed lg:inset-y-0 lg:z-50 lg:bg-sidebar lg:border-r lg:border-sidebar-border">
         <div className="flex flex-col flex-1 min-h-0">
           <div className="flex items-center h-16 px-6 border-b border-sidebar-border">
-            <Link href="/" className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-                <span className="text-primary-foreground font-bold text-sm">X</span>
-              </div>
-              <span className="font-bold text-xl tracking-tight">XENIA</span>
+            <Link href="/" className="flex items-center gap-2 px-3">
+              <Logo withText={true} size={32} className="!items-center" />
             </Link>
           </div>
           <nav className="flex-1 px-4 py-6 space-y-1">
@@ -82,10 +82,7 @@ export function Navigation() {
       <div className="lg:hidden">
         <div className="flex items-center justify-between h-16 px-4 border-b border-border bg-background">
           <Link href="/" className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-              <span className="text-primary-foreground font-bold text-sm">X</span>
-            </div>
-            <span className="font-bold text-xl tracking-tight">XENIA</span>
+            <Logo withText={false} size={28} className="!items-center" />
           </Link>
           <div className="flex items-center gap-2">
             <ThemeToggle />

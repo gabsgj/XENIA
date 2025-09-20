@@ -64,7 +64,7 @@ def test_analytics_endpoint():
     """Test analytics endpoint with UUID handling."""
     print("\n📊 Testing analytics endpoint...")
     try:
-        url = "http://localhost:8000/api/analytics/student?user_id=demo-user"
+        url = "http://localhost:8000/api/analytics/student"
         response = requests.get(url, timeout=10)
         
         if response.status_code == 200:

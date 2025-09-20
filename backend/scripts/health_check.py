@@ -9,7 +9,7 @@ import argparse, json, io, requests
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--base', default='http://localhost:8000')
-    ap.add_argument('--user', help='User UUID or demo id', default=None)
+    ap.add_argument('--user', help='User UUID or test id', default=None)
     args = ap.parse_args()
     headers = {}
     if args.user:

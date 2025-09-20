@@ -31,6 +31,9 @@ export default function PlannerPage() {
   const [sessionProgress, setSessionProgress] = useState<Record<string, number>>({})
   const [totalTimeSpent, setTotalTimeSpent] = useState(0)
   
+  // Resources display state
+  const [showAllResources, setShowAllResources] = useState(false)
+  
   const { pushError } = useErrorContext()
   
   useEffect(()=>{ 
@@ -452,50 +455,144 @@ export default function PlannerPage() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <span>📚</span>
+                <span>🎥</span>
                 Study Resources
               </CardTitle>
               <CardDescription>
-                AI-curated learning materials including YouTube videos, articles, and practice resources
+                AI-curated learning materials with videos as the primary resource type
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {resources.slice(0, 12).map((resource:any, idx:number) => (
-                  <div key={idx} className="border rounded-lg p-4 hover:shadow-md transition-all">
-                    <div className="flex items-start gap-3">
-                      <span className="text-2xl">
-                        {resource.source === 'youtube' ? '📺' : resource.source === 'ocw' ? '🎓' : '📖'}
-                      </span>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-2">
-                          <Badge variant="outline" className="text-xs">
-                            {resource.source.toUpperCase()}
-                          </Badge>
-                          <span className="text-xs text-muted-foreground">
-                            Topic: {resource.topic}
-                          </span>
+              {/* Sort resources to prioritize videos */}
+              {(() => {
+                const sortedResources = [...resources].sort((a, b) => {
+                  // YouTube videos first, then OCW, then others
+                  const priority = { youtube: 3, ocw: 2, article: 1, other: 0 };
+                  const aPriority = priority[a.source as keyof typeof priority] || 0;
+                  const bPriority = priority[b.source as keyof typeof priority] || 0;
+                  return bPriority - aPriority;
+                });
+
+                const videoResources = sortedResources.filter(r => r.source === 'youtube');
+                const otherResources = sortedResources.filter(r => r.source !== 'youtube');
+
+                return (
+                  <div className="space-y-6">
+                    {/* Featured Videos Section */}
+                    {videoResources.length > 0 && (
+                      <div>
+                        <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                          <span>🎬</span>
+                          Featured Videos
+                        </h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                          {videoResources.slice(0, showAllResources ? videoResources.length : 8).map((resource:any, idx:number) => (
+                            <Card key={`video-${idx}`} className="hover:shadow-lg transition-all border-l-4 border-l-red-500">
+                              <CardContent className="p-4">
+                                <div className="flex items-start gap-3">
+                                  <span className="text-2xl">🎥</span>
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2 mb-2">
+                                      <Badge variant="default" className="bg-red-500 text-white text-xs">
+                                        VIDEO
+                                      </Badge>
+                                      <span className="text-xs text-muted-foreground">
+                                        {resource.topic}
+                                      </span>
+                                    </div>
+                                    <h4 className="font-medium text-sm mb-2 line-clamp-2">
+                                      {resource.title}
+                                    </h4>
+                                    <Button
+                                      size="sm"
+                                      className="w-full"
+                                      onClick={() => window.open(resource.url, '_blank')}
+                                    >
+                                      <Play className="w-3 h-3 mr-1" />
+                                      Watch Video
+                                    </Button>
+                                  </div>
+                                </div>
+                              </CardContent>
+                            </Card>
+                          ))}
                         </div>
-                        <h4 className="font-medium text-sm mb-2 line-clamp-2">
-                          {resource.title}
-                        </h4>
-                        <a 
-                          href={resource.url} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="text-blue-600 dark:text-blue-400 hover:underline text-xs"
-                        >
-                          View Resource →
-                        </a>
                       </div>
-                    </div>
+                    )}
+
+                    {/* Other Resources Section */}
+                    {otherResources.length > 0 && (
+                      <div>
+                        <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                          <span>📚</span>
+                          Additional Resources
+                        </h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                          {otherResources.slice(0, showAllResources ? otherResources.length : 8).map((resource:any, idx:number) => (
+                            <div key={`other-${idx}`} className="border rounded-lg p-4 hover:shadow-md transition-all">
+                              <div className="flex items-start gap-3">
+                                <span className="text-2xl">
+                                  {resource.source === 'ocw' ? '🎓' : '📖'}
+                                </span>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2 mb-2">
+                                    <Badge variant="outline" className="text-xs">
+                                      {resource.source.toUpperCase()}
+                                    </Badge>
+                                    <span className="text-xs text-muted-foreground">
+                                      {resource.topic}
+                                    </span>
+                                  </div>
+                                  <h4 className="font-medium text-sm mb-2 line-clamp-2">
+                                    {resource.title}
+                                  </h4>
+                                  <a
+                                    href={resource.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-blue-600 dark:text-blue-400 hover:underline text-xs inline-flex items-center gap-1"
+                                  >
+                                    View Resource →
+                                  </a>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Show More/Less Button */}
+                    {(videoResources.length > 8 || otherResources.length > 8) && (
+                      <div className="text-center mt-6">
+                        <Button
+                          variant="outline"
+                          onClick={() => setShowAllResources(!showAllResources)}
+                          className="flex items-center gap-2"
+                        >
+                          {showAllResources ? (
+                            <>
+                              <span>Show Less</span>
+                            </>
+                          ) : (
+                            <>
+                              <span>Show All Resources</span>
+                              <span className="text-xs bg-muted px-2 py-1 rounded">
+                                {resources.length}
+                              </span>
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    )}
                   </div>
-                ))}
-              </div>
-              {resources.length > 12 && (
-                <div className="text-center mt-4">
+                );
+              })()}
+
+              {resources.length > 16 && !showAllResources && (
+                <div className="text-center mt-6">
                   <p className="text-sm text-muted-foreground">
-                    Showing 12 of {resources.length} resources
+                    Showing {Math.min(16, resources.length)} of {resources.length} resources
                   </p>
                 </div>
               )}

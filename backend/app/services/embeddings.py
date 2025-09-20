@@ -8,7 +8,7 @@ _provider: Optional[str] = None
 
 
 def _generate_mock_embeddings(texts: List[str]) -> List[List[float]]:
-    """Generate deterministic mock embeddings for demo mode."""
+    """Generate deterministic mock embeddings for development mode."""
     import logging
     logger = logging.getLogger('xenia')
     logger.info(f"🎭 Generating mock embeddings for {len(texts)} texts")

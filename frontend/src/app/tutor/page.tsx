@@ -42,7 +42,7 @@ export default function TutorPage(){
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // Load authenticated user id if available (Supabase); fallback to demo-user implicitly handled backend
+  // Load authenticated user id if available (Supabase); fallback handled by backend normalization
   useEffect(() => {
     let active = true
     ;(async () => {
@@ -110,7 +110,7 @@ export default function TutorPage(){
       if (file){
         const form = new FormData()
         form.append('file', file)
-        // only send user_id if we truly have one; backend will normalize demo implicitly
+        // only send user_id if we truly have one; backend will normalize implicitly
         if (userId) form.append('user_id', userId)
         const r = await fetch(`${API_BASE}/api/tutor/ask`, { 
           method:'POST', 

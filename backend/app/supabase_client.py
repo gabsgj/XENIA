@@ -49,33 +49,15 @@ def _create_mock_client() -> Client:
     class MockSupabaseClient:
         def __init__(self):
             self.mock_data = {
-                "profiles": [
-                    {"user_id": "demo-user", "xp": 1250, "level": 5, "streak_days": 7}
-                ],
-                "sessions": [
-                    {"id": 1, "user_id": "demo-user", "duration_min": 45, "topic": "Mathematics", "created_at": "2024-01-15T10:00:00Z"},
-                    {"id": 2, "user_id": "demo-user", "duration_min": 30, "topic": "Physics", "created_at": "2024-01-14T14:30:00Z"},
-                    {"id": 3, "user_id": "demo-user", "duration_min": 60, "topic": "Chemistry", "created_at": "2024-01-13T09:15:00Z"}
-                ],
-                "tasks": [
-                    {"id": 1, "user_id": "demo-user", "status": "done", "topic": "Calculus", "created_at": "2024-01-15T08:00:00Z"},
-                    {"id": 2, "user_id": "demo-user", "status": "done", "topic": "Algebra", "created_at": "2024-01-14T16:00:00Z"},
-                    {"id": 3, "user_id": "demo-user", "status": "pending", "topic": "Trigonometry", "created_at": "2024-01-13T10:00:00Z"}
-                ],
+                "profiles": [],
+                "sessions": [],
+                "tasks": [],
                 "artifacts": [],
                 "plans": [],
                 "manual_tags": [],
-                "enrollments": [
-                    {"user_id": "student1", "class_id": "class1"},
-                    {"user_id": "student2", "class_id": "class1"}
-                ],
-                "parents_children": [
-                    {"parent_user_id": "parent1", "child_user_id": "child1"},
-                    {"parent_user_id": "parent1", "child_user_id": "child2"}
-                ],
-                "reports": [
-                    {"class_id": "class1", "report_data": "Sample report data"}
-                ],
+                "enrollments": [],
+                "parents_children": [],
+                "reports": [],
                 "storage": {},
                 "buckets": set(),
             }

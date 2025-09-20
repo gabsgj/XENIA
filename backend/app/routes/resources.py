@@ -10,13 +10,49 @@ from ..services.topic_store import get_topics as store_get_topics
 logger = logging.getLogger('xenia')
 resources_bp = Blueprint("resources", __name__)
 
+
+def _determine_topic_category(topic: str) -> str:
+    """Determine the broad category of a topic for better resource targeting."""
+    topic_lower = topic.lower()
+    
+    # Programming/CS terms
+    if any(term in topic_lower for term in ["programming", "code", "algorithm", "data structure", "software", "web", "api", "javascript", "python", "java", "css", "html", "database", "networking", "operating system"]):
+        return "programming"
+    
+    # Mathematics terms
+    if any(term in topic_lower for term in ["math", "algebra", "calculus", "geometry", "statistics", "equation", "formula", "theorem", "proof", "linear algebra", "differential equations", "probability"]):
+        return "mathematics"
+    
+    # Science terms
+    if any(term in topic_lower for term in ["physics", "chemistry", "biology", "science", "experiment", "theory", "hypothesis", "quantum", "mechanics", "thermodynamics", "organic chemistry", "molecular"]):
+        return "science"
+    
+    # Language terms
+    if any(term in topic_lower for term in ["language", "literature", "writing", "grammar", "english", "spanish", "french", "german", "poetry", "novel", "essay"]):
+        return "language"
+    
+    # Business terms
+    if any(term in topic_lower for term in ["business", "finance", "marketing", "economics", "accounting", "management", "entrepreneurship", "strategy"]):
+        return "business"
+    
+    # History terms
+    if any(term in topic_lower for term in ["history", "civilization", "war", "revolution", "empire", "ancient", "medieval", "modern"]):
+        return "history"
+    
+    # Art terms
+    if any(term in topic_lower for term in ["art", "painting", "sculpture", "architecture", "design", "photography", "music", "theater"]):
+        return "art"
+    
+    return "general"
+
+
 @resources_bp.get("/topics")
 def list_topics():
     raw_user_id = request.args.get("user_id") or request.headers.get("X-User-Id") or ""
     if not raw_user_id:
         raise ApiError("AUTH_401", "Missing user_id")
     user_id = normalize_user_id(raw_user_id)
-    # If invalid UUID -> use in-memory store only (demo mode)
+    # If invalid UUID -> use in-memory store for development/testing
     if not is_valid_uuid(user_id):
         topics = store_get_topics(user_id)
         return {"topics": [
@@ -28,6 +64,19 @@ def list_topics():
         resp = sb.table("syllabus_topics").select(
             "id, topic, parent_topic, order_index, status, completed_at"
         ).eq("user_id", user_id).order("order_index").limit(500).execute()
+        
+        # If no topics found, return sample topics to get started
+        if not resp.data or len(resp.data) == 0:
+            logger.info(f"No topics found for user {user_id}, returning sample topics")
+            sample_topics = [
+                {"id": "sample-1", "topic": "Introduction to Programming", "parent_topic": None, "order_index": 1, "status": "pending", "completed_at": None},
+                {"id": "sample-2", "topic": "Data Structures", "parent_topic": None, "order_index": 2, "status": "pending", "completed_at": None},
+                {"id": "sample-3", "topic": "Algorithms", "parent_topic": None, "order_index": 3, "status": "pending", "completed_at": None},
+                {"id": "sample-4", "topic": "Web Development", "parent_topic": None, "order_index": 4, "status": "pending", "completed_at": None},
+                {"id": "sample-5", "topic": "Database Design", "parent_topic": None, "order_index": 5, "status": "pending", "completed_at": None}
+            ]
+            return {"topics": sample_topics}
+        
         return {"topics": resp.data or []}
     except Exception as e:
         logger.error(f"Topic fetch failed: {e}")
@@ -40,7 +89,7 @@ def list_resources():
         raise ApiError("AUTH_401", "Missing user_id")
     user_id = normalize_user_id(raw_user_id)
     if not is_valid_uuid(user_id):
-        # Demo mode: we currently don't store resources for demo users (no DB). Return empty list.
+        # Development mode: return empty list when no database connection
         return {"resources": []}
     data = get_resources(user_id)
     return {"resources": data}
@@ -54,9 +103,16 @@ def update_progress():
         raise ApiError("AUTH_401", "Missing user_id")
     user_id = normalize_user_id(raw_user_id)
     if not is_valid_uuid(user_id):
-        # Demo users: progress not persisted; return optimistic success
+        # Development mode: return optimistic success when no database connection
         return {"ok": True, "plan": {"sessions": []}}
     session_updates = data.get("sessions", [])  # [{date, topic, status}]
+    
+    # Check if any sessions reference sample topics - if so, return success without DB operations
+    has_sample_topics = any(upd.get("topic", "").startswith("sample-") for upd in session_updates)
+    if has_sample_topics:
+        logger.info(f"Sample topics detected in progress update for user {user_id}, returning optimistic success")
+        return {"ok": True, "plan": {"sessions": []}}
+    
     try:
         plan_resp = sb.table("plans").select("plan").eq("user_id", user_id).limit(1).execute()
         if not plan_resp.data:
@@ -113,8 +169,14 @@ def update_topic_status():
     if not raw_user_id or not topic or status not in ("pending","in-progress","completed"):
         raise ApiError("PLAN_400", "Invalid topic status payload")
     user_id = normalize_user_id(raw_user_id)
+    
+    # Handle sample topics
+    if topic.startswith("sample-"):
+        logger.info(f"Sample topic {topic} status update for user {user_id}, returning optimistic success")
+        return {"ok": True}
+    
     if not is_valid_uuid(user_id):
-        # Demo: pretend success
+        # Development: pretend success
         return {"ok": True}
     try:
         update = {"status": status}
@@ -137,8 +199,15 @@ def bulk_topic_status():
     if not raw_user_id or not isinstance(updates, list):
         raise ApiError("PLAN_400", "Invalid payload")
     user_id = normalize_user_id(raw_user_id)
+    
+    # Handle sample topics
+    has_sample_topics = any(u.get("topic", "").startswith("sample-") for u in updates)
+    if has_sample_topics:
+        logger.info(f"Sample topics detected in bulk status update for user {user_id}, returning optimistic success")
+        return {"ok": True, "updated": len(updates)}
+    
     if not is_valid_uuid(user_id):
-        # Demo: pretend success
+        # Development: pretend success
         return {"ok": True, "updated": len(updates)}
     from datetime import datetime, timezone
     completed_time = datetime.now(timezone.utc).isoformat()
@@ -177,22 +246,43 @@ def get_topic_recommendations(topic):
         
         logger.info(f"Getting recommendations for topic: {topic}, style: {learning_style}, difficulty: {difficulty_level}")
         
-        # Get AI-powered recommendations
-        recommendations = get_topic_resources(
+        # Create topic metadata for better resource targeting
+        topic_metadata = {
+            "difficulty_score": 5 if difficulty_level == "intermediate" else (3 if difficulty_level == "beginner" else 8),
+            "category": _determine_topic_category(topic),
+            "learning_style": learning_style
+        }
+        
+        # Use our enhanced resource system that includes topic-specific resources
+        recommendations = fetch_resources_for_topic(
             topic=topic,
             learning_style=learning_style,
-            difficulty_level=difficulty_level,
+            topic_metadata=topic_metadata,
             user_preferences=user_preferences
         )
+        
+        # Group recommendations by source type for better organization
+        grouped_recommendations = {
+            "topic_specific": [r for r in recommendations if r.get("source") == "topic_specific"],
+            "subject_resources": [r for r in recommendations if r.get("source") == "subject_specific"],
+            "youtube_videos": [r for r in recommendations if r.get("source") == "youtube"],
+            "ai_generated": [r for r in recommendations if r.get("source") == "ai_generated"],
+            "ocw_courses": [r for r in recommendations if r.get("source") == "ocw"],
+            "documentation": [r for r in recommendations if r.get("source") in ["wikipedia", "wikibooks", "stack_overflow", "github", "medium", "dev_to"]],
+            "hugging_face": [r for r in recommendations if r.get("source") == "huggingface"]
+        }
         
         return jsonify({
             "success": True,
             "topic": topic,
-            "recommendations": recommendations,
+            "total_recommendations": len(recommendations),
+            "grouped_recommendations": grouped_recommendations,
+            "top_recommendations": recommendations[:6],  # Top 6 most relevant
             "personalization": {
                 "learning_style": learning_style,
                 "difficulty_level": difficulty_level,
-                "user_preferences": user_preferences
+                "user_preferences": user_preferences,
+                "topic_metadata": topic_metadata
             }
         })
         

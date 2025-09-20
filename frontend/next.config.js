@@ -11,8 +11,19 @@ const nextConfig = {
     ignoreBuildErrors: true,
   },
   images: {
-    // Allow Next/Image to load remote images from Unsplash
-    domains: ["images.unsplash.com"],
+    // Use remotePatterns for external images and allow local avatars
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'images.unsplash.com',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'picsum.photos',
+        pathname: '/**',
+      }
+    ],
   },
 };
 

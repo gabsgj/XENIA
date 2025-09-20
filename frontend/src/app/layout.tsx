@@ -9,6 +9,14 @@ export const metadata: Metadata = {
   description: "Your personal AI-powered study planner and tutor. Generate personalized study plans, get help from AI tutors, and track your progress with powerful analytics.",
   keywords: ["AI", "study planner", "education", "tutoring", "learning", "analytics"],
   authors: [{ name: "XENIA Team" }],
+  icons: {
+    // include both the classic favicon path and the PNG logo so browsers and platforms
+    // that prefer one or the other pick the right asset. Add a proper /favicon.ico
+    // file to `public/` for the best cross-browser support.
+    icon: ['/favicon.ico', '/logo.png'],
+    shortcut: '/logo.png',
+    apple: '/logo.png',
+  },
 };
 
 export default function RootLayout({
