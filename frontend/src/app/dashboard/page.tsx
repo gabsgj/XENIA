@@ -616,27 +616,27 @@ export default function DashboardPage(){
             ) : !progress || Object.keys(progress).length === 0 ? (
               <div className="p-4 text-center text-muted-foreground">No progress data yet.</div>
             ) : (
-              <div className="max-w-xl mx-auto">
-                <table className="w-full border">
+                <div className="max-w-xl mx-auto">
+                <table className="w-full border border-border">
                   <thead>
-                    <tr className="bg-gray-100">
-                      <th className="p-2">Topic</th>
-                      <th className="p-2">Quizzes Taken</th>
-                      <th className="p-2">Correct</th>
-                      <th className="p-2">Wrong</th>
-                      <th className="p-2">Last Score</th>
-                      <th className="p-2">Last Updated</th>
+                    <tr className="bg-gray-100 dark:bg-gray-800">
+                      <th className="p-2 text-sm text-muted-foreground">Topic</th>
+                      <th className="p-2 text-sm text-muted-foreground">Quizzes Taken</th>
+                      <th className="p-2 text-sm text-muted-foreground">Correct</th>
+                      <th className="p-2 text-sm text-muted-foreground">Wrong</th>
+                      <th className="p-2 text-sm text-muted-foreground">Last Score</th>
+                      <th className="p-2 text-sm text-muted-foreground">Last Updated</th>
                     </tr>
                   </thead>
                   <tbody>
                     {Object.entries(progress).map(([topic, stats]: any) => (
-                      <tr key={topic}>
-                        <td className="p-2 font-semibold">{topic}</td>
-                        <td className="p-2">{stats.quizzes_taken}</td>
-                        <td className="p-2">{stats.correct}</td>
-                        <td className="p-2">{stats.wrong}</td>
-                        <td className="p-2">{(stats.last_score * 100).toFixed(0)}%</td>
-                        <td className="p-2">{new Date(stats.last_updated).toLocaleString()}</td>
+                      <tr key={topic} className="odd:bg-white even:bg-muted/5 dark:odd:bg-transparent dark:even:bg-muted/10">
+                        <td className="p-2 font-semibold text-foreground dark:text-foreground">{topic}</td>
+                        <td className="p-2 text-sm text-muted-foreground">{stats.quizzes_taken}</td>
+                        <td className="p-2 text-sm text-muted-foreground">{stats.correct}</td>
+                        <td className="p-2 text-sm text-muted-foreground">{stats.wrong}</td>
+                        <td className="p-2 text-sm text-muted-foreground">{(stats.last_score * 100).toFixed(0)}%</td>
+                        <td className="p-2 text-sm text-muted-foreground">{new Date(stats.last_updated).toLocaleString()}</td>
                       </tr>
                     ))}
                   </tbody>
