@@ -6,6 +6,7 @@ import os
 import json
 import re
 from typing import Optional, Dict, Any, List
+from datetime import datetime, timedelta
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -36,7 +37,7 @@ def get_ai_response(prompt: str, model: Optional[str] = None) -> str:
             genai.configure(api_key=gemini_key.strip())
             
             logger.info("   Creating Gemini model...")
-            gemini_model = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+            gemini_model = os.getenv("GEMINI_MODEL", "gemini-1.5-pro")
             model_instance = genai.GenerativeModel(gemini_model)
             
             logger.info("   Generating content...")
@@ -229,11 +230,11 @@ Return ONLY valid JSON:
             logger.info("    Configuring real Gemini API...")
             genai.configure(api_key=gemini_key)
             
-            logger.info("    Creating Gemini model (2.5-flash)...")
-            model = genai.GenerativeModel('gemini-2.5-flash')
+            logger.info("    Creating Gemini model...")
+            model = genai.GenerativeModel('gemini-1.5-flash')
             
             logger.info("    Generating content...")
-            response = model.generate_content(prompt, generation_config=genai.types.GenerationConfig(temperature=0.0, max_output_tokens=3000))
+            response = model.generate_content(prompt)
             logger.info(f"    ✅ Gemini response received: {len(response.text)} characters")
             
             # Clean and parse JSON response
@@ -1351,54 +1352,34 @@ def filter_syllabus_content(extracted_text: str) -> str:
     if len(extracted_text) < 500:
         return extracted_text
     
-    prompt = f"""
-You are an expert at cleaning syllabus documents for educational content extraction.
-
-Your task is to filter the extracted text from a syllabus PDF and remove:
-1. Administrative content (grading policies, attendance, office hours, course policies)
-2. Headers and footers (page numbers, university logos, contact info)
-3. Course logistics (prerequisites, textbooks, required materials)
-4. Assessment details (exam schedules, assignment deadlines, marking schemes)
-5. Contact information and administrative procedures
-6. Generic course descriptions and learning objectives sections
-7. Copyright notices and disclaimers
-8. Table of contents and navigation elements
-
-KEEP ONLY:
-- Academic topics, units, and chapters
-- Learning content, concepts, and subject matter
-- Technical terminology and specialized vocabulary
-- Course-specific content that students need to learn
-- Detailed topic descriptions and subtopics
-
-IMPORTANT: Be conservative in removal - if you're unsure, keep the content.
-
-Return ONLY the filtered academic content, maintaining the original structure where possible.
-
-ORIGINAL TEXT:
-{extracted_text[:4000]}...
-
-FILTERED ACADEMIC CONTENT:
-"""
-    
     try:
-        # Use faster Gemini model
-        gemini_key = os.getenv("GEMINI_API_KEY")
-        is_demo_gemini = (gemini_key and ("demo" in gemini_key.lower() or gemini_key.startswith("AIzaSyDemo_")))
-        
-        if gemini_key and not is_demo_gemini:
+        # Use Gemini for advanced content filtering
+        if os.getenv("GEMINI_API_KEY"):
             import google.generativeai as genai
-            logger.info("🤖 Filtering syllabus content with Gemini...")
-            genai.configure(api_key=gemini_key)
+            logger.info("🤖 Using Gemini for advanced content filtering...")
             
-            # Use higher-capacity model: Gemini 2.5 Flash
-            model = genai.GenerativeModel('gemini-2.5-flash')
+            genai.configure(api_key=os.getenv("GEMINI_API_KEY").strip())
+            model = genai.GenerativeModel(os.getenv("GEMINI_MODEL", "gemini-1.5-pro"))
+
+            prompt = f"""
+            Analyze the following syllabus text and extract ONLY the core academic topics and their descriptions.
+            
+            **Instructions:**
+            1.  **KEEP:** Main topics, sub-topics, chapter titles, and brief descriptions of academic content.
+            2.  **REMOVE:** All administrative information, such as instructor names, contact details (email, phone), office hours, course codes, prerequisites, grading policies, textbook lists, and university names.
+            3.  **FORMAT:** Return the cleaned text, preserving the original structure of the topics as much as possible. Do not add any extra formatting or commentary.
+
+            **Syllabus Text:**
+            ---
+            {extracted_text}
+            ---
+            """
             
             response = model.generate_content(
                 prompt,
                 generation_config=genai.types.GenerationConfig(
-                    temperature=0.0,  # deterministic filtering
-                    max_output_tokens=4000,
+                    temperature=0.1,  # Low temperature for consistent filtering
+                    max_output_tokens=2000,
                 )
             )
             
@@ -1414,127 +1395,116 @@ FILTERED ACADEMIC CONTENT:
             
     except Exception as e:
         logger.error(f"❌ Content filtering failed: {e}")
-        # As a robust fallback apply deterministic regex-based cleaning
-        cleaned = []
-        lines = extracted_text.splitlines()
-        for line in lines:
-            s = line.strip()
-            # Skip empty or very short navigation lines
-            if not s or len(s) < 3:
-                continue
-            # Remove page number lines like 'Page 1 of 10' or just numerics
-            if re.match(r'^(page\s+\d+|\d+\s*/\s*\d+)$', s, re.I):
-                continue
-            # Remove emails, phones, urls
-            if re.search(r"\b[\w\.-]+@[\w\.-]+\.[a-zA-Z]{2,6}\b", s):
-                continue
-            if re.search(r"\bhttps?://|www\.", s):
-                continue
-            if re.search(r"\(\d{3}\)\s*\d{3}-\d{4}|\d{3}[-\.\s]\d{3}[-\.\s]\d{4}", s):
-                continue
-            # Common administrative headings to drop
-            admin_keywords = ['grading', 'attendance', 'office hours', 'course policies', 'textbook', 'required materials', 'assessment', 'exam', 'assignment', 'policy', 'contact', 'email', 'phone']
-            if any(k in s.lower() for k in admin_keywords):
-                continue
-            # Drop lines that look like table-of-contents numbering without content
-            if re.match(r'^\d+\.?\s*$', s):
-                continue
-            cleaned.append(s)
-
-        # Keep blocks that look like topics: lines with commas, colons, bullets, arrows or title case
-        topic_lines = []
-        for s in cleaned:
-            if re.search(r'\b(topic|chapter|week|unit|module)\b', s, re.I):
-                topic_lines.append(s)
-            elif re.search(r'[-\u2022\u25B8\u25BA\u25CF\u2023\u25E6]', s):
-                topic_lines.append(s)
-            elif len(s.split()) <= 6 and any(c.isupper() for c in s[:1]):
-                # Short title-like lines
-                topic_lines.append(s)
-            elif ',' in s and len(s.split(',')) <= 6:
-                topic_lines.append(s)
-
-        if topic_lines:
-            return "\n".join(topic_lines)
-        return "\n".join(cleaned)
+        return extracted_text
     
+    # Fallback filtering logic
+    lines = extracted_text.split('\n')
+    filtered_lines = []
+    
+    # Simple heuristic filtering
+    exclude_patterns = [
+        r'(?i)\b(?:grading|grade|marks?|points?|attendance|office hours?)\b',
+        r'(?i)\b(?:prerequisites?|textbooks?|materials?|resources?)\b',
+        r'(?i)\b(?:policies?|procedures?|administrative)\b',
+        r'(?i)\b(?:contact|email|phone|address|instructor|dr\.)\b',
+        r'(?i)\b(?:copyright|disclaimer|notice)\b',
+        r'(?i)\b(?:page \d+|table of contents)\b',
+        r'(?i)\b(?:university|college|department|school)\b',
+        r'(?i)\b(?:course description|learning objectives)\b'
+    ]
+    
+    for line in lines:
+        line_lower = line.lower().strip()
+        if not line_lower:
+            continue
+            
+        # Skip if matches exclusion patterns
+        should_exclude = False
+        for pattern in exclude_patterns:
+            if re.search(pattern, line_lower):
+                should_exclude = True
+                break
+        
+        if not should_exclude and len(line.strip()) > 10:
+            filtered_lines.append(line)
+    
+    filtered_text = '\n'.join(filtered_lines)
+    logger.info(f"🔄 Fallback filtering: {len(extracted_text)} -> {len(filtered_text)} characters")
+    return filtered_text
 
-def extract_topics_with_gemini(extracted_text: str, max_topics: int = 100) -> List[Dict[str, Any]]:
-    """Use Gemini 2.5 Flash to extract structured topics and subtopics from cleaned syllabus text.
 
-    Returns a list of topic dicts: {"topic": str, "subtopics": [str], "notes": str}
-    """
+def extract_topics_with_gemini(text: str) -> Dict[str, Any]:
+    """Extracts topics from text using Gemini with a structured JSON output."""
     import logging
     logger = logging.getLogger('xenia')
-
-    # Avoid calling AI on very short text
-    if not extracted_text or len(extracted_text.strip()) < 50:
-        return []
-
-    prompt = f"""
-Extract the academic topics and subtopics from the following syllabus text.
-
-Return STRICTLY valid JSON in this exact format:
-{{"topics": [{{"topic":"Topic Name","subtopics":["sub1","sub2"],"notes":"short notes"}}]}}
-
-Input text:
-{extracted_text[:5000]}
-
-Rules:
-- Only include academic topics (no administrative content).
-- Group closely related items as subtopics under the nearest main topic.
-- Provide concise notes when relevant (1-2 sentences).
-- Aim to provide up to {max_topics} topics in order of importance.
-"""
-
-    gemini_key = os.getenv("GEMINI_API_KEY")
-    is_demo_gemini = (gemini_key and ("demo" in gemini_key.lower() or gemini_key.startswith("AIzaSyDemo_")))
-
+    
     try:
-        if gemini_key and not is_demo_gemini:
+        if os.getenv("GEMINI_API_KEY"):
             import google.generativeai as genai
-            genai.configure(api_key=gemini_key)
-            model = genai.GenerativeModel('gemini-2.5-flash')
-            response = model.generate_content(prompt, generation_config=genai.types.GenerationConfig(temperature=0.0, max_output_tokens=3000))
-            text = response.text.strip()
+            logger.info("🤖 Using Gemini for topic extraction...")
+            
+            genai.configure(api_key=os.getenv("GEMINI_API_KEY").strip())
+            model = genai.GenerativeModel(os.getenv("GEMINI_MODEL", "gemini-1.5-pro"))
 
-            # strip fences
-            if text.startswith('```'):
-                # remove first code fence and optional language
-                parts = text.split('\n', 1)
-                if len(parts) > 1:
-                    text = parts[1]
-                if text.endswith('```'):
-                    text = text[:-3]
+            prompt = f"""
+            Analyze the following academic text and extract the main topics.
 
-            parsed = json.loads(text)
-            topics = parsed.get('topics', [])
-            # normalize to expected list of dicts
-            normalized = []
-            for t in topics:
-                if isinstance(t, str):
-                    normalized.append({"topic": t, "subtopics": [], "notes": ""})
-                elif isinstance(t, dict):
-                    normalized.append({
-                        "topic": t.get('topic') or t.get('name'),
-                        "subtopics": t.get('subtopics', []),
-                        "notes": t.get('notes', '')
-                    })
-            logger.info(f"✅ Gemini extracted {len(normalized)} topics")
-            return normalized
+            **Instructions:**
+            1.  Identify the key topics and sub-topics.
+            2.  Organize the output as a nested JSON object.
+            3.  Each main topic should be a key, and its value should be a list of strings representing the subtopics.
+
+            **Example Output:**
+            ```json
+            {{
+                "topics": {{
+                    "Main Topic 1": [
+                        "Subtopic 1.1",
+                        "Subtopic 1.2"
+                    ],
+                    "Main Topic 2": [
+                        "Subtopic 2.1",
+                        "Subtopic 2.2"
+                    ]
+                }}
+            }}
+            ```
+
+            **Academic Text:**
+            ---
+            {text}
+            ---
+            """
+            
+            response = model.generate_content(
+                prompt,
+                generation_config=genai.types.GenerationConfig(
+                    temperature=0.2,
+                    max_output_tokens=2000,
+                )
+            )
+            
+            if response and response.text:
+                logger.info("✅ Topics extracted from Gemini.")
+                # Clean the response to handle potential markdown
+                clean_response = response.text.strip().replace("```json", "").replace("```", "")
+                try:
+                    return json.loads(clean_response)
+                except json.JSONDecodeError:
+                    logger.warning("⚠️ Failed to parse JSON directly, attempting regex extraction.")
+                    # Fallback to regex to find the topics list
+                    topic_matches = re.findall(r'"(.*?)"', clean_response)
+                    if topic_matches:
+                        return {"topics": topic_matches}
+                    else:
+                        return {"topics": []}
+            else:
+                logger.warning("⚠️ Gemini topic extraction returned empty response.")
+                return {"topics": []}
+        else:
+            logger.info("🎭 GEMINI_API_KEY not found, skipping topic extraction.")
+            return {"topics": []}
+            
     except Exception as e:
-        logger.error(f"Gemini topic extraction failed: {e}")
-
-    # Fallback to local weak topic extractor
-    try:
-        from .weaktopics import extract_topics_from_text
-        raw_topics = extract_topics_from_text(extracted_text)
-        normalized = []
-        for t in raw_topics[:max_topics]:
-            if isinstance(t, str):
-                normalized.append({"topic": t, "subtopics": [], "notes": ""})
-            elif isinstance(t, dict):
-                normalized.append({"topic": t.get('topic', ''), "subtopics": t.get('subtopics', []), "notes": ''})
-        return normalized
-    except Exception:
-        return []
+        logger.error(f"❌ Gemini topic extraction failed: {e}")
+        return {"topics": []}

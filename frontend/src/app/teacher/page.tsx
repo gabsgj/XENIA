@@ -19,6 +19,7 @@ import {
   Target,
   Award
 } from 'lucide-react'
+import ContentCreationTools from './content-tools'
 
 export default function TeacherPage(){
   const [topic, setTopic] = useState('')
@@ -245,6 +246,9 @@ export default function TeacherPage(){
             </Card>
           </div>
         </div>
+
+        {/* Content Creation Tools */}
+        <ContentCreationTools />
       </div>
     </MainLayout>
   )

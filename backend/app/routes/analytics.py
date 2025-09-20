@@ -203,7 +203,6 @@ def student_analytics():
     """Return comprehensive per-student analytics with gamification data.
 
     Query param: user_id (optional) or X-User-Id header.
-    If user id missing or invalid -> return demo data for development.
     """
     logger.info("📊 Student analytics endpoint called")
     from ..services.gamification import get_study_stats, recompute_level, check_achievements, generate_progress_insights
@@ -217,10 +216,8 @@ def student_analytics():
     tasks = []
     profile = {}
     
-    # If no valid user ID, return demo data for development
-    if not is_valid_uuid(user_id):
-        logger.info("No valid user ID, returning demo analytics data")
-        return generate_demo_analytics()
+    if not user_id:
+        raise ApiError("AUTH_401", "Missing user_id")
 
     try:
         sessions_resp = (

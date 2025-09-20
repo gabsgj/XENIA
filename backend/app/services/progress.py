@@ -46,71 +46,19 @@ def record_quiz_result(user_id, topic_scores):
         })
 
     try:
-        # If using the mock supabase client, clear pre-existing user_progress rows for these topics
-        try:
-            if hasattr(sb, 'mock_data'):
-                for row in upsert_rows:
-                    topic = row['topic']
-                    sb.mock_data.setdefault('user_progress', [])[:] = [r for r in sb.mock_data.get('user_progress', []) if not (r.get('user_id') == user_id and r.get('topic') == topic)]
-        except Exception:
-            pass
-
         if history_rows:
             sb.table("user_progress_history").insert(history_rows).execute()
 
-        # If we're using the mock client, recompute aggregates from history to keep a single canonical row per topic
-        if hasattr(sb, 'mock_data'):
-            try:
-                # Build aggregates from history
-                history = sb.mock_data.get('user_progress_history', [])
-                user_history = [h for h in history if h.get('user_id') == user_id]
-                agg = {}
-                for h in user_history:
-                    t = h.get('topic')
-                    entry = agg.setdefault(t, {'quizzes_taken': 0, 'correct': 0, 'wrong': 0, 'last_score': 0.0, 'last_updated': h.get('created_at')})
-                    entry['quizzes_taken'] += 1
-                    entry['correct'] += int(h.get('correct', 0))
-                    entry['wrong'] += int(h.get('wrong', 0))
-                    entry['last_score'] = float(h.get('score', entry['last_score']))
-                    entry['last_updated'] = h.get('created_at') or entry['last_updated']
-
-                # Remove any existing user_progress rows for this user
-                sb.mock_data.setdefault('user_progress', [])[:] = [r for r in sb.mock_data.get('user_progress', []) if r.get('user_id') != user_id]
-
-                # Insert aggregated rows
-                for topic, vals in agg.items():
-                    sb.mock_data['user_progress'].append({
-                        'user_id': user_id,
-                        'topic': topic,
-                        'quizzes_taken': vals['quizzes_taken'],
-                        'correct': vals['correct'],
-                        'wrong': vals['wrong'],
-                        'last_score': vals['last_score'],
-                        'last_updated': vals['last_updated'],
-                    })
-            except Exception:
-                pass
-
         # For aggregates, use upsert semantics: if record exists, increment fields; otherwise insert
         for row in upsert_rows:
-            topic = row["topic"]
-            # Special-case mock client: replace any existing rows for this user+topic to avoid duplicate accumulation in tests
-            if hasattr(sb, 'mock_data'):
-                try:
-                    sb.mock_data.setdefault('user_progress', [])[:] = [r for r in sb.mock_data.get('user_progress', []) if not (r.get('user_id') == user_id and r.get('topic') == topic)]
-                except Exception:
-                    pass
-                # Insert fresh row
-                sb.table("user_progress").insert(row).execute()
-                continue
-
-            # Normal behavior for real Supabase: read-update-write
-            existing = sb.table("user_progress").select("*").eq("user_id", user_id).eq("topic", topic).limit(1).execute().data
+            # Attempt to upsert by user_id+topic
+            # Using a simple read-update-write because Supabase client mock may not support compound upsert
+            existing = sb.table("user_progress").select("*").eq("user_id", user_id).eq("topic", row["topic"]).limit(1).execute().data
             if existing:
                 rec = existing[0]
-                new_quizzes = int(rec.get("quizzes_taken", 0)) + int(row.get("quizzes_taken", 0))
-                new_correct = int(rec.get("correct", 0)) + int(row.get("correct", 0))
-                new_wrong = int(rec.get("wrong", 0)) + int(row.get("wrong", 0))
+                new_quizzes = int(rec.get("quizzes_taken", 0)) + int(row["quizzes_taken"])
+                new_correct = int(rec.get("correct", 0)) + int(row["correct"])
+                new_wrong = int(rec.get("wrong", 0)) + int(row["wrong"])
                 # last_score becomes the most recent
                 sb.table("user_progress").update({
                     "quizzes_taken": new_quizzes,
@@ -118,7 +66,7 @@ def record_quiz_result(user_id, topic_scores):
                     "wrong": new_wrong,
                     "last_score": row["last_score"],
                     "last_updated": row["last_updated"],
-                }).eq("user_id", user_id).eq("topic", topic).execute()
+                }).eq("user_id", user_id).eq("topic", row["topic"]).execute()
             else:
                 sb.table("user_progress").insert(row).execute()
     except Exception as e:

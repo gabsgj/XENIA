@@ -1001,6 +1001,15 @@ def get_resources(user_id: str) -> List[Dict[str, Any]]:
     sb = get_supabase()
     try:
         resp = sb.table("resources").select("topic, source, title, url, metadata").eq("user_id", user_id).limit(500).execute()
+        
+        # Parse the metadata field from JSON string to dict
+        for resource in resp.data:
+            if isinstance(resource.get("metadata"), str):
+                try:
+                    resource["metadata"] = json.loads(resource["metadata"])
+                except json.JSONDecodeError:
+                    resource["metadata"] = {} # or some default value
+                    
         return resp.data or []
     except Exception:
         return []

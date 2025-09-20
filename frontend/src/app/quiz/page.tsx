@@ -16,6 +16,11 @@ const DEFAULT_TOPICS = [
   "Biology",
 ];
 
+import { getUserId } from "@/lib/api";
+
+// Use the global getUserId utility for consistent authentication
+const getRealUserId = () => getUserId();
+
 export default function QuizPage() {
   const [selectedTopics, setSelectedTopics] = useState<string[]>([]);
   const [duration, setDuration] = useState<number>(10);
@@ -30,7 +35,7 @@ export default function QuizPage() {
   const handleStartQuiz = async () => {
     try {
       const resp = await axios.post("/api/quiz/generate", {
-        user_id: "demo-user-123",
+        user_id: getRealUserId(), // Use the real user ID
         topics: selectedTopics,
         num_questions: numQuestions,
         options_count: 4,

@@ -14,6 +14,8 @@ def generate_quiz_api():
     if not raw_user_id:
         raise ApiError("AUTH_401", "Missing user_id")
     user_id = normalize_user_id(raw_user_id)
+    if not is_valid_uuid(user_id):
+        raise ApiError("AUTH_403", "Invalid user_id")
     topics = data.get("topics", [])
     num_questions = int(data.get("num_questions", 10))
     options_count = int(data.get("options_count", 4))
@@ -44,6 +46,8 @@ def submit_quiz_api():
     stats = score_quiz(quiz, user_answers)
     # Record progress for each topic
     user_id = quiz.get("user_id")
+    if not user_id or not is_valid_uuid(user_id):
+        raise ApiError("AUTH_403", "Invalid user_id in quiz data")
     topic_scores = []
     for idx, topic in enumerate(quiz.get("topics", [])):
         correct = 1 if stats["feedback"][idx]["is_correct"] else 0
