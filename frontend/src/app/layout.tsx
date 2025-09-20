@@ -3,6 +3,7 @@ import "./globals.css";
 import { ThemeProvider } from "next-themes";
 import Providers from "@/components/providers";
 import { Toaster } from "@/components/ui/sonner";
+import WakeBackend from "@/components/WakeBackend";
 
 export const metadata: Metadata = {
   title: "XENIA - AI Study Planner",
@@ -29,6 +30,7 @@ export default function RootLayout({
       <body className="font-sans antialiased">
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
           <Providers>
+            <WakeBackend />
             {children}
             <Toaster richColors position="top-right" closeButton />
           </Providers>
