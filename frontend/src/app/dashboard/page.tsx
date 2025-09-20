@@ -159,6 +159,27 @@ export default function DashboardPage(){
     }
   }, [plan, data, progress])
 
+  // Normalize data for charts to ensure numeric fields and consistent keys
+  const studyChartData = useMemo(() => {
+    const sessions = data?.sessions || [];
+    return sessions.map((s: any) => ({
+      date: (s.created_at || '').slice(0,10),
+      minutes: Number(s.duration_min || 0),
+      topic: s.topic || 'General'
+    }));
+  }, [data]);
+
+  const weeklyChartData = useMemo(() => {
+    // backend sends weekly_progress as [{week, study_time, completion, sessions}]
+    const w = (data?.weekly_progress || weekly || []) as any[];
+    return w.map(item => ({
+      week: item.week || item.date || '',
+      study_time: Number(item.study_time || 0),
+      completion: Number(item.completion || 0),
+      sessions: Number(item.sessions || 0)
+    }));
+  }, [data, weekly]);
+
   const recentAchievements = useMemo(()=>{
     const achievements = [
       { title: 'Study Streak', description: `${enhancedStats.streakDays} days in a row`, icon: Award },
@@ -369,10 +390,7 @@ export default function DashboardPage(){
                     </div>
                   ) : (
                     <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart data={data?.sessions?.map((s:any)=> ({ 
-                        date: s.created_at?.slice(0,10), 
-                        minutes: s.duration_min 
-                      })) || []}>
+                      <AreaChart data={studyChartData}>
                         <XAxis dataKey='date' />
                         <YAxis />
                         <Tooltip />
@@ -407,7 +425,7 @@ export default function DashboardPage(){
                     </div>
                   ) : (
                     <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart data={weekly}>
+                      <AreaChart data={weeklyChartData}>
                         <XAxis dataKey="week" />
                         <YAxis />
                         <Tooltip />

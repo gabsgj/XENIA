@@ -53,18 +53,24 @@ export function WeeklyProgressChart({ data }: WeeklyProgressChartProps) {
               <Tooltip 
                 content={({ active, payload, label }) => {
                   if (active && payload && payload.length) {
+                    // Find entries by dataKey where possible
+                    const studyEntry = payload.find((p:any) => p.dataKey === 'study_time' || p.dataKey === 'minutes') || payload[0];
+                    const completionEntry = payload.find((p:any) => p.dataKey === 'completion') || payload[1];
+                    const sessionsVal = studyEntry?.payload?.sessions ?? studyEntry?.payload?.sessions ?? 0;
+                    const studyVal = studyEntry?.value ?? 0;
+                    const completionVal = completionEntry?.value ?? 0;
                     return (
                       <div className="bg-background border rounded-lg p-3 shadow-lg">
                         <p className="font-medium">{label}</p>
                         <div className="space-y-1 mt-2">
                           <p className="text-sm text-blue-600">
-                            Study Time: {payload[0]?.value} minutes
+                            Study Time: {studyVal} minutes
                           </p>
                           <p className="text-sm text-green-600">
-                            Completion: {payload[1]?.value}%
+                            Completion: {completionVal}%
                           </p>
                           <p className="text-sm text-purple-600">
-                            Sessions: {payload[0]?.payload?.sessions}
+                            Sessions: {sessionsVal}
                           </p>
                         </div>
                       </div>
