@@ -1,5 +1,4 @@
 'use client'
-'use client'
 
 
 import { MainLayout } from '@/components/navigation'

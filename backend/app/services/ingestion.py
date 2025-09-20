@@ -6,6 +6,8 @@ from PIL import Image
 import pytesseract
 from pdfminer.high_level import extract_text
 from pdf2image import convert_from_bytes
+from contextlib import contextmanager
+import time
 from ..supabase_client import get_supabase
 from ..utils import normalize_user_id, is_valid_uuid
 from .topic_store import add_topics as store_add_topics
@@ -53,23 +55,35 @@ def handle_upload(file_storage, user_id: str, artifact_type: str) -> Dict:
     data = file_storage.read()
     mime = _detect_mimetype(filename)
 
+    # Lightweight timing helper for profiling
+    @contextmanager
+    def _timer(name: str):
+        start = time.perf_counter()
+        try:
+            yield
+        finally:
+            elapsed = time.perf_counter() - start
+            print(f"⏱️ {name}: {elapsed:.3f}s")
+
     # Extract text
-    if mime == "application/pdf":
-        text = _extract_text_from_pdf(data)
-        print(f"📄 Extracted {len(text)} characters from PDF")
-    elif mime == "image/*":
-        text = _extract_text_from_image(data)
-        print(f"🖼️ Extracted {len(text)} characters from image")
-    else:
-        text = data.decode("utf-8", errors="ignore")
-        print(f"📝 Read {len(text)} characters from text file")
+    with _timer("extraction"):
+        if mime == "application/pdf":
+            text = _extract_text_from_pdf(data)
+            print(f"📄 Extracted {len(text)} characters from PDF")
+        elif mime == "image/*":
+            text = _extract_text_from_image(data)
+            print(f"🖼️ Extracted {len(text)} characters from image")
+        else:
+            text = data.decode("utf-8", errors="ignore")
+            print(f"📝 Read {len(text)} characters from text file")
 
     # Filter out unnecessary content using AI
     if artifact_type == "syllabus":
         try:
             from .ai_providers import filter_syllabus_content
             original_length = len(text)
-            text = filter_syllabus_content(text)
+            with _timer("ai_filtering"):
+                text = filter_syllabus_content(text)
             print(f"🎯 AI content filtering: {original_length} -> {len(text)} characters")
         except Exception as e:
             print(f"⚠️ AI content filtering failed: {e}, proceeding with original text")
@@ -78,12 +92,14 @@ def handle_upload(file_storage, user_id: str, artifact_type: str) -> Dict:
     bucket = os.getenv("ARTIFACTS_BUCKET", "artifacts")
     object_path = f"{user_id}/{artifact_type}/{uuid.uuid4().hex}-{filename}"
     try:
-        supabase.storage.from_(bucket).upload(object_path, data, {"contentType": mime})
+        with _timer("storage_upload"):
+            supabase.storage.from_(bucket).upload(object_path, data, {"contentType": mime})
         print(f"☁️ File uploaded to storage: {object_path}")
     except Exception:
         try:
             supabase.storage.create_bucket(bucket, {"public": False, "file_size_limit": "50mb"})
-            supabase.storage.from_(bucket).upload(object_path, data, {"contentType": mime})
+            with _timer("storage_upload"):
+                supabase.storage.from_(bucket).upload(object_path, data, {"contentType": mime})
             print(f"☁️ File uploaded to newly created bucket: {object_path}")
         except Exception as e:
             # Ignore storage errors in development mode
@@ -99,7 +115,8 @@ def handle_upload(file_storage, user_id: str, artifact_type: str) -> Dict:
         "mime_type": mime,
         "extracted_text": text,
     }
-    vectors = embed_texts([text]) or []
+    with _timer("embedding"):
+        vectors = embed_texts([text]) or []
     if vectors and len(vectors) == 1:
         record["embedding"] = vectors[0]
     artifact_id = None
@@ -107,29 +124,30 @@ def handle_upload(file_storage, user_id: str, artifact_type: str) -> Dict:
     # Try to store artifact in database with retry mechanism
     if record["user_id"]:
         max_retries = 3
-        for attempt in range(max_retries):
-            try:
-                insert_resp = supabase.table("artifacts").insert(record).execute()
-                if getattr(insert_resp, "data", None):
-                    try:
-                        artifact_id = insert_resp.data[0]["id"]
-                        print(f"Artifact stored successfully in database: {artifact_id}")
+        with _timer("db_insert"):
+            for attempt in range(max_retries):
+                try:
+                    insert_resp = supabase.table("artifacts").insert(record).execute()
+                    if getattr(insert_resp, "data", None):
+                        try:
+                            artifact_id = insert_resp.data[0]["id"]
+                            print(f"Artifact stored successfully in database: {artifact_id}")
+                            break
+                        except Exception:
+                            artifact_id = None
+                except Exception as e:
+                    fk_like = 'foreign key' in str(e).lower() or '23503' in str(e)
+                    if fk_like:
+                        print(f"Foreign key violation for user {norm_user_id}, treating as development user")
+                        record["user_id"] = None
                         break
-                    except Exception:
-                        artifact_id = None
-            except Exception as e:
-                fk_like = 'foreign key' in str(e).lower() or '23503' in str(e)
-                if fk_like:
-                    print(f"Foreign key violation for user {norm_user_id}, treating as development user")
-                    record["user_id"] = None
-                    break
-                elif attempt < max_retries - 1:
-                    print(f"Database insert attempt {attempt + 1} failed: {e}, retrying...")
-                    continue
-                else:
-                    print(f"Database insert failed after {max_retries} attempts: {e}")
-                    record["user_id"] = None  # Fallback to in-memory
-                    break
+                    elif attempt < max_retries - 1:
+                        print(f"Database insert attempt {attempt + 1} failed: {e}, retrying...")
+                        continue
+                    else:
+                        print(f"Database insert failed after {max_retries} attempts: {e}")
+                        record["user_id"] = None  # Fallback to in-memory
+                        break
     else:
         print(f"Invalid user ID {norm_user_id}, skipping database storage")
 
@@ -140,7 +158,8 @@ def handle_upload(file_storage, user_id: str, artifact_type: str) -> Dict:
             text = filter_syllabus_content(text)
             
             # Use Gemini for topic extraction
-            topics_data = extract_topics_with_gemini(text)
+            with _timer("topic_extraction"):
+                topics_data = extract_topics_with_gemini(text)
             
             # Flatten the topics and subtopics
             topics = []
@@ -150,7 +169,8 @@ def handle_upload(file_storage, user_id: str, artifact_type: str) -> Dict:
             
             # Store topics in topic store for quiz generation
             if topics:
-                store_add_topics(norm_user_id, topics)
+                with _timer("store_topics"):
+                    store_add_topics(norm_user_id, topics)
                 print(f"📚 Stored {len(topics)} topics for user {norm_user_id}")
             
         except Exception:
@@ -158,7 +178,8 @@ def handle_upload(file_storage, user_id: str, artifact_type: str) -> Dict:
             topics = extract_topics_from_text(text)
             # Store fallback topics as well
             if topics:
-                store_add_topics(norm_user_id, topics)
+                with _timer("store_topics"):
+                    store_add_topics(norm_user_id, topics)
                 print(f"📚 Stored {len(topics)} fallback topics for user {norm_user_id}")
     elif artifact_type == "assessment":
         try:
@@ -172,7 +193,8 @@ def handle_upload(file_storage, user_id: str, artifact_type: str) -> Dict:
     plan_preview = None
     try:
         # Always build dynamic plan preview (objective B & C)
-        plan_preview = generate_plan(norm_user_id)
+        with _timer("generate_plan"):
+            plan_preview = generate_plan(norm_user_id)
     except Exception:
         plan_preview = None
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, ReactNode } from "react";
 import { api, getUserId } from "@/lib/api";
 import { useErrorContext } from "@/lib/error-context";
 import { MainLayout } from "@/components/navigation";
@@ -15,7 +15,16 @@ import {
 import { WeeklyProgressChart } from "@/components/ui/analytics-charts";
 import { SkeletonCard } from "@/components/ui/loading";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+// Local fallback Alert components (used when shared ui/alert is not available)
+const Alert = ({ children }: { children: ReactNode }) => (
+  <div className="rounded-lg bg-surface p-4 border border-muted-foreground/10 flex items-start gap-3">
+    {children}
+  </div>
+);
+
+const AlertDescription = ({ children }: { children: ReactNode }) => (
+  <div className="text-sm text-muted-foreground">{children}</div>
+);
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { 

@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Confirm your XENIA account</title>
+    <style>
+      body { margin:0; padding:0; background:#f7fafc; font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial; color:#102a43; }
+      .container { width:100%; max-width:680px; margin:24px auto; background:#ffffff; border-radius:12px; overflow:hidden; box-shadow:0 6px 18px rgba(15,23,42,0.06); }
+      .header { background: linear-gradient(90deg,#0f172a 0%,#0ea5a4 100%); color:#fff; padding:28px 24px; text-align:left; }
+      .logo { display:flex; align-items:center; gap:12px; font-weight:700; font-size:20px; }
+      .logo-mark { width:44px; height:44px; background:rgba(255,255,255,0.12); border-radius:8px; display:inline-block; text-align:center; line-height:44px; }
+      .content { padding:28px 24px; }
+      h1 { margin:0 0 8px 0; font-size:20px; color:#07203a; }
+      p { margin:0 0 16px 0; line-height:1.5; color:#334e68; }
+      .button-wrap { text-align:center; margin:22px 0; }
+      .button { display:inline-block; text-decoration:none; background:#0ea5a4; color:#fff; padding:12px 22px; border-radius:8px; font-weight:600; }
+      .muted { color:#64748b; font-size:13px; }
+      .footer { padding:18px 24px; background:#f1f5f9; color:#586e7c; font-size:13px; text-align:center; }
+      .card { background:#f8fafc; padding:14px; border-radius:8px; margin:12px 0; color:#334e68; }
+      @media (max-width:480px){ .header,.content { padding:18px 16px } .logo { font-size:18px } .button { width:100%; padding:12px 14px } }
+    </style>
+  </head>
+  <body>
+    <div class="container" role="article" aria-label="Confirm your XENIA account">
+      <div class="header">
+        <div class="logo">
+          <img src="https://drive.google.com/uc?export=view&id=11VWXB0Km8ykFPTRT257TTcpAwrVKMAMu" alt="XENIA logo" style="width:44px;height:44px;border-radius:8px;object-fit:contain;" />
+          <div>
+            XENIA<br/>
+            <span style="font-size:12px; opacity:0.92; font-weight:600">Welcome aboard</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <h1>Confirm your email to complete sign up</h1>
+        <p>Hi there — welcome to XENIA. We’re thrilled you’re here. To finish creating your account and unlock personalized learning recommendations, please confirm your email address.</p>
+
+        <div class="button-wrap">
+          <!-- Use intermediate page to mitigate prefetch: pass the confirmation URL as a query param -->
+          <a class="button" href="https://xenia.onrender.com/confirm-signup?confirmation_url={{ urlquery .ConfirmationURL }}">Confirm my email</a>
+        </div>
+
+        <p class="muted">If the button above doesn't work, copy and paste this link into your browser:</p>
+        <div class="card">
+          <a href="{{ .ConfirmationURL }}" style="color:#0ea5a4; word-break:break-all;">{{ .ConfirmationURL }}</a>
+        </div>
+
+        <p>If you didn't sign up for XENIA, you can safely ignore this email — the link will expire and no account will be created.</p>
+
+        <p>Thanks for joining us — we can't wait to help you make learning more engaging.</p>
+
+        <p style="margin-top:12px; font-size:13px; color:#52606d">Warmly,<br/>The XENIA Team</p>
+
+        <hr style="border:none; border-top:1px solid #eef2f6; margin:20px 0;" />
+
+        <p style="font-size:13px; color:#7b8a99">Need help? Reply to this email or visit <a href="https://xenia.onrender.com" style="color:#0ea5a4">xenia.onrender.com</a>.</p>
+      </div>
+
+      <div class="footer">
+        XENIA — Personalized learning, simplified.<br/>
+        © {{ now.Year }} XENIA. All rights reserved.
+      </div>
+    </div>
+  </body>
+</html>

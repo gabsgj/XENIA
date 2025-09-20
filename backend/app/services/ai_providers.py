@@ -37,7 +37,7 @@ def get_ai_response(prompt: str, model: Optional[str] = None) -> str:
             genai.configure(api_key=gemini_key.strip())
             
             logger.info("   Creating Gemini model...")
-            gemini_model = os.getenv("GEMINI_MODEL", "gemini-1.5-pro")
+            gemini_model = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
             model_instance = genai.GenerativeModel(gemini_model)
             
             logger.info("   Generating content...")
@@ -1359,7 +1359,7 @@ def filter_syllabus_content(extracted_text: str) -> str:
             logger.info("🤖 Using Gemini for advanced content filtering...")
             
             genai.configure(api_key=os.getenv("GEMINI_API_KEY").strip())
-            model = genai.GenerativeModel(os.getenv("GEMINI_MODEL", "gemini-1.5-pro"))
+            model = genai.GenerativeModel(os.getenv("GEMINI_MODEL", "gemini-2.5-flash"))
 
             prompt = f"""
             Analyze the following syllabus text and extract ONLY the core academic topics and their descriptions.
@@ -1444,7 +1444,7 @@ def extract_topics_with_gemini(text: str) -> Dict[str, Any]:
             logger.info("🤖 Using Gemini for topic extraction...")
             
             genai.configure(api_key=os.getenv("GEMINI_API_KEY").strip())
-            model = genai.GenerativeModel(os.getenv("GEMINI_MODEL", "gemini-1.5-pro"))
+            model = genai.GenerativeModel(os.getenv("GEMINI_MODEL", "gemini-2.5-flash"))
 
             prompt = f"""
             Analyze the following academic text and extract the main topics.

@@ -42,11 +42,11 @@ export function Navigation() {
   return (
     <>
       {/* Desktop Sidebar */}
-      <div className="hidden lg:flex lg:w-64 lg:flex-col lg:fixed lg:inset-y-0 lg:z-50 lg:bg-sidebar lg:border-r lg:border-sidebar-border">
+  <div className="hidden lg:flex lg:w-64 lg:flex-col lg:fixed lg:inset-y-0 lg:z-50 lg:bg-sidebar lg:border-r lg:border-sidebar-border">
         <div className="flex flex-col flex-1 min-h-0">
           <div className="flex items-center h-16 px-6 border-b border-sidebar-border">
-            <Link href="/" className="flex items-center gap-2">
-              <Logo className="h-8 w-8" />
+            <Link href="/" className="flex items-center gap-2 px-3">
+              <Logo withText={true} size={32} className="!items-center" />
             </Link>
           </div>
           <nav className="flex-1 px-4 py-6 space-y-1">
@@ -82,7 +82,7 @@ export function Navigation() {
       <div className="lg:hidden">
         <div className="flex items-center justify-between h-16 px-4 border-b border-border bg-background">
           <Link href="/" className="flex items-center gap-2">
-            <Logo className="h-8 w-8" />
+            <Logo withText={false} size={28} className="!items-center" />
           </Link>
           <div className="flex items-center gap-2">
             <ThemeToggle />

@@ -366,21 +366,21 @@ export default function QuizPage() {
         <div className="max-w-4xl mx-auto p-6 space-y-6">
           {/* Header with Progress */}
           <div className="sticky top-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b pb-4">
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between mb-3">
               <div>
-                <h1 className="text-2xl font-bold">Quiz Time</h1>
-                <p className="text-muted-foreground">
-                  Question {answeredCount + 1} of {quiz.questions.length}
-                </p>
+                <h1 className="text-xl md:text-2xl font-medium">Quiz Time</h1>
+                <p className="text-sm text-muted-foreground">Question {answeredCount + 1} of {quiz.questions.length}</p>
               </div>
               <div className="flex items-center gap-3">
-                <Badge variant="outline" className="flex items-center gap-1">
+                <Badge variant="outline" className="flex items-center gap-1 px-2 py-0.5 text-xs">
                   <Clock className="w-4 h-4" />
                   {quiz.duration} min
                 </Badge>
-                <Badge variant="secondary">
-                  {selectedTopics.join(", ")}
-                </Badge>
+                <div className="max-w-[32ch] md:max-w-[48ch]">
+                  <div className="inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium text-slate-700 dark:text-slate-200 bg-slate-50 dark:bg-slate-800/40">
+                    {selectedTopics.join(", ")}
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -390,9 +390,9 @@ export default function QuizPage() {
                 <span>Progress</span>
                 <span>{answeredCount}/{quiz.questions.length} answered</span>
               </div>
-              <div className="w-full bg-muted rounded-full h-2">
+              <div className="w-full bg-muted rounded-full h-1.5">
                 <div
-                  className="bg-primary h-2 rounded-full transition-all duration-300"
+                  className="bg-primary h-1.5 rounded-full transition-all duration-300"
                   style={{ width: `${progressPercentage}%` }}
                 />
               </div>
@@ -463,19 +463,20 @@ export default function QuizPage() {
 
           {/* Submit Section */}
           <Card className="sticky bottom-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-t">
-            <CardContent className="pt-6">
+            <CardContent className="py-3 px-4">
               <div className="flex items-center justify-between">
                 <div className="text-sm text-muted-foreground">
                   {answeredCount === quiz.questions.length ? (
                     <span className="text-green-600 font-medium">All questions answered! Ready to submit.</span>
                   ) : (
-                    <span>{quiz.questions.length - answeredCount} questions remaining</span>
+                    <span className="text-sm">{quiz.questions.length - answeredCount} questions remaining</span>
                   )}
                 </div>
-                <div className="flex gap-3">
+                <div className="flex gap-2 items-center">
                   <Button
                     variant="outline"
                     onClick={() => setStep("setup")}
+                    className="h-8 px-3 text-sm"
                   >
                     <ArrowLeft className="w-4 h-4 mr-2" />
                     Cancel
@@ -483,8 +484,8 @@ export default function QuizPage() {
                   <Button
                     onClick={handleSubmitQuiz}
                     disabled={loading || answers.includes(-1)}
-                    size="lg"
-                    className="min-w-[140px]"
+                    size="sm"
+                    className="px-4 h-8"
                   >
                     {loading ? "Submitting..." : "Submit Quiz"}
                   </Button>

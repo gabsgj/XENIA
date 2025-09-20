@@ -85,7 +85,8 @@ export default function UploadPage() {
 
     setUploading(true)
     setUploadProgress(0)
-    setProcessingTopics(false)
+    // Indicate that the upload+processing workflow is active
+    setProcessingTopics(true)
     setErrorMessage(null) // Reset error
 
     try {
@@ -110,8 +111,8 @@ export default function UploadPage() {
         body: formData,
       })
 
-      clearInterval(progressInterval)
-      setUploadProgress(100)
+  clearInterval(progressInterval)
+  setUploadProgress(100)
 
       if (!response.ok) {
         const errorText = await response.text()
@@ -120,8 +121,7 @@ export default function UploadPage() {
 
       const result = await response.json()
       
-      // Start processing topics
-      setProcessingTopics(true)
+  // Processing remains true while we extract topics and update UI
       
       // Extract topics
       if (result.analysis) {
@@ -152,7 +152,7 @@ export default function UploadPage() {
   if (rawTopicList && rawTopicList.length > 0) setShowGeneratePlan(true)
       }
       
-      setProcessingTopics(false)
+  setProcessingTopics(false)
       
       console.log('Upload successful:', result)
       
@@ -174,7 +174,7 @@ export default function UploadPage() {
 
     setUploading(true)
     setUploadProgress(0)
-    setProcessingTopics(false)
+    setProcessingTopics(true)
     setErrorMessage(null)
 
     try {
@@ -200,8 +200,8 @@ export default function UploadPage() {
         }),
       })
 
-      clearInterval(progressInterval)
-      setUploadProgress(100)
+  clearInterval(progressInterval)
+  setUploadProgress(100)
 
       if (!response.ok) {
         const errorText = await response.text()
@@ -210,8 +210,7 @@ export default function UploadPage() {
 
       const result = await response.json()
       
-      // Start processing topics
-      setProcessingTopics(true)
+  // Processing remains true while we extract topics and update UI
       
       // Extract topics
       if (result.analysis) {
@@ -240,7 +239,7 @@ export default function UploadPage() {
         if (rawTopicList && rawTopicList.length > 0) setShowGeneratePlan(true)
       }
       
-      setProcessingTopics(false)
+  setProcessingTopics(false)
       
       console.log('Text upload successful:', result)
       
@@ -334,7 +333,21 @@ export default function UploadPage() {
           </div>
         )}
 
-        {/* Progress Indicator */}
+        {/* Processing Banner + Progress Indicator */}
+        { (uploading || processingTopics) && (
+          <div className="mb-4 max-w-2xl mx-auto">
+            <div className="flex items-center justify-between p-3 bg-primary/10 rounded">
+              <div className="flex items-center gap-3">
+                <Loader2 className="w-5 h-5 animate-spin text-primary" />
+                <div>
+                  <div className="text-sm font-medium">Processing your upload</div>
+                  <div className="text-xs text-muted-foreground">We are extracting text and analyzing topics — this may take a few moments.</div>
+                </div>
+              </div>
+              <div className="text-sm text-muted-foreground">{uploadProgress}%</div>
+            </div>
+          </div>
+        )}
         <div className="mb-8">
           <ProgressIndicator 
             steps={uploadSteps}
@@ -358,7 +371,11 @@ export default function UploadPage() {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Main Upload Area */}
-          <div className="lg:col-span-2 space-y-6">
+          <div className="lg:col-span-2 space-y-6 relative">
+            {/* Overlay while processing/uploading */}
+            {(uploading || processingTopics) && (
+              <LoadingOverlay className="z-20" />
+            )}
             {/* Upload Section */}
             <Card>
               <CardHeader>

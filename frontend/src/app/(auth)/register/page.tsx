@@ -55,9 +55,9 @@ export default function RegisterPage() {
       <div className="w-full max-w-md">
         {/* Header */}
         <div className="text-center mb-8">
-          <Link href="/" className="inline-flex items-center gap-2 mb-6">
-            <Logo className="h-10 w-10" />
-          </Link>
+          <div className="inline-flex flex-col items-center gap-1 mb-6">
+            <Logo withText={true} size={64} className="!flex-col items-center text-center" />
+          </div>
         </div>
 
         <Card className="shadow-lg">
