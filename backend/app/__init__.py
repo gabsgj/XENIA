@@ -8,6 +8,7 @@ from flask_cors import CORS
 from .config import load_config
 from .errors import register_error_handlers
 from .routes.analytics import analytics_bp
+from .routes.analytics_progress import analytics_progress_bp
 from .routes.ingest import ingest_bp
 from .routes.parent import parent_bp
 from .routes.plan import plan_bp
@@ -16,6 +17,8 @@ from .routes.teacher import teacher_bp
 from .routes.tutor import tutor_bp
 from .routes.resources import resources_bp
 from .routes.upload import upload_bp
+from .routes.quiz import quiz_bp
+from .routes.progress import progress_bp  # Import the progress blueprint
 
 # Suppress NumPy runtime warnings for floating-point precision issues
 warnings.filterwarnings("ignore", category=RuntimeWarning, module="numpy")
@@ -106,6 +109,9 @@ def create_app() -> Flask:
     app.register_blueprint(teacher_bp, url_prefix="/api/teacher")
     app.register_blueprint(parent_bp, url_prefix="/api/parent")
     app.register_blueprint(resources_bp, url_prefix="/api/resources")
+    app.register_blueprint(quiz_bp, url_prefix="/api/quiz")
+    app.register_blueprint(progress_bp, url_prefix="/api/progress")  # Register the progress blueprint
+    app.register_blueprint(analytics_progress_bp, url_prefix="/api/analytics/progress")
 
     @app.get("/health")
     def health():

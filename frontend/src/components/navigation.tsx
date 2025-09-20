@@ -17,7 +17,8 @@ import {
   Settings,
   Menu,
   X,
-  BookOpen
+  BookOpen,
+  Brain
 } from "lucide-react";
 
 const navigation = [
@@ -25,6 +26,7 @@ const navigation = [
   { name: "Planner", href: "/planner", icon: Calendar },
   { name: "AI Tutor", href: "/tutor", icon: MessageSquare },
   { name: "Tasks", href: "/tasks", icon: BookOpen },
+  { name: "Quiz", href: "/quiz", icon: Brain },
   { name: "Upload", href: "/upload", icon: Upload },
   { name: "Analytics", href: "/analytics", icon: BarChart3 },
   { name: "Teacher View", href: "/teacher", icon: Users },

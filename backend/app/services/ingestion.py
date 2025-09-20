@@ -47,6 +47,7 @@ def _detect_mimetype(filename: str) -> str:
 def handle_upload(file_storage, user_id: str, artifact_type: str) -> Dict:
     raw_user_id = user_id
     norm_user_id = normalize_user_id(raw_user_id)
+    print(f"🔄 Processing upload for user {raw_user_id} -> normalized to {norm_user_id}")
     supabase = get_supabase()
     filename = file_storage.filename or f"upload-{uuid.uuid4().hex}"
     data = file_storage.read()
@@ -55,22 +56,38 @@ def handle_upload(file_storage, user_id: str, artifact_type: str) -> Dict:
     # Extract text
     if mime == "application/pdf":
         text = _extract_text_from_pdf(data)
+        print(f"📄 Extracted {len(text)} characters from PDF")
     elif mime == "image/*":
         text = _extract_text_from_image(data)
+        print(f"🖼️ Extracted {len(text)} characters from image")
     else:
         text = data.decode("utf-8", errors="ignore")
+        print(f"📝 Read {len(text)} characters from text file")
+
+    # Filter out unnecessary content using AI
+    if artifact_type == "syllabus":
+        try:
+            from .ai_providers import filter_syllabus_content
+            original_length = len(text)
+            text = filter_syllabus_content(text)
+            print(f"🎯 AI content filtering: {original_length} -> {len(text)} characters")
+        except Exception as e:
+            print(f"⚠️ AI content filtering failed: {e}, proceeding with original text")
 
     # Upload raw file to storage (mock-friendly)
     bucket = os.getenv("ARTIFACTS_BUCKET", "artifacts")
     object_path = f"{user_id}/{artifact_type}/{uuid.uuid4().hex}-{filename}"
     try:
         supabase.storage.from_(bucket).upload(object_path, data, {"contentType": mime})
+        print(f"☁️ File uploaded to storage: {object_path}")
     except Exception:
         try:
             supabase.storage.create_bucket(bucket, {"public": False, "file_size_limit": "50mb"})
             supabase.storage.from_(bucket).upload(object_path, data, {"contentType": mime})
-        except Exception:
+            print(f"☁️ File uploaded to newly created bucket: {object_path}")
+        except Exception as e:
             # Ignore storage errors in demo mode
+            print(f"⚠️ Storage upload failed (continuing): {e}")
             pass
 
     # Store metadata + extracted text (and embedding if available)
@@ -86,26 +103,54 @@ def handle_upload(file_storage, user_id: str, artifact_type: str) -> Dict:
     if vectors and len(vectors) == 1:
         record["embedding"] = vectors[0]
     artifact_id = None
+
+    # Try to store artifact in database with retry mechanism
     if record["user_id"]:
-        try:
-            insert_resp = supabase.table("artifacts").insert(record).execute()
-            if getattr(insert_resp, "data", None):
-                try:
-                    artifact_id = insert_resp.data[0]["id"]
-                except Exception:
-                    artifact_id = None
-        except Exception as e:
-            # Foreign key violation or other error -> treat as demo (suppress further DB writes)
-            fk_like = 'foreign key' in str(e).lower() or '23503' in str(e)
-            print(f"Artifact insert failed: {e}")
-            if fk_like:
-                record["user_id"] = None
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                insert_resp = supabase.table("artifacts").insert(record).execute()
+                if getattr(insert_resp, "data", None):
+                    try:
+                        artifact_id = insert_resp.data[0]["id"]
+                        print(f"Artifact stored successfully in database: {artifact_id}")
+                        break
+                    except Exception:
+                        artifact_id = None
+            except Exception as e:
+                fk_like = 'foreign key' in str(e).lower() or '23503' in str(e)
+                if fk_like:
+                    print(f"Foreign key violation for user {norm_user_id}, treating as demo user")
+                    record["user_id"] = None
+                    break
+                elif attempt < max_retries - 1:
+                    print(f"Database insert attempt {attempt + 1} failed: {e}, retrying...")
+                    continue
+                else:
+                    print(f"Database insert failed after {max_retries} attempts: {e}")
+                    record["user_id"] = None  # Fallback to in-memory
+                    break
+    else:
+        print(f"Invalid user ID {norm_user_id}, skipping database storage")
 
     topics = []
     if artifact_type == "syllabus":
-        # Extract topics with enhanced extraction for more comprehensive coverage
-        topics = extract_topics_from_text(text)
-        print(f"📚 Enhanced topic extraction: {len(topics)} topics extracted")
+        # First, try extracting structured topics using Gemini via ai_providers
+        try:
+            from .ai_providers import extract_topics_with_gemini, filter_syllabus_content
+            # Ensure text is filtered before extraction
+            filtered_text = filter_syllabus_content(text)
+            structured = extract_topics_with_gemini(filtered_text, max_topics=150)
+            topics = [t.get('topic') if isinstance(t, dict) else str(t) for t in structured]
+            print(f"📚 Gemini structured extraction: {len(topics)} topics extracted")
+            # Keep structured_metadata for later persistence
+            structured_metadata = structured
+        except Exception as e:
+            print(f"⚠️ Gemini extraction failed: {e}, falling back to local extractor")
+            # Fallback to weak topics extractor
+            topics = extract_topics_from_text(text)
+            structured_metadata = [{"topic": t, "subtopics": []} for t in topics]
+            print(f"📚 Local fallback extraction: {len(topics)} topics extracted")
         
         # Get AI-enhanced analysis for better topic metadata
         analysis = {}
@@ -183,35 +228,54 @@ def handle_upload(file_storage, user_id: str, artifact_type: str) -> Dict:
             })
             
         if rows and is_valid_uuid(norm_user_id) and record.get("user_id"):
-            try:
-                # Try inserting with metadata first
-                supabase.table("syllabus_topics").insert(rows).execute()
-                print(f"Enhanced topics stored in DB: {len(rows)} topics with metadata")
-            except Exception as e:
-                print(f"Enhanced topic insert failed, trying without metadata: {e}")
-                # Fallback to basic format if metadata column doesn't exist
+            max_retries = 3
+            for attempt in range(max_retries):
                 try:
-                    basic_rows = []
-                    for row in rows:
-                        basic_row = {k: v for k, v in row.items() if k != "metadata"}
-                        basic_rows.append(basic_row)
-                    supabase.table("syllabus_topics").insert(basic_rows).execute()
-                    print(f"Basic topics stored in DB: {len(basic_rows)} topics")
-                except Exception as e2:
-                    print(f"Basic topic insert also failed: {e2}")
-                    # Final fallback to in-memory
-                    store_add_topics(norm_user_id, topics)
+                    # Try inserting with metadata first
+                    supabase.table("syllabus_topics").insert(rows).execute()
+                    print(f"Enhanced topics stored in DB: {len(rows)} topics with metadata")
+                    break
+                except Exception as e:
+                    if attempt < max_retries - 1:
+                        print(f"Enhanced topic insert attempt {attempt + 1} failed: {e}, retrying...")
+                        continue
+                    else:
+                        print(f"Enhanced topic insert failed after {max_retries} attempts, trying without metadata: {e}")
+                        # Fallback to basic format if metadata column doesn't exist
+                        try:
+                            basic_rows = []
+                            for row in rows:
+                                basic_row = {k: v for k, v in row.items() if k != "metadata"}
+                                basic_rows.append(basic_row)
+                            supabase.table("syllabus_topics").insert(basic_rows).execute()
+                            print(f"Basic topics stored in DB: {len(basic_rows)} topics")
+                            break
+                        except Exception as e2:
+                            print(f"Basic topic insert also failed: {e2}")
+                            # Final fallback to in-memory
+                            store_add_topics(norm_user_id, topics)
+                            break
         else:
+            print(f"Skipping database topic storage - invalid user_id or no user_id in record")
             store_add_topics(norm_user_id, topics)
             
         # Fetch resources for more topics (increased coverage)
         if is_valid_uuid(norm_user_id) and record.get("user_id"):
-            try:
-                fetch_and_store_resources_for_topics(norm_user_id, topics[:50])  # Increased from 25
-            except Exception as e:
-                print(f"Resource fetch error: {e}")
-                
-    elif artifact_type == "assessment":
+            max_retries = 3
+            for attempt in range(max_retries):
+                try:
+                    fetch_and_store_resources_for_topics(norm_user_id, topics[:50])  # Increased from 25
+                    print(f"Resources fetched and stored for {len(topics[:50])} topics")
+                    break
+                except Exception as e:
+                    if attempt < max_retries - 1:
+                        print(f"Resource fetch attempt {attempt + 1} failed: {e}, retrying...")
+                        continue
+                    else:
+                        print(f"Resource fetch failed after {max_retries} attempts: {e}")
+                        break
+        else:
+            print(f"Skipping resource fetch - invalid user_id or no user_id in record")
         try:
             from .ai_providers import get_assessment_analysis
             analysis = get_assessment_analysis(text[:6000])

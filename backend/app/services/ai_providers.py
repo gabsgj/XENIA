@@ -4,6 +4,7 @@ Supports OpenAI, Anthropic, and Gemini APIs.
 """
 import os
 import json
+import re
 from typing import Optional, Dict, Any, List
 from dotenv import load_dotenv
 
@@ -35,7 +36,7 @@ def get_ai_response(prompt: str, model: Optional[str] = None) -> str:
             genai.configure(api_key=gemini_key.strip())
             
             logger.info("   Creating Gemini model...")
-            gemini_model = os.getenv("GEMINI_MODEL", "gemini-2.0-flash-exp")
+            gemini_model = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
             model_instance = genai.GenerativeModel(gemini_model)
             
             logger.info("   Generating content...")
@@ -228,11 +229,11 @@ Return ONLY valid JSON:
             logger.info("    Configuring real Gemini API...")
             genai.configure(api_key=gemini_key)
             
-            logger.info("    Creating Gemini model...")
-            model = genai.GenerativeModel('gemini-2.0-flash-exp')
+            logger.info("    Creating Gemini model (2.5-flash)...")
+            model = genai.GenerativeModel('gemini-2.5-flash')
             
             logger.info("    Generating content...")
-            response = model.generate_content(prompt)
+            response = model.generate_content(prompt, generation_config=genai.types.GenerationConfig(temperature=0.0, max_output_tokens=3000))
             logger.info(f"    ✅ Gemini response received: {len(response.text)} characters")
             
             # Clean and parse JSON response
@@ -374,7 +375,6 @@ Return ONLY valid JSON:
         
     except Exception as e:
         import logging
-        from datetime import datetime, timedelta
         logger = logging.getLogger('xenia')
         logger.error(f"AI study plan generation failed: {e}")
         
@@ -1337,3 +1337,204 @@ def _generate_practice_resources(topic: str, difficulty_level: str) -> List[Dict
         })
     
     return platforms
+
+def filter_syllabus_content(extracted_text: str) -> str:
+    """Use Gemini AI to filter out unnecessary content from extracted syllabus text.
+    
+    Removes administrative content, headers/footers, grading policies, etc.
+    Keeps only academic content relevant for topic extraction.
+    """
+    import logging
+    logger = logging.getLogger('xenia')
+    
+    # If text is too short, return as-is
+    if len(extracted_text) < 500:
+        return extracted_text
+    
+    prompt = f"""
+You are an expert at cleaning syllabus documents for educational content extraction.
+
+Your task is to filter the extracted text from a syllabus PDF and remove:
+1. Administrative content (grading policies, attendance, office hours, course policies)
+2. Headers and footers (page numbers, university logos, contact info)
+3. Course logistics (prerequisites, textbooks, required materials)
+4. Assessment details (exam schedules, assignment deadlines, marking schemes)
+5. Contact information and administrative procedures
+6. Generic course descriptions and learning objectives sections
+7. Copyright notices and disclaimers
+8. Table of contents and navigation elements
+
+KEEP ONLY:
+- Academic topics, units, and chapters
+- Learning content, concepts, and subject matter
+- Technical terminology and specialized vocabulary
+- Course-specific content that students need to learn
+- Detailed topic descriptions and subtopics
+
+IMPORTANT: Be conservative in removal - if you're unsure, keep the content.
+
+Return ONLY the filtered academic content, maintaining the original structure where possible.
+
+ORIGINAL TEXT:
+{extracted_text[:4000]}...
+
+FILTERED ACADEMIC CONTENT:
+"""
+    
+    try:
+        # Use faster Gemini model
+        gemini_key = os.getenv("GEMINI_API_KEY")
+        is_demo_gemini = (gemini_key and ("demo" in gemini_key.lower() or gemini_key.startswith("AIzaSyDemo_")))
+        
+        if gemini_key and not is_demo_gemini:
+            import google.generativeai as genai
+            logger.info("🤖 Filtering syllabus content with Gemini...")
+            genai.configure(api_key=gemini_key)
+            
+            # Use higher-capacity model: Gemini 2.5 Flash
+            model = genai.GenerativeModel('gemini-2.5-flash')
+            
+            response = model.generate_content(
+                prompt,
+                generation_config=genai.types.GenerationConfig(
+                    temperature=0.0,  # deterministic filtering
+                    max_output_tokens=4000,
+                )
+            )
+            
+            if response and response.text:
+                filtered_text = response.text.strip()
+                logger.info(f"✅ Content filtered: {len(extracted_text)} -> {len(filtered_text)} characters")
+                return filtered_text
+            else:
+                logger.warning("⚠️ Gemini filtering returned empty response")
+                return extracted_text
+        else:
+            logger.info("🎭 Using fallback content filtering...")
+            
+    except Exception as e:
+        logger.error(f"❌ Content filtering failed: {e}")
+        # As a robust fallback apply deterministic regex-based cleaning
+        cleaned = []
+        lines = extracted_text.splitlines()
+        for line in lines:
+            s = line.strip()
+            # Skip empty or very short navigation lines
+            if not s or len(s) < 3:
+                continue
+            # Remove page number lines like 'Page 1 of 10' or just numerics
+            if re.match(r'^(page\s+\d+|\d+\s*/\s*\d+)$', s, re.I):
+                continue
+            # Remove emails, phones, urls
+            if re.search(r"\b[\w\.-]+@[\w\.-]+\.[a-zA-Z]{2,6}\b", s):
+                continue
+            if re.search(r"\bhttps?://|www\.", s):
+                continue
+            if re.search(r"\(\d{3}\)\s*\d{3}-\d{4}|\d{3}[-\.\s]\d{3}[-\.\s]\d{4}", s):
+                continue
+            # Common administrative headings to drop
+            admin_keywords = ['grading', 'attendance', 'office hours', 'course policies', 'textbook', 'required materials', 'assessment', 'exam', 'assignment', 'policy', 'contact', 'email', 'phone']
+            if any(k in s.lower() for k in admin_keywords):
+                continue
+            # Drop lines that look like table-of-contents numbering without content
+            if re.match(r'^\d+\.?\s*$', s):
+                continue
+            cleaned.append(s)
+
+        # Keep blocks that look like topics: lines with commas, colons, bullets, arrows or title case
+        topic_lines = []
+        for s in cleaned:
+            if re.search(r'\b(topic|chapter|week|unit|module)\b', s, re.I):
+                topic_lines.append(s)
+            elif re.search(r'[-\u2022\u25B8\u25BA\u25CF\u2023\u25E6]', s):
+                topic_lines.append(s)
+            elif len(s.split()) <= 6 and any(c.isupper() for c in s[:1]):
+                # Short title-like lines
+                topic_lines.append(s)
+            elif ',' in s and len(s.split(',')) <= 6:
+                topic_lines.append(s)
+
+        if topic_lines:
+            return "\n".join(topic_lines)
+        return "\n".join(cleaned)
+    
+
+def extract_topics_with_gemini(extracted_text: str, max_topics: int = 100) -> List[Dict[str, Any]]:
+    """Use Gemini 2.5 Flash to extract structured topics and subtopics from cleaned syllabus text.
+
+    Returns a list of topic dicts: {"topic": str, "subtopics": [str], "notes": str}
+    """
+    import logging
+    logger = logging.getLogger('xenia')
+
+    # Avoid calling AI on very short text
+    if not extracted_text or len(extracted_text.strip()) < 50:
+        return []
+
+    prompt = f"""
+Extract the academic topics and subtopics from the following syllabus text.
+
+Return STRICTLY valid JSON in this exact format:
+{{"topics": [{{"topic":"Topic Name","subtopics":["sub1","sub2"],"notes":"short notes"}}]}}
+
+Input text:
+{extracted_text[:5000]}
+
+Rules:
+- Only include academic topics (no administrative content).
+- Group closely related items as subtopics under the nearest main topic.
+- Provide concise notes when relevant (1-2 sentences).
+- Aim to provide up to {max_topics} topics in order of importance.
+"""
+
+    gemini_key = os.getenv("GEMINI_API_KEY")
+    is_demo_gemini = (gemini_key and ("demo" in gemini_key.lower() or gemini_key.startswith("AIzaSyDemo_")))
+
+    try:
+        if gemini_key and not is_demo_gemini:
+            import google.generativeai as genai
+            genai.configure(api_key=gemini_key)
+            model = genai.GenerativeModel('gemini-2.5-flash')
+            response = model.generate_content(prompt, generation_config=genai.types.GenerationConfig(temperature=0.0, max_output_tokens=3000))
+            text = response.text.strip()
+
+            # strip fences
+            if text.startswith('```'):
+                # remove first code fence and optional language
+                parts = text.split('\n', 1)
+                if len(parts) > 1:
+                    text = parts[1]
+                if text.endswith('```'):
+                    text = text[:-3]
+
+            parsed = json.loads(text)
+            topics = parsed.get('topics', [])
+            # normalize to expected list of dicts
+            normalized = []
+            for t in topics:
+                if isinstance(t, str):
+                    normalized.append({"topic": t, "subtopics": [], "notes": ""})
+                elif isinstance(t, dict):
+                    normalized.append({
+                        "topic": t.get('topic') or t.get('name'),
+                        "subtopics": t.get('subtopics', []),
+                        "notes": t.get('notes', '')
+                    })
+            logger.info(f"✅ Gemini extracted {len(normalized)} topics")
+            return normalized
+    except Exception as e:
+        logger.error(f"Gemini topic extraction failed: {e}")
+
+    # Fallback to local weak topic extractor
+    try:
+        from .weaktopics import extract_topics_from_text
+        raw_topics = extract_topics_from_text(extracted_text)
+        normalized = []
+        for t in raw_topics[:max_topics]:
+            if isinstance(t, str):
+                normalized.append({"topic": t, "subtopics": [], "notes": ""})
+            elif isinstance(t, dict):
+                normalized.append({"topic": t.get('topic', ''), "subtopics": t.get('subtopics', []), "notes": ''})
+        return normalized
+    except Exception:
+        return []

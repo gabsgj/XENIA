@@ -1,6 +1,6 @@
 """Enhanced resource recommendation service.
 Fetches external educational resources with AI-powered personalization, quality scoring,
-and comprehensive content discovery from multiple sources.
+and comprehensive content discovery from multiple sources including Hugging Face.
 """
 from __future__ import annotations
 import os
@@ -40,26 +40,356 @@ DOC_SOURCES = [
 # Subject-specific resource pools
 SUBJECT_RESOURCES = {
     "mathematics": [
-        {"name": "Wolfram MathWorld", "url": "https://mathworld.wolfram.com", "quality": 9},
-        {"name": "Paul's Online Math Notes", "url": "https://tutorial.math.lamar.edu", "quality": 8},
-        {"name": "3Blue1Brown", "url": "https://www.3blue1brown.com", "quality": 9},
-        {"name": "Desmos Calculator", "url": "https://www.desmos.com/calculator", "quality": 8},
+        {"name": "Wolfram MathWorld", "url": "https://mathworld.wolfram.com", "quality": 9, "description": "Comprehensive mathematical encyclopedia"},
+        {"name": "Paul's Online Math Notes", "url": "https://tutorial.math.lamar.edu", "quality": 8, "description": "Free calculus and algebra tutorials"},
+        {"name": "3Blue1Brown", "url": "https://www.3blue1brown.com", "quality": 9, "description": "Visual mathematics explanations"},
+        {"name": "Desmos Calculator", "url": "https://www.desmos.com/calculator", "quality": 8, "description": "Interactive graphing calculator"},
+        {"name": "Khan Academy Math", "url": "https://www.khanacademy.org/math", "quality": 9, "description": "Free math courses from basic to advanced"},
+        {"name": "Brilliant Math", "url": "https://brilliant.org/courses/mathematics/", "quality": 8, "description": "Interactive math problem solving"},
+        {"name": "Mathway", "url": "https://www.mathway.com", "quality": 7, "description": "Step-by-step math problem solver"},
     ],
     "programming": [
-        {"name": "LeetCode", "url": "https://leetcode.com", "quality": 8},
-        {"name": "HackerRank", "url": "https://www.hackerrank.com", "quality": 8},
-        {"name": "Replit", "url": "https://replit.com", "quality": 7},
-        {"name": "CodePen", "url": "https://codepen.io", "quality": 7},
+        {"name": "LeetCode", "url": "https://leetcode.com", "quality": 9, "description": "Coding interview preparation platform"},
+        {"name": "HackerRank", "url": "https://www.hackerrank.com", "quality": 8, "description": "Coding challenges and skill assessment"},
+        {"name": "freeCodeCamp", "url": "https://www.freecodecamp.org", "quality": 9, "description": "Free coding bootcamp with certifications"},
+        {"name": "Codecademy", "url": "https://www.codecademy.com", "quality": 8, "description": "Interactive coding lessons"},
+        {"name": "Replit", "url": "https://replit.com", "quality": 7, "description": "Online IDE for coding practice"},
+        {"name": "CodePen", "url": "https://codepen.io", "quality": 7, "description": "Front-end code playground"},
+        {"name": "GitHub Learning Lab", "url": "https://lab.github.com", "quality": 8, "description": "Interactive GitHub learning courses"},
+        {"name": "Exercism", "url": "https://exercism.org", "quality": 8, "description": "Mentored coding exercises in 50+ languages"},
     ],
     "science": [
-        {"name": "Crash Course", "url": "https://www.youtube.com/c/crashcourse", "quality": 9},
-        {"name": "SciShow", "url": "https://www.youtube.com/c/scishow", "quality": 8},
-        {"name": "National Geographic", "url": "https://www.nationalgeographic.com", "quality": 8},
+        {"name": "Khan Academy Science", "url": "https://www.khanacademy.org/science", "quality": 9, "description": "Comprehensive science education"},
+        {"name": "Crash Course", "url": "https://www.youtube.com/c/crashcourse", "quality": 9, "description": "Fast-paced science video series"},
+        {"name": "SciShow", "url": "https://www.youtube.com/c/scishow", "quality": 8, "description": "Science news and explanations"},
+        {"name": "National Geographic", "url": "https://www.nationalgeographic.com", "quality": 8, "description": "Science and nature documentaries"},
+        {"name": "PhET Interactive Simulations", "url": "https://phet.colorado.edu", "quality": 9, "description": "Interactive physics and chemistry simulations"},
+        {"name": "BioInteractive", "url": "https://www.biointeractive.org", "quality": 8, "description": "Biology teaching resources from HHMI"},
+        {"name": "NASA Education", "url": "https://www.nasa.gov/audience/foreducators", "quality": 8, "description": "Space science and STEM resources"},
     ],
     "language": [
-        {"name": "Duolingo", "url": "https://www.duolingo.com", "quality": 8},
-        {"name": "SparkNotes", "url": "https://www.sparknotes.com", "quality": 7},
-        {"name": "Grammar Girl", "url": "https://www.quickanddirtytips.com/grammar-girl", "quality": 7},
+        {"name": "Duolingo", "url": "https://www.duolingo.com", "quality": 9, "description": "Gamified language learning platform"},
+        {"name": "Memrise", "url": "https://www.memrise.com", "quality": 8, "description": "Spaced repetition language learning"},
+        {"name": "BBC Languages", "url": "https://www.bbc.co.uk/languages", "quality": 7, "description": "Free language learning courses"},
+        {"name": "SparkNotes Literature", "url": "https://www.sparknotes.com/lit", "quality": 7, "description": "Literature study guides and analysis"},
+        {"name": "Grammar Girl", "url": "https://www.quickanddirtytips.com/grammar-girl", "quality": 7, "description": "Grammar and writing tips podcast"},
+        {"name": "Purdue OWL", "url": "https://owl.purdue.edu", "quality": 8, "description": "Online writing lab and grammar resources"},
+        {"name": "Merriam-Webster", "url": "https://www.merriam-webster.com", "quality": 8, "description": "Dictionary and thesaurus with word games"},
+    ],
+    "business": [
+        {"name": "Khan Academy Business", "url": "https://www.khanacademy.org/economics-finance-domain", "quality": 8, "description": "Business and economics education"},
+        {"name": "Coursera Business", "url": "https://www.coursera.org/browse/business", "quality": 8, "description": "Business courses from top universities"},
+        {"name": "edX Business", "url": "https://www.edx.org/learn/business", "quality": 8, "description": "Business and management courses"},
+        {"name": "Investopedia", "url": "https://www.investopedia.com", "quality": 8, "description": "Financial education and market analysis"},
+    ],
+    "history": [
+        {"name": "Khan Academy History", "url": "https://www.khanacademy.org/humanities", "quality": 8, "description": "World history and humanities"},
+        {"name": "Crash Course History", "url": "https://www.youtube.com/playlist?list=PL8dPuuaLjXtNjasccl-WajpONGX3zoY4", "quality": 8, "description": "World history video series"},
+        {"name": "BBC History", "url": "https://www.bbc.co.uk/history", "quality": 7, "description": "Historical documentaries and articles"},
+    ],
+    "art": [
+        {"name": "Khan Academy Art", "url": "https://www.khanacademy.org/humanities/art-history", "quality": 8, "description": "Art history and appreciation"},
+        {"name": "The Metropolitan Museum of Art", "url": "https://www.metmuseum.org/learn", "quality": 8, "description": "Art education resources"},
+        {"name": "Smarthistory", "url": "https://smarthistory.org", "quality": 8, "description": "Art history teaching resources"},
+    ]
+}
+
+# Topic-specific resource mapping for syllabus topics
+TOPIC_SPECIFIC_RESOURCES = {
+    # Mathematics Topics
+    "linear algebra": [
+        {"name": "3Blue1Brown Linear Algebra", "url": "https://www.3blue1brown.com/topics/linear-algebra", "quality": 10, "description": "Visual linear algebra explanations"},
+        {"name": "Khan Academy Linear Algebra", "url": "https://www.khanacademy.org/math/linear-algebra", "quality": 9, "description": "Comprehensive linear algebra course"},
+        {"name": "MIT Linear Algebra", "url": "https://ocw.mit.edu/courses/mathematics/18-06-linear-algebra-spring-2010/", "quality": 9, "description": "MIT's legendary linear algebra course"},
+        {"name": "Gilbert Strang Lectures", "url": "https://www.youtube.com/playlist?list=PL49CF3715CB9EF31D", "quality": 9, "description": "MIT professor's linear algebra lectures"},
+    ],
+    "calculus": [
+        {"name": "Khan Academy Calculus", "url": "https://www.khanacademy.org/math/calculus-1", "quality": 9, "description": "Complete calculus curriculum"},
+        {"name": "Paul's Online Calculus Notes", "url": "https://tutorial.math.lamar.edu/Classes/CalcI/CalcI.aspx", "quality": 8, "description": "Detailed calculus tutorials"},
+        {"name": "3Blue1Brown Calculus", "url": "https://www.3blue1brown.com/topics/calculus", "quality": 9, "description": "Visual calculus explanations"},
+        {"name": "MIT Calculus", "url": "https://ocw.mit.edu/courses/mathematics/18-01sc-single-variable-calculus-fall-2010/", "quality": 9, "description": "MIT single variable calculus"},
+    ],
+    "differential equations": [
+        {"name": "Khan Academy Differential Equations", "url": "https://www.khanacademy.org/math/differential-equations", "quality": 8, "description": "Differential equations course"},
+        {"name": "Paul's Online Diff Eq Notes", "url": "https://tutorial.math.lamar.edu/Classes/DE/DE.aspx", "quality": 8, "description": "Comprehensive differential equations"},
+        {"name": "MIT Differential Equations", "url": "https://ocw.mit.edu/courses/mathematics/18-03sc-differential-equations-fall-2011/", "quality": 9, "description": "MIT differential equations course"},
+    ],
+    "probability": [
+        {"name": "Khan Academy Probability", "url": "https://www.khanacademy.org/math/probability", "quality": 9, "description": "Complete probability curriculum"},
+        {"name": "StatQuest Probability", "url": "https://www.youtube.com/playlist?list=PLblh5JKOoLUK0FLuzwntyYI10UQFUhsCd", "quality": 8, "description": "Visual probability explanations"},
+        {"name": "MIT Probability", "url": "https://ocw.mit.edu/courses/electrical-engineering-and-computer-science/6-041sc-probabilistic-systems-analysis-and-applied-probability-fall-2013/", "quality": 9, "description": "MIT probability course"},
+    ],
+    "statistics": [
+        {"name": "Khan Academy Statistics", "url": "https://www.khanacademy.org/math/statistics-probability", "quality": 9, "description": "Statistics and probability"},
+        {"name": "StatQuest Statistics", "url": "https://www.youtube.com/playlist?list=PLblh5JKOoLUK0FLuzwntyYI10UQFUhsCd", "quality": 8, "description": "Statistical concepts explained visually"},
+        {"name": "Coursera Statistics", "url": "https://www.coursera.org/learn/basic-statistics", "quality": 8, "description": "Statistics courses from top universities"},
+    ],
+
+    # Programming Topics
+    "data structures": [
+        {"name": "MIT Data Structures", "url": "https://ocw.mit.edu/courses/electrical-engineering-and-computer-science/6-006-introduction-to-algorithms-fall-2011/", "quality": 9, "description": "MIT algorithms and data structures"},
+        {"name": "GeeksforGeeks DSA", "url": "https://www.geeksforgeeks.org/data-structures/", "quality": 8, "description": "Comprehensive data structures guide"},
+        {"name": "Visualgo", "url": "https://visualgo.net/en", "quality": 8, "description": "Interactive algorithm visualizations"},
+        {"name": "Khan Academy Algorithms", "url": "https://www.khanacademy.org/computing/computer-science/algorithms", "quality": 8, "description": "Algorithm fundamentals"},
+    ],
+    "algorithms": [
+        {"name": "MIT Algorithms", "url": "https://ocw.mit.edu/courses/electrical-engineering-and-computer-science/6-006-introduction-to-algorithms-fall-2011/", "quality": 9, "description": "MIT introduction to algorithms"},
+        {"name": "Khan Academy Algorithms", "url": "https://www.khanacademy.org/computing/computer-science/algorithms", "quality": 8, "description": "Algorithm tutorials"},
+        {"name": "GeeksforGeeks Algorithms", "url": "https://www.geeksforgeeks.org/fundamentals-of-algorithms/", "quality": 8, "description": "Algorithm implementations"},
+        {"name": "Coursera Algorithms", "url": "https://www.coursera.org/specializations/algorithms", "quality": 9, "description": "Stanford algorithms specialization"},
+    ],
+    "machine learning": [
+        {"name": "Coursera ML", "url": "https://www.coursera.org/learn/machine-learning", "quality": 10, "description": "Andrew Ng's machine learning course"},
+        {"name": "fast.ai", "url": "https://www.fast.ai/", "quality": 9, "description": "Practical deep learning"},
+        {"name": "MIT Machine Learning", "url": "https://ocw.mit.edu/courses/electrical-engineering-and-computer-science/6-034-artificial-intelligence-fall-2010/", "quality": 8, "description": "MIT AI and machine learning"},
+        {"name": "Google ML Crash Course", "url": "https://developers.google.com/machine-learning/crash-course", "quality": 8, "description": "Google's ML fundamentals"},
+    ],
+    "web development": [
+        {"name": "MDN Web Docs", "url": "https://developer.mozilla.org/en-US/docs/Learn", "quality": 9, "description": "Mozilla's web development learning"},
+        {"name": "freeCodeCamp", "url": "https://www.freecodecamp.org/learn/responsive-web-design/", "quality": 9, "description": "Full web development curriculum"},
+        {"name": "The Odin Project", "url": "https://www.theodinproject.com/", "quality": 8, "description": "Open source web development curriculum"},
+        {"name": "Codecademy Web", "url": "https://www.codecademy.com/catalog/language/html-css", "quality": 8, "description": "Interactive web development"},
+    ],
+    "python programming": [
+        {"name": "Python Official Tutorial", "url": "https://docs.python.org/3/tutorial/", "quality": 9, "description": "Official Python tutorial"},
+        {"name": "Automate the Boring Stuff", "url": "https://automatetheboringstuff.com/", "quality": 8, "description": "Practical Python programming"},
+        {"name": "Codecademy Python", "url": "https://www.codecademy.com/learn/learn-python-3", "quality": 8, "description": "Interactive Python course"},
+        {"name": "MIT Python", "url": "https://ocw.mit.edu/courses/electrical-engineering-and-computer-science/6-0001-introduction-to-computer-science-and-programming-in-python-fall-2016/", "quality": 9, "description": "MIT introduction to Python"},
+    ],
+
+    # Science Topics
+    "physics": [
+        {"name": "Khan Academy Physics", "url": "https://www.khanacademy.org/science/physics", "quality": 9, "description": "Complete physics curriculum"},
+        {"name": "MIT Physics", "url": "https://ocw.mit.edu/courses/physics/", "quality": 9, "description": "MIT physics courses"},
+        {"name": "PhET Physics", "url": "https://phet.colorado.edu/en/simulations/category/physics", "quality": 9, "description": "Interactive physics simulations"},
+        {"name": "Crash Course Physics", "url": "https://www.youtube.com/playlist?list=PL8dPuuaLjXtN0ge7yDk_UA0ldZJdhwko", "quality": 8, "description": "Physics video series"},
+    ],
+    "chemistry": [
+        {"name": "Khan Academy Chemistry", "url": "https://www.khanacademy.org/science/chemistry", "quality": 9, "description": "Chemistry fundamentals"},
+        {"name": "MIT Chemistry", "url": "https://ocw.mit.edu/courses/chemistry/", "quality": 9, "description": "MIT chemistry courses"},
+        {"name": "PhET Chemistry", "url": "https://phet.colorado.edu/en/simulations/category/chemistry", "quality": 9, "description": "Interactive chemistry simulations"},
+        {"name": "Crash Course Chemistry", "url": "https://www.youtube.com/playlist?list=PL8dPuuaLjXtPHzzYuWy6fYEaX9mQQ8oGr", "quality": 8, "description": "Chemistry video series"},
+    ],
+    "biology": [
+        {"name": "Khan Academy Biology", "url": "https://www.khanacademy.org/science/biology", "quality": 9, "description": "Biology curriculum"},
+        {"name": "MIT Biology", "url": "https://ocw.mit.edu/courses/biology/", "quality": 9, "description": "MIT biology courses"},
+        {"name": "BioInteractive", "url": "https://www.biointeractive.org/", "quality": 8, "description": "HHMI biology resources"},
+        {"name": "Crash Course Biology", "url": "https://www.youtube.com/playlist?list=PL8dPuuaLjXtPWn0KrZb5FCiJq2JGc2HO7", "quality": 8, "description": "Biology video series"},
+    ],
+
+    # Computer Science Topics
+    "computer networks": [
+        {"name": "Khan Academy Networks", "url": "https://www.khanacademy.org/computing/computer-science/internet-intro", "quality": 8, "description": "Computer networking basics"},
+        {"name": "MIT Networks", "url": "https://ocw.mit.edu/courses/electrical-engineering-and-computer-science/6-02-introduction-to-eecs-i-fall-2010/", "quality": 9, "description": "MIT computer engineering"},
+        {"name": "Beej's Network Programming", "url": "https://beej.us/guide/bgnet/", "quality": 8, "description": "Network programming guide"},
+    ],
+    "operating systems": [
+        {"name": "MIT OS", "url": "https://ocw.mit.edu/courses/electrical-engineering-and-computer-science/6-828-operating-system-engineering-fall-2012/", "quality": 9, "description": "MIT operating systems"},
+        {"name": "Stanford OS", "url": "https://web.stanford.edu/~ouster/cgi-bin/cs140-spring14/index.php", "quality": 9, "description": "Stanford operating systems"},
+        {"name": "OSDev Wiki", "url": "https://wiki.osdev.org/Main_Page", "quality": 8, "description": "OS development resources"},
+    ],
+    "database systems": [
+        {"name": "Stanford DB", "url": "https://web.stanford.edu/class/cs145/", "quality": 9, "description": "Stanford database systems"},
+        {"name": "MIT DB", "url": "https://ocw.mit.edu/courses/electrical-engineering-and-computer-science/6-830-database-systems-fall-2010/", "quality": 9, "description": "MIT database systems"},
+        {"name": "SQLZoo", "url": "https://sqlzoo.net/", "quality": 8, "description": "Interactive SQL learning"},
+    ],
+
+    # Business Topics
+    "finance": [
+        {"name": "Khan Academy Finance", "url": "https://www.khanacademy.org/economics-finance-domain/core-finance", "quality": 8, "description": "Finance fundamentals"},
+        {"name": "Investopedia", "url": "https://www.investopedia.com/", "quality": 8, "description": "Financial education"},
+        {"name": "Coursera Finance", "url": "https://www.coursera.org/browse/business/finance", "quality": 8, "description": "Finance courses"},
+    ],
+    "marketing": [
+        {"name": "Khan Academy Marketing", "url": "https://www.khanacademy.org/economics-finance-domain/core-finance/pf-saving-and-investing", "quality": 7, "description": "Marketing basics"},
+        {"name": "Coursera Marketing", "url": "https://www.coursera.org/browse/business/marketing", "quality": 8, "description": "Marketing courses"},
+        {"name": "HubSpot Academy", "url": "https://academy.hubspot.com/", "quality": 8, "description": "Marketing certification"},
+    ],
+    "economics": [
+        {"name": "Khan Academy Economics", "url": "https://www.khanacademy.org/economics-finance-domain", "quality": 8, "description": "Economics curriculum"},
+        {"name": "MIT Economics", "url": "https://ocw.mit.edu/courses/economics/", "quality": 9, "description": "MIT economics courses"},
+        {"name": "Crash Course Economics", "url": "https://www.youtube.com/playlist?list=PL8dPuuaLjXtPNySztEg6o8F7nkyXKiqMj", "quality": 8, "description": "Economics video series"},
+    ],
+
+    # Language Topics
+    "english literature": [
+        {"name": "SparkNotes Literature", "url": "https://www.sparknotes.com/lit/", "quality": 7, "description": "Literature study guides"},
+        {"name": "Khan Academy Literature", "url": "https://www.khanacademy.org/humanities", "quality": 8, "description": "Literature and humanities"},
+        {"name": "MIT Literature", "url": "https://ocw.mit.edu/courses/literature/", "quality": 8, "description": "MIT literature courses"},
+    ],
+    "writing": [
+        {"name": "Purdue OWL", "url": "https://owl.purdue.edu/", "quality": 8, "description": "Online writing lab"},
+        {"name": "Grammarly", "url": "https://www.grammarly.com/grammar", "quality": 7, "description": "Writing and grammar"},
+        {"name": "Hemingway App", "url": "http://www.hemingwayapp.com/", "quality": 7, "description": "Writing improvement tool"},
+    ],
+}
+
+HEADERS = {"User-Agent": "XENIA-EduBot/1.0 (+https://example.com)"}
+
+HUGGINGFACE_RESOURCES = {
+    "models": [
+        {
+            "name": "MerlynMind Education Models",
+            "url": "https://hf.co/MerlynMind",
+            "description": "Specialized models for educational content generation and QA",
+            "quality": 9,
+            "category": "text-generation",
+            "tags": ["education", "qa", "content-generation"]
+        },
+        {
+            "name": "Princeton NLP Educational Models",
+            "url": "https://hf.co/princeton-nlp",
+            "description": "Research models focused on educational value and learning",
+            "quality": 8,
+            "category": "text-generation",
+            "tags": ["education", "research", "learning"]
+        },
+        {
+            "name": "Educational Chatbots",
+            "url": "https://hf.co/spaces/phani50101/Educational-bot",
+            "description": "Interactive educational chatbot for lesson planning",
+            "quality": 7,
+            "category": "chatbot",
+            "tags": ["education", "lesson-planning", "interactive"]
+        }
+    ],
+    "datasets": [
+        {
+            "name": "British Educational Prompts",
+            "url": "https://hf.co/datasets/roneymatusp/british-educational-prompts",
+            "description": "Curated educational prompts for British International Schools",
+            "quality": 8,
+            "category": "education",
+            "tags": ["prompts", "curriculum", "british-english"]
+        },
+        {
+            "name": "Education Parallel Data",
+            "url": "https://hf.co/datasets/mbazaNLP/NMT_Education_parallel_data_en_kin",
+            "description": "Translation dataset for educational content",
+            "quality": 7,
+            "category": "translation",
+            "tags": ["education", "translation", "multilingual"]
+        },
+        {
+            "name": "K-12 Education Data",
+            "url": "https://hf.co/datasets/ruiiw/k-12_education_data",
+            "description": "Educational data for K-12 curriculum",
+            "quality": 7,
+            "category": "education",
+            "tags": ["k-12", "curriculum", "data"]
+        }
+    ],
+    "papers": [
+        {
+            "name": "LearnLM: Improving Gemini for Learning",
+            "url": "https://hf.co/papers/2412.16429",
+            "description": "Framework for pedagogical instruction following in LLMs",
+            "quality": 9,
+            "category": "pedagogy",
+            "tags": ["llm", "pedagogy", "instruction-following"]
+        },
+        {
+            "name": "CLASS Meet SPOCK: Education Tutoring Chatbot",
+            "url": "https://hf.co/papers/2305.13272",
+            "description": "Design framework for high-performance tutoring systems",
+            "quality": 8,
+            "category": "tutoring",
+            "tags": ["tutoring", "chatbot", "learning-science"]
+        },
+        {
+            "name": "Health Text Simplification for Education",
+            "url": "https://hf.co/papers/2401.15043",
+            "description": "Text simplification models for educational health content",
+            "quality": 8,
+            "category": "text-simplification",
+            "tags": ["health-education", "text-simplification", "accessibility"]
+        }
+    ]
+}
+
+HEADERS = {"User-Agent": "XENIA-EduBot/1.0 (+https://example.com)"}
+from ..supabase_client import get_supabase
+
+YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY")  # Optional; if absent use search scraping fallback
+YOUTUBE_SEARCH_URL = "https://www.googleapis.com/youtube/v3/search"
+YOUTUBE_VIDEO_FIELDS = "items(id/videoId,snippet/title,snippet/channelTitle,snippet/publishedAt,snippet/description)"
+
+# Enhanced catalog sources with quality ratings
+OPENCOURSEWARE_INDEX = [
+    {"title": "MIT OpenCourseWare", "url": "https://ocw.mit.edu", "quality": 9, "type": "university"},
+    {"title": "Khan Academy", "url": "https://www.khanacademy.org", "quality": 9, "type": "interactive"},
+    {"title": "Coursera Free Courses", "url": "https://www.coursera.org/courses?query={query}", "quality": 8, "type": "mooc"},
+    {"title": "edX", "url": "https://www.edx.org/search?q={query}", "quality": 8, "type": "mooc"},
+    {"title": "freeCodeCamp", "url": "https://www.freecodecamp.org", "quality": 8, "type": "interactive"},
+    {"title": "Codecademy", "url": "https://www.codecademy.com", "quality": 7, "type": "interactive"},
+    {"title": "W3Schools", "url": "https://www.w3schools.com", "quality": 7, "type": "reference"},
+    {"title": "MDN Web Docs", "url": "https://developer.mozilla.org", "quality": 9, "type": "reference"},
+]
+
+# Enhanced documentation sources with subject-specific resources
+DOC_SOURCES = [
+    ("wikipedia", "https://en.wikipedia.org/wiki/{query}", 6),
+    ("wikibooks", "https://en.wikibooks.org/wiki/{query}", 7),
+    ("stack_overflow", "https://stackoverflow.com/search?q={query}", 8),
+    ("github", "https://github.com/search?q={query}", 7),
+    ("medium", "https://medium.com/search?q={query}", 6),
+    ("dev_to", "https://dev.to/search?q={query}", 7),
+]
+
+# Subject-specific resource pools
+SUBJECT_RESOURCES = {
+    "mathematics": [
+        {"name": "Wolfram MathWorld", "url": "https://mathworld.wolfram.com", "quality": 9, "description": "Comprehensive mathematical encyclopedia"},
+        {"name": "Paul's Online Math Notes", "url": "https://tutorial.math.lamar.edu", "quality": 8, "description": "Free calculus and algebra tutorials"},
+        {"name": "3Blue1Brown", "url": "https://www.3blue1brown.com", "quality": 9, "description": "Visual mathematics explanations"},
+        {"name": "Desmos Calculator", "url": "https://www.desmos.com/calculator", "quality": 8, "description": "Interactive graphing calculator"},
+        {"name": "Khan Academy Math", "url": "https://www.khanacademy.org/math", "quality": 9, "description": "Free math courses from basic to advanced"},
+        {"name": "Brilliant Math", "url": "https://brilliant.org/courses/mathematics/", "quality": 8, "description": "Interactive math problem solving"},
+        {"name": "Mathway", "url": "https://www.mathway.com", "quality": 7, "description": "Step-by-step math problem solver"},
+    ],
+    "programming": [
+        {"name": "LeetCode", "url": "https://leetcode.com", "quality": 9, "description": "Coding interview preparation platform"},
+        {"name": "HackerRank", "url": "https://www.hackerrank.com", "quality": 8, "description": "Coding challenges and skill assessment"},
+        {"name": "freeCodeCamp", "url": "https://www.freecodecamp.org", "quality": 9, "description": "Free coding bootcamp with certifications"},
+        {"name": "Codecademy", "url": "https://www.codecademy.com", "quality": 8, "description": "Interactive coding lessons"},
+        {"name": "Replit", "url": "https://replit.com", "quality": 7, "description": "Online IDE for coding practice"},
+        {"name": "CodePen", "url": "https://codepen.io", "quality": 7, "description": "Front-end code playground"},
+        {"name": "GitHub Learning Lab", "url": "https://lab.github.com", "quality": 8, "description": "Interactive GitHub learning courses"},
+        {"name": "Exercism", "url": "https://exercism.org", "quality": 8, "description": "Mentored coding exercises in 50+ languages"},
+    ],
+    "science": [
+        {"name": "Khan Academy Science", "url": "https://www.khanacademy.org/science", "quality": 9, "description": "Comprehensive science education"},
+        {"name": "Crash Course", "url": "https://www.youtube.com/c/crashcourse", "quality": 9, "description": "Fast-paced science video series"},
+        {"name": "SciShow", "url": "https://www.youtube.com/c/scishow", "quality": 8, "description": "Science news and explanations"},
+        {"name": "National Geographic", "url": "https://www.nationalgeographic.com", "quality": 8, "description": "Science and nature documentaries"},
+        {"name": "PhET Interactive Simulations", "url": "https://phet.colorado.edu", "quality": 9, "description": "Interactive physics and chemistry simulations"},
+        {"name": "BioInteractive", "url": "https://www.biointeractive.org", "quality": 8, "description": "Biology teaching resources from HHMI"},
+        {"name": "NASA Education", "url": "https://www.nasa.gov/audience/foreducators", "quality": 8, "description": "Space science and STEM resources"},
+    ],
+    "language": [
+        {"name": "Duolingo", "url": "https://www.duolingo.com", "quality": 9, "description": "Gamified language learning platform"},
+        {"name": "Memrise", "url": "https://www.memrise.com", "quality": 8, "description": "Spaced repetition language learning"},
+        {"name": "BBC Languages", "url": "https://www.bbc.co.uk/languages", "quality": 7, "description": "Free language learning courses"},
+        {"name": "SparkNotes Literature", "url": "https://www.sparknotes.com/lit", "quality": 7, "description": "Literature study guides and analysis"},
+        {"name": "Grammar Girl", "url": "https://www.quickanddirtytips.com/grammar-girl", "quality": 7, "description": "Grammar and writing tips podcast"},
+        {"name": "Purdue OWL", "url": "https://owl.purdue.edu", "quality": 8, "description": "Online writing lab and grammar resources"},
+        {"name": "Merriam-Webster", "url": "https://www.merriam-webster.com", "quality": 8, "description": "Dictionary and thesaurus with word games"},
+    ],
+    "business": [
+        {"name": "Khan Academy Business", "url": "https://www.khanacademy.org/economics-finance-domain", "quality": 8, "description": "Business and economics education"},
+        {"name": "Coursera Business", "url": "https://www.coursera.org/browse/business", "quality": 8, "description": "Business courses from top universities"},
+        {"name": "edX Business", "url": "https://www.edx.org/learn/business", "quality": 8, "description": "Business and management courses"},
+        {"name": "Investopedia", "url": "https://www.investopedia.com", "quality": 8, "description": "Financial education and market analysis"},
+    ],
+    "history": [
+        {"name": "Khan Academy History", "url": "https://www.khanacademy.org/humanities", "quality": 8, "description": "World history and humanities"},
+        {"name": "Crash Course History", "url": "https://www.youtube.com/playlist?list=PL8dPuuaLjXtNjasccl-WajpONGX3zoY4", "quality": 8, "description": "World history video series"},
+        {"name": "BBC History", "url": "https://www.bbc.co.uk/history", "quality": 7, "description": "Historical documentaries and articles"},
+    ],
+    "art": [
+        {"name": "Khan Academy Art", "url": "https://www.khanacademy.org/humanities/art-history", "quality": 8, "description": "Art history and appreciation"},
+        {"name": "The Metropolitan Museum of Art", "url": "https://www.metmuseum.org/learn", "quality": 8, "description": "Art education resources"},
+        {"name": "Smarthistory", "url": "https://smarthistory.org", "quality": 8, "description": "Art history teaching resources"},
     ]
 }
 
@@ -236,6 +566,176 @@ def _get_subject_specific_resources(topic: str, subject_category: str) -> List[D
     return resources
 
 
+def _get_huggingface_resources(topic: str, subject_category: str) -> List[Dict[str, Any]]:
+    """Get relevant Hugging Face resources for educational topics."""
+    resources = []
+    
+    # Map subject categories to Hugging Face resource types
+    category_mapping = {
+        "programming": ["models", "datasets"],
+        "mathematics": ["models", "papers"],
+        "science": ["models", "datasets", "papers"],
+        "language": ["models", "datasets"],
+        "general": ["models", "papers"]
+    }
+    
+    relevant_types = category_mapping.get(subject_category, ["models", "papers"])
+    
+    for resource_type in relevant_types:
+        if resource_type in HUGGINGFACE_RESOURCES:
+            for resource in HUGGINGFACE_RESOURCES[resource_type]:
+                # Check if resource is relevant to the topic
+                if _is_resource_relevant_to_topic(resource, topic, subject_category):
+                    resources.append({
+                        "source": f"huggingface_{resource_type}",
+                        "title": f"{topic} - {resource['name']} (Hugging Face)",
+                        "url": resource["url"],
+                        "quality_score": resource["quality"],
+                        "metadata": {
+                            "category": subject_category,
+                            "provider": "Hugging Face",
+                            "resource_type": resource_type,
+                            "description": resource.get("description", ""),
+                            "tags": resource.get("tags", []),
+                            "specialization": "ai_research"
+                        }
+                    })
+    
+    return resources
+
+
+def _is_resource_relevant_to_topic(resource: Dict[str, Any], topic: str, subject_category: str) -> bool:
+    """Check if a Hugging Face resource is relevant to the given topic."""
+    topic_lower = topic.lower()
+    tags = resource.get("tags", [])
+    description = resource.get("description", "").lower()
+    
+    # Check subject category relevance
+    if subject_category == "programming":
+        relevant_terms = ["code", "programming", "algorithm", "software", "development"]
+    elif subject_category == "mathematics":
+        relevant_terms = ["math", "mathematics", "calculus", "algebra", "statistics"]
+    elif subject_category == "science":
+        relevant_terms = ["science", "physics", "chemistry", "biology", "research"]
+    elif subject_category == "language":
+        relevant_terms = ["language", "literature", "writing", "grammar", "nlp"]
+    else:
+        relevant_terms = ["education", "learning", "teaching"]
+    
+    # Check if any relevant terms appear in topic, tags, or description
+    for term in relevant_terms:
+        if (term in topic_lower or 
+            any(term in tag.lower() for tag in tags) or 
+            term in description):
+            return True
+    
+    return False
+
+
+def _get_topic_specific_resources(topic: str, subject_category: str) -> List[Dict[str, Any]]:
+    """Get highly specific resources for exact syllabus topics."""
+    resources: List[Dict[str, Any]] = []
+    topic_lower = topic.lower().strip()
+    
+    # Direct topic matching with fuzzy search
+    topic_matches = []
+    
+    # Check for exact matches first
+    if topic_lower in TOPIC_SPECIFIC_RESOURCES:
+        topic_matches = TOPIC_SPECIFIC_RESOURCES[topic_lower]
+    else:
+        # Fuzzy matching for partial matches
+        for topic_key, topic_resources in TOPIC_SPECIFIC_RESOURCES.items():
+            # Check if the topic contains key terms or vice versa
+            if (topic_key in topic_lower or 
+                any(word in topic_lower for word in topic_key.split()) or
+                any(word in topic_key for word in topic_lower.split())):
+                topic_matches.extend(topic_resources)
+                break  # Take first match to avoid duplicates
+    
+    # Convert to resource format
+    for resource in topic_matches[:4]:  # Limit to top 4 most relevant
+        resources.append({
+            "source": "topic_specific",
+            "title": resource["name"],
+            "url": resource["url"],
+            "quality_score": resource["quality"],
+            "metadata": {
+                "description": resource["description"],
+                "subject_category": subject_category,
+                "topic_match": topic,
+                "relevance": "high",
+                "type": "educational_content"
+            },
+        })
+    
+    return resources
+
+
+def _generate_ai_resources_for_topic(topic: str, subject_category: str, difficulty_level: str = "intermediate") -> List[Dict[str, Any]]:
+    """Generate AI-powered resource recommendations for topics not in our predefined lists."""
+    try:
+        from .ai_providers import get_ai_response
+        
+        prompt = f"""
+Generate 3-4 highly relevant educational resources for the topic: "{topic}"
+Subject category: {subject_category}
+Difficulty level: {difficulty_level}
+
+Focus on:
+- High-quality, authoritative sources
+- Current and up-to-date resources
+- Mix of video, text, and interactive content
+- Free or accessible resources when possible
+
+Return ONLY valid JSON in this exact format:
+{{
+  "resources": [
+    {{
+      "name": "Resource Name",
+      "url": "https://example.com",
+      "description": "Brief description of the resource",
+      "quality": 8,
+      "type": "video|text|interactive|course"
+    }}
+  ]
+}}
+"""
+        
+        response = get_ai_response(prompt)
+        # Clean up any markdown formatting
+        clean_response = response.strip()
+        if clean_response.startswith('```json'):
+            clean_response = clean_response[7:]
+        if clean_response.endswith('```'):
+            clean_response = clean_response[:-3]
+        
+        parsed = json.loads(clean_response.strip())
+        
+        resources = []
+        for resource in parsed.get("resources", []):
+            resources.append({
+                "source": "ai_generated",
+                "title": resource["name"],
+                "url": resource["url"],
+                "quality_score": min(10, max(1, resource.get("quality", 7))),
+                "metadata": {
+                    "description": resource["description"],
+                    "subject_category": subject_category,
+                    "topic": topic,
+                    "type": resource.get("type", "educational_content"),
+                    "ai_generated": True,
+                    "difficulty_level": difficulty_level
+                },
+            })
+        
+        return resources[:3]  # Limit to top 3 AI-generated resources
+        
+    except Exception as e:
+        print(f"AI resource generation failed: {e}")
+        return []
+
+
 def fetch_resources_for_topic(topic: str, learning_style: str = None, topic_metadata: Dict[str, Any] = None, 
                             user_preferences: Dict[str, Any] = None) -> List[Dict[str, Any]]:
     """Enhanced resource fetching with personalization and quality scoring."""
@@ -271,14 +771,33 @@ def fetch_resources_for_topic(topic: str, learning_style: str = None, topic_meta
     except Exception:
         pass
     
-    # 2. Subject-specific high-quality resources
+    # 2. Topic-specific high-quality resources (most relevant first)
+    try:
+        topic_resources = _get_topic_specific_resources(topic, subject_category)
+        if topic_resources:
+            resources.extend(topic_resources)
+        else:
+            # Fallback to AI-generated resources for uncovered topics
+            ai_resources = _generate_ai_resources_for_topic(topic, subject_category, difficulty_level)
+            resources.extend(ai_resources)
+    except Exception:
+        pass
+    
+    # 3. Subject-specific high-quality resources
     try:
         subject_resources = _get_subject_specific_resources(topic, subject_category)
         resources.extend(subject_resources)
     except Exception:
         pass
     
-    # 3. OCW/MOOC catalogs
+    # 3. Hugging Face AI research resources
+    try:
+        hf_resources = _get_huggingface_resources(topic, subject_category)
+        resources.extend(hf_resources)
+    except Exception:
+        pass
+    
+    # 4. OCW/MOOC catalogs
     try:
         ocw_resources = _ocw_links(search_query)
         resources.extend(ocw_resources)

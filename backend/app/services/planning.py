@@ -218,8 +218,21 @@ def generate_plan(
             try:
                 if is_valid_uuid(norm_user_id):
                     sb = get_supabase()
-                    sb.table("plans").upsert({"user_id": norm_user_id, "plan": plan}).execute()
-                    logger.info(f"   Plan stored in database for user {norm_user_id}")
+                    max_retries = 3
+                    for attempt in range(max_retries):
+                        try:
+                            sb.table("plans").upsert({"user_id": norm_user_id, "plan": plan}).execute()
+                            logger.info(f"   Plan stored in database for user {norm_user_id}")
+                            break
+                        except Exception as e:
+                            if attempt < max_retries - 1:
+                                logger.warning(f"   Plan storage attempt {attempt + 1} failed: {e}, retrying...")
+                                continue
+                            else:
+                                logger.error(f"   Plan storage failed after {max_retries} attempts: {e}")
+                                break
+                else:
+                    logger.warning(f"   Invalid user ID {norm_user_id}, skipping database storage")
             except Exception as e:
                 logger.warning(f"   Could not store plan in DB: {e}")
             
@@ -269,8 +282,21 @@ def generate_plan(
         try:
             if is_valid_uuid(norm_user_id):
                 sb = get_supabase()
-                sb.table("plans").upsert({"user_id": norm_user_id, "plan": plan}).execute()
-                logger.info(f"   Advanced plan stored for user {norm_user_id}")
+                max_retries = 3
+                for attempt in range(max_retries):
+                    try:
+                        sb.table("plans").upsert({"user_id": norm_user_id, "plan": plan}).execute()
+                        logger.info(f"   Advanced plan stored for user {norm_user_id}")
+                        break
+                    except Exception as e:
+                        if attempt < max_retries - 1:
+                            logger.warning(f"   Advanced plan storage attempt {attempt + 1} failed: {e}, retrying...")
+                            continue
+                        else:
+                            logger.error(f"   Advanced plan storage failed after {max_retries} attempts: {e}")
+                            break
+            else:
+                logger.warning(f"   Invalid user ID {norm_user_id}, skipping advanced plan database storage")
         except Exception as e:
             logger.warning(f"   Could not store advanced plan in DB: {e}")
         
@@ -295,10 +321,24 @@ def generate_plan(
     try:
         if is_valid_uuid(norm_user_id):
             sb = get_supabase()
-            sb.table("plans").upsert({"user_id": norm_user_id, "plan": plan}).execute()
+            max_retries = 3
+            for attempt in range(max_retries):
+                try:
+                    sb.table("plans").upsert({"user_id": norm_user_id, "plan": plan}).execute()
+                    logger.info(f"   Traditional plan stored for user {norm_user_id}")
+                    break
+                except Exception as e:
+                    if attempt < max_retries - 1:
+                        logger.warning(f"   Traditional plan storage attempt {attempt + 1} failed: {e}, retrying...")
+                        continue
+                    else:
+                        logger.error(f"   Traditional plan storage failed after {max_retries} attempts: {e}")
+                        break
+        else:
+            logger.warning(f"   Invalid user ID {norm_user_id}, skipping traditional plan database storage")
     except Exception:
         # If DB is unavailable, still return the generated plan
-        pass
+        logger.warning("   Database unavailable, returning plan without storage")
     return plan
 
 
@@ -311,13 +351,28 @@ def get_current_plan(user_id: str, allow_regenerate: bool = False) -> Dict:
     norm_user_id = normalize_user_id(user_id)
     stored_plan: Optional[Dict] = None
     if is_valid_uuid(norm_user_id):
-        try:
-            sb = get_supabase()
-            resp = sb.table("plans").select("plan").eq("user_id", norm_user_id).limit(1).execute()
-            if resp.data:
-                stored_plan = resp.data[0]["plan"]
-        except Exception:
-            stored_plan = None
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                sb = get_supabase()
+                resp = sb.table("plans").select("plan").eq("user_id", norm_user_id).limit(1).execute()
+                if resp.data:
+                    stored_plan = resp.data[0]["plan"]
+                    logger.info(f"   Retrieved stored plan for user {norm_user_id}")
+                    break
+                else:
+                    logger.info(f"   No stored plan found for user {norm_user_id}")
+                    break
+            except Exception as e:
+                if attempt < max_retries - 1:
+                    logger.warning(f"   Plan retrieval attempt {attempt + 1} failed: {e}, retrying...")
+                    continue
+                else:
+                    logger.error(f"   Plan retrieval failed after {max_retries} attempts: {e}")
+                    stored_plan = None
+                    break
+    else:
+        logger.warning(f"   Invalid user ID {norm_user_id}, cannot retrieve from database")
 
     def _generic(p: Dict) -> bool:
         sessions = p.get("sessions") or []
@@ -332,14 +387,29 @@ def get_current_plan(user_id: str, allow_regenerate: bool = False) -> Dict:
         # Check for presence of syllabus topics now
         syllabus_topics: List[str] = []
         if is_valid_uuid(norm_user_id):
-            try:
-                sb = get_supabase()
-                tr = sb.table("syllabus_topics").select("topic").eq("user_id", norm_user_id).limit(5).execute()
-                syllabus_topics = [r["topic"] for r in (tr.data or [])]
-            except Exception:
-                syllabus_topics = []
+            max_retries = 3
+            for attempt in range(max_retries):
+                try:
+                    sb = get_supabase()
+                    tr = sb.table("syllabus_topics").select("topic").eq("user_id", norm_user_id).limit(5).execute()
+                    syllabus_topics = [r["topic"] for r in (tr.data or [])]
+                    logger.info(f"   Found {len(syllabus_topics)} syllabus topics for user {norm_user_id}")
+                    break
+                except Exception as e:
+                    if attempt < max_retries - 1:
+                        logger.warning(f"   Syllabus topics retrieval attempt {attempt + 1} failed: {e}, retrying...")
+                        continue
+                    else:
+                        logger.error(f"   Syllabus topics retrieval failed after {max_retries} attempts: {e}")
+                        syllabus_topics = []
+                        break
+        else:
+            logger.warning(f"   Invalid user ID {norm_user_id}, cannot check syllabus topics in database")
+            
         if not syllabus_topics:
             syllabus_topics = store_get_topics(norm_user_id)
+            if syllabus_topics:
+                logger.info(f"   Found {len(syllabus_topics)} topics in in-memory store")
         if syllabus_topics:
             need_regen = True
 

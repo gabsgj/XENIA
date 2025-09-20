@@ -10,6 +10,42 @@ from ..services.topic_store import get_topics as store_get_topics
 logger = logging.getLogger('xenia')
 resources_bp = Blueprint("resources", __name__)
 
+
+def _determine_topic_category(topic: str) -> str:
+    """Determine the broad category of a topic for better resource targeting."""
+    topic_lower = topic.lower()
+    
+    # Programming/CS terms
+    if any(term in topic_lower for term in ["programming", "code", "algorithm", "data structure", "software", "web", "api", "javascript", "python", "java", "css", "html", "database", "networking", "operating system"]):
+        return "programming"
+    
+    # Mathematics terms
+    if any(term in topic_lower for term in ["math", "algebra", "calculus", "geometry", "statistics", "equation", "formula", "theorem", "proof", "linear algebra", "differential equations", "probability"]):
+        return "mathematics"
+    
+    # Science terms
+    if any(term in topic_lower for term in ["physics", "chemistry", "biology", "science", "experiment", "theory", "hypothesis", "quantum", "mechanics", "thermodynamics", "organic chemistry", "molecular"]):
+        return "science"
+    
+    # Language terms
+    if any(term in topic_lower for term in ["language", "literature", "writing", "grammar", "english", "spanish", "french", "german", "poetry", "novel", "essay"]):
+        return "language"
+    
+    # Business terms
+    if any(term in topic_lower for term in ["business", "finance", "marketing", "economics", "accounting", "management", "entrepreneurship", "strategy"]):
+        return "business"
+    
+    # History terms
+    if any(term in topic_lower for term in ["history", "civilization", "war", "revolution", "empire", "ancient", "medieval", "modern"]):
+        return "history"
+    
+    # Art terms
+    if any(term in topic_lower for term in ["art", "painting", "sculpture", "architecture", "design", "photography", "music", "theater"]):
+        return "art"
+    
+    return "general"
+
+
 @resources_bp.get("/topics")
 def list_topics():
     raw_user_id = request.args.get("user_id") or request.headers.get("X-User-Id") or ""
@@ -177,22 +213,43 @@ def get_topic_recommendations(topic):
         
         logger.info(f"Getting recommendations for topic: {topic}, style: {learning_style}, difficulty: {difficulty_level}")
         
-        # Get AI-powered recommendations
-        recommendations = get_topic_resources(
+        # Create topic metadata for better resource targeting
+        topic_metadata = {
+            "difficulty_score": 5 if difficulty_level == "intermediate" else (3 if difficulty_level == "beginner" else 8),
+            "category": _determine_topic_category(topic),
+            "learning_style": learning_style
+        }
+        
+        # Use our enhanced resource system that includes topic-specific resources
+        recommendations = fetch_resources_for_topic(
             topic=topic,
             learning_style=learning_style,
-            difficulty_level=difficulty_level,
+            topic_metadata=topic_metadata,
             user_preferences=user_preferences
         )
+        
+        # Group recommendations by source type for better organization
+        grouped_recommendations = {
+            "topic_specific": [r for r in recommendations if r.get("source") == "topic_specific"],
+            "subject_resources": [r for r in recommendations if r.get("source") == "subject_specific"],
+            "youtube_videos": [r for r in recommendations if r.get("source") == "youtube"],
+            "ai_generated": [r for r in recommendations if r.get("source") == "ai_generated"],
+            "ocw_courses": [r for r in recommendations if r.get("source") == "ocw"],
+            "documentation": [r for r in recommendations if r.get("source") in ["wikipedia", "wikibooks", "stack_overflow", "github", "medium", "dev_to"]],
+            "hugging_face": [r for r in recommendations if r.get("source") == "huggingface"]
+        }
         
         return jsonify({
             "success": True,
             "topic": topic,
-            "recommendations": recommendations,
+            "total_recommendations": len(recommendations),
+            "grouped_recommendations": grouped_recommendations,
+            "top_recommendations": recommendations[:6],  # Top 6 most relevant
             "personalization": {
                 "learning_style": learning_style,
                 "difficulty_level": difficulty_level,
-                "user_preferences": user_preferences
+                "user_preferences": user_preferences,
+                "topic_metadata": topic_metadata
             }
         })
         

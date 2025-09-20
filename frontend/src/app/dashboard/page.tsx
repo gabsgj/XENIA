@@ -22,6 +22,7 @@ import {
   Plus,
   ArrowRight
 } from "lucide-react";
+import axios from "axios";
 
 export default function DashboardPage(){
   const [data, setData] = useState<any>(null);
@@ -29,6 +30,9 @@ export default function DashboardPage(){
   const [topics, setTopics] = useState<any[]>([]);
   const [resources, setResources] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [progress, setProgress] = useState<any>(null);
+  const [aggregates, setAggregates] = useState<any>(null);
+  const [weekly, setWeekly] = useState<any[]>([]);
   const { pushError } = useErrorContext();
   
   const fetchData = async () => {
@@ -153,6 +157,24 @@ export default function DashboardPage(){
   },[enhancedStats, topics])
 
   const chartColors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
+
+  // Fetch progress data for the user
+  useEffect(() => {
+    async function fetchProgress() {
+      setLoading(true);
+      const userId = 'demo-user-123';
+      const [resp, aggResp, weeklyResp] = await Promise.all([
+        axios.get(`/api/progress/user/${userId}`).catch(()=> ({data:{progress:{}}})),
+        axios.get(`/api/analytics/progress/user/${userId}/aggregates`).catch(()=> ({data:{}})),
+        axios.get(`/api/analytics/progress/user/${userId}/weekly`).catch(()=> ({data:{weekly:[]}})),
+      ])
+      setProgress(resp.data.progress || {});
+      setAggregates((aggResp.data && aggResp.data.aggregates) || null);
+      setWeekly((weeklyResp.data && weeklyResp.data.weekly) || []);
+      setLoading(false);
+    }
+    fetchProgress();
+  }, []);
 
   return (
     <MainLayout>
@@ -358,6 +380,53 @@ export default function DashboardPage(){
 
           {/* Sidebar Content */}
           <div className="space-y-6">
+            {/* Weekly Quizzes */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Weekly Quizzes</CardTitle>
+                <CardDescription>Quizzes taken in the last 7 days</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div style={{ width: '100%', height: 160 }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={weekly}>
+                      <XAxis dataKey="date" />
+                      <YAxis />
+                      <Tooltip />
+                      <Area type="monotone" dataKey="quizzes" stroke="#8884d8" fill="#8884d8" />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Topic Mastery */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Topic Mastery</CardTitle>
+                <CardDescription>Last known score per topic</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div style={{ width: '100%', height: 200 }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={Object.entries(progress || {}).map(([k, v]: any) => ({ name: k, value: (v.last_score || 0) * 100 }))}
+                        dataKey="value"
+                        nameKey="name"
+                        outerRadius={70}
+                        fill="#82ca9d"
+                      >
+                        {Object.keys(progress || {}).map((k, idx) => (
+                          <Cell key={k} fill={chartColors[idx % chartColors.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
             {/* Quick Actions */}
             <Card>
               <CardHeader>
@@ -486,6 +555,48 @@ export default function DashboardPage(){
                 <div className="col-span-full text-sm text-muted-foreground">Generate a plan to see upcoming sessions.</div>
               )}
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Study Progress Table */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Study Progress</CardTitle>
+            <CardDescription>Quizzes and topic mastery</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {loading ? (
+              <div className="p-4 text-center text-muted-foreground">Loading progress data...</div>
+            ) : !progress || Object.keys(progress).length === 0 ? (
+              <div className="p-4 text-center text-muted-foreground">No progress data yet.</div>
+            ) : (
+              <div className="max-w-xl mx-auto">
+                <table className="w-full border">
+                  <thead>
+                    <tr className="bg-gray-100">
+                      <th className="p-2">Topic</th>
+                      <th className="p-2">Quizzes Taken</th>
+                      <th className="p-2">Correct</th>
+                      <th className="p-2">Wrong</th>
+                      <th className="p-2">Last Score</th>
+                      <th className="p-2">Last Updated</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {Object.entries(progress).map(([topic, stats]: any) => (
+                      <tr key={topic}>
+                        <td className="p-2 font-semibold">{topic}</td>
+                        <td className="p-2">{stats.quizzes_taken}</td>
+                        <td className="p-2">{stats.correct}</td>
+                        <td className="p-2">{stats.wrong}</td>
+                        <td className="p-2">{(stats.last_score * 100).toFixed(0)}%</td>
+                        <td className="p-2">{new Date(stats.last_updated).toLocaleString()}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
