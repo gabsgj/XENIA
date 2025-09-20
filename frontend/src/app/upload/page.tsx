@@ -9,6 +9,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
+import { Label } from '@/components/ui/label'
+import { Input } from '@/components/ui/input'
 import { LoadingButton, LoadingOverlay, TopicsSkeleton, ProgressIndicator } from '@/components/ui/loading'
 import { useErrorContext } from '@/lib/error-context'
 
@@ -25,7 +27,9 @@ import {
   Calendar,
   FileIcon,
   ImageIcon,
-  Loader2
+  Loader2,
+  Clipboard,
+  FileType
 } from 'lucide-react'
 
 export default function UploadPage() {
@@ -47,6 +51,11 @@ export default function UploadPage() {
   const [learningStyle, setLearningStyle] = useState<string>('balanced')
   const [showPlanSettings, setShowPlanSettings] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  
+  // New state for text paste functionality
+  const [activeTab, setActiveTab] = useState<'files' | 'text'>('files')
+  const [pastedText, setPastedText] = useState<string>('')
+  const [textTitle, setTextTitle] = useState<string>('')
   
   const { pushError } = useErrorContext()
 
@@ -160,6 +169,94 @@ export default function UploadPage() {
     }
   }
 
+  const uploadText = async () => {
+    if (!pastedText.trim()) return
+
+    setUploading(true)
+    setUploadProgress(0)
+    setProcessingTopics(false)
+    setErrorMessage(null)
+
+    try {
+      // Simulate upload progress
+      const progressInterval = setInterval(() => {
+        setUploadProgress(prev => {
+          if (prev >= 90) {
+            clearInterval(progressInterval)
+            return 90
+          }
+          return prev + 10
+        })
+      }, 200)
+
+      const response = await fetch(`${API_BASE}/api/ingest/upload-text`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          text: pastedText,
+          title: textTitle || 'Pasted Text Document'
+        }),
+      })
+
+      clearInterval(progressInterval)
+      setUploadProgress(100)
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error('Text upload failed: ' + errorText)
+      }
+
+      const result = await response.json()
+      
+      // Start processing topics
+      setProcessingTopics(true)
+      
+      // Extract topics
+      if (result.analysis) {
+        setAnalysis(result.analysis)
+        const rawTopicList = (
+          result.analysis.prioritized_topics ||
+          result.analysis.filtered_topics ||
+          result.topics || []
+        )
+
+        // Preserve detailed structures
+        setTopicDetails(rawTopicList)
+
+        // Normalize for badge display
+        const normalized = rawTopicList.map((t: any) => {
+          if (t == null) return 'Untitled'
+          if (typeof t === 'string') return t.trim() || 'Untitled'
+          if (typeof t === 'object') {
+            const topicName = (t.topic || t.name || '').toString().trim()
+            return topicName || 'Untitled'
+          }
+          return String(t)
+        })
+        setTopics(normalized)
+
+        if (rawTopicList && rawTopicList.length > 0) setShowGeneratePlan(true)
+      }
+      
+      setProcessingTopics(false)
+      
+      console.log('Text upload successful:', result)
+      
+    } catch (error: any) {
+      console.error('Text upload error:', error)
+      setErrorMessage(error.message || 'Failed to upload text')
+      pushError({ 
+        errorCode: error?.errorCode||'UPLOAD_FAIL', 
+        errorMessage: error?.errorMessage || 'Failed to upload text', 
+        details: error 
+      })
+    } finally {
+      setUploading(false)
+    }
+  }
+
   const generateStudyPlan = async () => {
     if (topics.length === 0) return
 
@@ -190,8 +287,8 @@ export default function UploadPage() {
       // Show success message
       console.log('Enhanced study plan generated with resources!', planData)
       
-      // Navigate to planner page to show the new plan
-      window.location.href = '/planner'
+      // Navigate to dashboard after successful plan generation
+      window.location.href = '/dashboard'
       
     } catch (e: any) {
       pushError({
@@ -250,7 +347,12 @@ export default function UploadPage() {
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
           <div>
             <h1 className="text-3xl md:text-4xl font-bold tracking-tight">Upload Materials</h1>
-            <p className="text-muted-foreground">Upload your syllabus, assessments, and study materials for AI analysis</p>
+            <p className="text-muted-foreground">Upload your syllabus, notes, or study materials for AI analysis</p>
+          </div>
+          <div className="flex gap-3">
+            <Button variant="outline" onClick={() => window.location.href = '/dashboard'}>
+              Skip to Dashboard
+            </Button>
           </div>
         </div>
 
@@ -262,96 +364,183 @@ export default function UploadPage() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Upload className="w-5 h-5" />
-                  Upload Documents
+                  Upload Materials
                 </CardTitle>
                 <CardDescription>
                   Upload syllabi, assessments, or study materials for AI analysis
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                {/* Dropzone */}
-                <div
-                  {...getRootProps()}
-                  className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
-                    isDragActive
-                      ? 'border-primary bg-primary/5'
-                      : 'border-gray-300 hover:border-primary hover:bg-gray-50 dark:hover:bg-gray-800'
-                  }`}
-                >
-                  <input {...getInputProps()} />
-                  <div className="flex flex-col items-center gap-4">
-                    <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
-                      <Upload className="w-6 h-6 text-primary" />
-                    </div>
-                    {isDragActive ? (
-                      <div>
-                        <p className="text-lg font-medium">Drop files here...</p>
-                        <p className="text-sm text-muted-foreground">Release to upload</p>
-                      </div>
-                    ) : (
-                      <div>
-                        <p className="text-lg font-medium">Drag & drop files here</p>
-                        <p className="text-sm text-muted-foreground">or click to select files</p>
-                        <p className="text-xs text-muted-foreground mt-2">
-                          Support for PDF, images, text files (max 10MB)
-                        </p>
-                      </div>
-                    )}
-                  </div>
+                {/* Tab Navigation */}
+                <div className="flex border-b border-border mb-6">
+                  <button
+                    onClick={() => setActiveTab('files')}
+                    className={`flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                      activeTab === 'files'
+                        ? 'border-primary text-primary'
+                        : 'border-transparent text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    <FileType className="w-4 h-4" />
+                    Upload Files
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('text')}
+                    className={`flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                      activeTab === 'text'
+                        ? 'border-primary text-primary'
+                        : 'border-transparent text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    <Clipboard className="w-4 h-4" />
+                    Paste Text
+                  </button>
                 </div>
 
-                {/* Selected Files */}
-                {files.length > 0 && (
-                  <div className="mt-6 space-y-3">
-                    <h4 className="font-medium">Selected Files ({files.length})</h4>
-                    <div className="space-y-2">
-                      {files.map((file, index) => (
-                        <div key={index} className="flex items-center justify-between p-3 bg-muted rounded-lg">
-                          <div className="flex items-center gap-3 flex-1 min-w-0">
-                            {getFileIcon(file)}
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium truncate">{file.name}</p>
-                              <p className="text-xs text-muted-foreground">
-                                {formatFileSize(file.size)}
-                              </p>
-                            </div>
+                {/* File Upload Tab */}
+                {activeTab === 'files' && (
+                  <>
+                    {/* Dropzone */}
+                    <div
+                      {...getRootProps()}
+                      className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
+                        isDragActive
+                          ? 'border-primary bg-primary/5'
+                          : 'border-gray-300 hover:border-primary hover:bg-gray-50 dark:hover:bg-gray-800'
+                      }`}
+                    >
+                      <input {...getInputProps()} />
+                      <div className="flex flex-col items-center gap-4">
+                        <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+                          <Upload className="w-6 h-6 text-primary" />
+                        </div>
+                        {isDragActive ? (
+                          <div>
+                            <p className="text-lg font-medium">Drop files here...</p>
+                            <p className="text-sm text-muted-foreground">Release to upload</p>
                           </div>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => removeFile(index)}
-                            disabled={uploading}
-                          >
-                            <X className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      ))}
+                        ) : (
+                          <div>
+                            <p className="text-lg font-medium">Drag & drop files here</p>
+                            <p className="text-sm text-muted-foreground">or click to select files</p>
+                            <p className="text-xs text-muted-foreground mt-2">
+                              Support for PDF, images, text files (max 10MB)
+                            </p>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                )}
 
-                {/* Upload Button */}
-                {files.length > 0 && (
-                  <div className="mt-6 space-y-4">
-                    {uploading && (
-                      <div className="space-y-2">
-                        <div className="flex justify-between text-sm">
-                          <span>Uploading files...</span>
-                          <span>{uploadProgress}%</span>
+                    {/* Selected Files */}
+                    {files.length > 0 && (
+                      <div className="mt-6 space-y-3">
+                        <h4 className="font-medium">Selected Files ({files.length})</h4>
+                        <div className="space-y-2">
+                          {files.map((file, index) => (
+                            <div key={index} className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                              <div className="flex items-center gap-3 flex-1 min-w-0">
+                                {getFileIcon(file)}
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-medium truncate">{file.name}</p>
+                                  <p className="text-xs text-muted-foreground">
+                                    {formatFileSize(file.size)}
+                                  </p>
+                                </div>
+                              </div>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => removeFile(index)}
+                                disabled={uploading}
+                              >
+                                <X className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          ))}
                         </div>
-                        <Progress value={uploadProgress} />
                       </div>
                     )}
-                    <LoadingButton
-                      loading={uploading}
-                      loadingText="Uploading..."
-                      onClick={uploadFiles}
-                      className="w-full sm:w-auto"
-                      icon={Upload}
-                    >
-                      Upload Files
-                    </LoadingButton>
-                  </div>
+
+                    {/* Upload Button */}
+                    {files.length > 0 && (
+                      <div className="mt-6 space-y-4">
+                        {uploading && (
+                          <div className="space-y-2">
+                            <div className="flex justify-between text-sm">
+                              <span>Uploading files...</span>
+                              <span>{uploadProgress}%</span>
+                            </div>
+                            <Progress value={uploadProgress} />
+                          </div>
+                        )}
+                        <LoadingButton
+                          loading={uploading}
+                          loadingText="Uploading..."
+                          onClick={uploadFiles}
+                          className="w-full sm:w-auto"
+                          icon={Upload}
+                        >
+                          Upload Files
+                        </LoadingButton>
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {/* Text Paste Tab */}
+                {activeTab === 'text' && (
+                  <>
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="textTitle">Document Title (Optional)</Label>
+                        <Input
+                          id="textTitle"
+                          type="text"
+                          placeholder="e.g., Chemistry Syllabus, Math Notes"
+                          value={textTitle}
+                          onChange={(e) => setTextTitle(e.target.value)}
+                        />
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label htmlFor="pastedText">Paste your text content</Label>
+                        <textarea
+                          id="pastedText"
+                          className="w-full h-64 p-3 border border-input rounded-md bg-background text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
+                          placeholder="Paste your syllabus, notes, or study materials here..."
+                          value={pastedText}
+                          onChange={(e) => setPastedText(e.target.value)}
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Paste any text content like syllabi, notes, or study materials for AI analysis
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Upload Button for Text */}
+                    {pastedText.trim() && (
+                      <div className="mt-6 space-y-4">
+                        {uploading && (
+                          <div className="space-y-2">
+                            <div className="flex justify-between text-sm">
+                              <span>Processing text...</span>
+                              <span>{uploadProgress}%</span>
+                            </div>
+                            <Progress value={uploadProgress} />
+                          </div>
+                        )}
+                        <LoadingButton
+                          loading={uploading}
+                          loadingText="Processing..."
+                          onClick={uploadText}
+                          className="w-full sm:w-auto"
+                          icon={Clipboard}
+                        >
+                          Process Text
+                        </LoadingButton>
+                      </div>
+                    )}
+                  </>
                 )}
               </CardContent>
             </Card>

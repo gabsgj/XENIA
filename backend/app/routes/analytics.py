@@ -10,67 +10,6 @@ logger = logging.getLogger('xenia')
 analytics_bp = Blueprint("analytics", __name__)
 
 
-def generate_demo_analytics():
-    """Generate realistic demo data for development and testing."""
-    from ..services.gamification import recompute_level
-    
-    # Realistic demo profile
-    demo_xp = 1250
-    level_data = recompute_level(demo_xp)
-    
-    return {
-        "sessions": [
-            {"duration_min": 45, "topic": "Organic Chemistry", "created_at": "2024-01-12T10:00:00Z", "status": "completed"},
-            {"duration_min": 30, "topic": "Calculus", "created_at": "2024-01-11T14:30:00Z", "status": "completed"},
-            {"duration_min": 60, "topic": "Physics", "created_at": "2024-01-10T09:15:00Z", "status": "completed"},
-            {"duration_min": 25, "topic": "Linear Algebra", "created_at": "2024-01-09T16:45:00Z", "status": "completed"},
-        ],
-        "tasks": [
-            {"status": "completed", "topic": "Organic Chemistry", "created_at": "2024-01-12T10:45:00Z", "difficulty": "hard", "priority": "high"},
-            {"status": "completed", "topic": "Calculus", "created_at": "2024-01-11T15:00:00Z", "difficulty": "medium", "priority": "medium"},
-            {"status": "in_progress", "topic": "Physics", "created_at": "2024-01-10T10:15:00Z", "difficulty": "medium", "priority": "high"},
-            {"status": "completed", "topic": "Linear Algebra", "created_at": "2024-01-09T17:30:00Z", "difficulty": "easy", "priority": "low"},
-        ],
-        "profile": {
-            "xp": demo_xp,
-            "streak_days": 8,
-            "achievements": ["first_session", "week_streak", "chemistry_master"],
-            "preferences": {"study_reminder": True, "difficulty": "medium"},
-            **level_data
-        },
-        "stats": {
-            "total_sessions": 15,
-            "total_tasks": 12,
-            "completed_tasks": 10,
-            "completion_rate": 83.3,
-            "total_study_hours": 12.5,
-            "total_study_minutes": 750,
-            "recent_study_minutes": 160,
-            "recent_study_hours": 2.7,
-            "streak_days": 8,
-            "avg_session_length": 42.5
-        },
-        "insights": [
-            "🎯 Excellent completion rate! You're consistently finishing your tasks.",
-            "📅 Great weekly streak! Keep the momentum going.",
-            "📚 Good study time this week! Consider adding review sessions."
-        ],
-        "achievements": [],
-        "weekly_progress": [
-            {"week": "Week 1", "study_time": 180, "completion": 85, "sessions": 4},
-            {"week": "Week 2", "study_time": 210, "completion": 92, "sessions": 5},
-            {"week": "Week 3", "study_time": 165, "completion": 78, "sessions": 3},
-            {"week": "Week 4", "study_time": 195, "completion": 88, "sessions": 3}
-        ],
-        "subject_performance": [
-            {"subject": "Chemistry", "sessions": 6, "avg_time": 45, "completion": 90, "difficulty": "Hard"},
-            {"subject": "Mathematics", "sessions": 5, "avg_time": 38, "completion": 85, "difficulty": "Medium"},
-            {"subject": "Physics", "sessions": 4, "avg_time": 52, "completion": 95, "difficulty": "Medium"}
-        ],
-        "user_id": "demo-user"
-    }
-
-
 def generate_weekly_progress(sessions: List[Dict], tasks: List[Dict]) -> List[Dict]:
     """Generate weekly progress data for charts."""
     from collections import defaultdict

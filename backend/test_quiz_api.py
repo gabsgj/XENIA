@@ -1,6 +1,7 @@
 import requests
 import json
 import random
+import uuid
 from app import create_app
 
 
@@ -9,7 +10,7 @@ def test_quiz_endpoints_via_test_client():
     app = create_app()
     client = app.test_client()
 
-    user_id = "demo-user-123"
+    user_id = str(uuid.uuid4())  # Generate a proper UUID instead of demo-user-123
     topics = ["linear algebra", "machine learning", "calculus"]
     num_questions = 5
     options_count = 4

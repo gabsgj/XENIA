@@ -78,3 +78,24 @@ def upload_document():
         return results[0]["data"], 200
     
     return {"results": results}, 200
+
+
+@ingest_bp.post("/upload-text")
+def upload_text():
+    """Upload text content for processing"""
+    data = request.get_json()
+    if not data or 'text' not in data:
+        raise ApiError("TEXT_INVALID_FORMAT", "No text provided", status=400)
+
+    text_content = data['text']
+    title = data.get('title', 'Pasted Text Document')
+    raw_uid = _extract_user_id()
+    
+    # Create a temporary file-like object from the text
+    from io import StringIO
+    text_file = StringIO(text_content)
+    text_file.filename = f"{title}.txt"
+    
+    # Process the text as a document
+    result = handle_upload(text_file, user_id=raw_uid, artifact_type="syllabus")
+    return result, 200

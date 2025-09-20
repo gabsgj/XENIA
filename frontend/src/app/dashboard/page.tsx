@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import { api } from "@/lib/api";
+import { api, getUserId } from "@/lib/api";
 import { useErrorContext } from "@/lib/error-context";
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, PieChart, Pie, Cell } from "recharts";
 import { MainLayout } from "@/components/navigation";
@@ -38,16 +38,20 @@ export default function DashboardPage(){
   const fetchData = async () => {
     setLoading(true)
     try{ 
-      const [analytics, currentPlan, topicResp, resResp] = await Promise.all([
+      const [analytics, currentPlan, topicResp, resResp, progressResp] = await Promise.all([
         api('/api/analytics/student').catch(()=> null),
         api('/api/plan/current').catch(()=> null),
         api('/api/resources/topics').catch(()=> ({topics:[]})),
-        api('/api/resources/list').catch(()=> ({resources:[]}))
+        api('/api/resources/list').catch(()=> ({resources:[]})),
+        api('/api/progress/user/' + getUserId()).catch(()=> ({progress:{}}))
       ])
       if(analytics) setData(analytics)
       if(currentPlan) setPlan(currentPlan)
       setTopics((topicResp as any)?.topics||[])
       setResources((resResp as any)?.resources||[])
+      setProgress((progressResp as any)?.progress||{})
+      setAggregates(analytics?.stats || null)
+      setWeekly(analytics?.weekly_progress || [])
     } catch(e:any){ 
       pushError({ errorCode: e?.errorCode||'CONTENT_API_FAIL', errorMessage: e?.errorMessage, details: e }) 
     } finally { setLoading(false) }
@@ -129,6 +133,7 @@ export default function DashboardPage(){
     const planSessions = plan?.sessions || []
     const completedPlanSessions = planSessions.filter((s:any) => s.status === 'completed')
     const analyticsSessions = data?.sessions || []
+    const analyticsTasks = data?.tasks || []
     
     // Use plan data if available, fallback to analytics
     const sessionsCompleted = plan?.progress?.sessions_completed ?? completedPlanSessions.length
@@ -138,22 +143,38 @@ export default function DashboardPage(){
     const analyticsStudyTime = analyticsSessions.reduce((total:number, session:any) => total + (session.duration_min || 0), 0)
     const totalStudyTime = Math.max(planStudyTime, analyticsStudyTime) // Use whichever is higher
     
-    // Enhanced streak calculation
+    // Enhanced streak calculation using analytics profile data
     const streakDays = data?.profile?.streak_days || (completedPlanSessions.length > 0 ? 1 : 0)
+    
+    // Calculate quiz performance from progress data
+    const totalQuizzes = Object.values(progress || {}).reduce((sum: number, topic: any) => sum + (topic.quizzes_taken || 0), 0)
+    const avgScore = Object.values(progress || {}).reduce((sum: number, topic: any) => sum + (topic.last_score || 0), 0) / Math.max(Object.keys(progress || {}).length, 1)
     
     return {
       sessionsCompleted,
       totalStudyTime,
-      streakDays
+      streakDays,
+      totalQuizzes: totalQuizzes || 0,
+      avgScore: isNaN(avgScore) ? 0 : Math.round(avgScore * 100)
     }
-  }, [plan, data])
+  }, [plan, data, progress])
 
   const recentAchievements = useMemo(()=>{
-    return [
+    const achievements = [
       { title: 'Study Streak', description: `${enhancedStats.streakDays} days in a row`, icon: Award },
       { title: 'Completed Sessions', description: `${enhancedStats.sessionsCompleted} finished`, icon: TrendingUp },
       { title: 'Active Topics', description: `${topics.length} topics tracked`, icon: Target }
     ]
+    
+    if (enhancedStats.totalQuizzes > 0) {
+      achievements.push({
+        title: 'Quiz Performance', 
+        description: `${enhancedStats.totalQuizzes} quizzes, ${enhancedStats.avgScore}% avg`, 
+        icon: BookOpen 
+      })
+    }
+    
+    return achievements
   },[enhancedStats, topics])
 
   const chartColors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
@@ -162,21 +183,15 @@ export default function DashboardPage(){
   useEffect(() => {
     async function fetchProgress() {
       setLoading(true);
-      const userId = 'demo-user-123';
-      const [resp, aggResp, weeklyResp] = await Promise.all([
-        axios.get(`/api/progress/user/${userId}`).catch(()=> ({data:{progress:{}}})),
-        axios.get(`/api/analytics/progress/user/${userId}/aggregates`).catch(()=> ({data:{}})),
-        axios.get(`/api/analytics/progress/user/${userId}/weekly`).catch(()=> ({data:{weekly:[]}})),
+      const userId = getUserId();
+      const [resp] = await Promise.all([
+        api('/api/progress/user/' + userId).catch(()=> ({progress:{}})),
       ])
-      setProgress(resp.data.progress || {});
-      setAggregates((aggResp.data && aggResp.data.aggregates) || null);
-      setWeekly((weeklyResp.data && weeklyResp.data.weekly) || []);
+      setProgress((resp as any)?.progress || {});
       setLoading(false);
     }
     fetchProgress();
-  }, []);
-
-  return (
+  }, []);  return (
     <MainLayout>
       <div className="p-6 space-y-8">
         {/* Header */}
@@ -261,18 +276,18 @@ export default function DashboardPage(){
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground">Topic Status</p>
-                  <p className="text-3xl font-bold">{topicStatusCounts.completed}/{topics.length}</p>
+                  <p className="text-sm text-muted-foreground">Quizzes Taken</p>
+                  <p className="text-3xl font-bold">{enhancedStats.totalQuizzes}</p>
                 </div>
-                <div className="w-12 h-12 bg-teal-100 dark:bg-teal-900/20 rounded-full flex items-center justify-center">
-                  <BookOpen className="w-6 h-6 text-teal-600 dark:text-teal-400" />
+                <div className="w-12 h-12 bg-indigo-100 dark:bg-indigo-900/20 rounded-full flex items-center justify-center">
+                  <BookOpen className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
                 </div>
               </div>
-              <div className="mt-4 space-y-2">
-                <div className="flex items-center gap-2 text-xs"><span className="w-2 h-2 rounded-full bg-muted-foreground/60" /> Pending {topicStatusCounts['pending']}</div>
-                <div className="flex items-center gap-2 text-xs"><span className="w-2 h-2 rounded-full bg-amber-500" /> In Progress {topicStatusCounts['in-progress']}</div>
-                <div className="flex items-center gap-2 text-xs"><span className="w-2 h-2 rounded-full bg-green-500" /> Completed {topicStatusCounts['completed']}</div>
-              </div>
+              {enhancedStats.avgScore > 0 && (
+                <div className="mt-4 text-xs text-muted-foreground">
+                  Avg Score: {enhancedStats.avgScore}%
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -348,31 +363,29 @@ export default function DashboardPage(){
               </CardHeader>
               <CardContent>
                 <div className="h-64">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={data?.sessions?.map((s:any)=> ({ 
-                      date: s.created_at?.slice(0,10), 
-                      minutes: s.duration_min 
-                    })) || [
-                      { date: '2024-01-01', minutes: 45 },
-                      { date: '2024-01-02', minutes: 60 },
-                      { date: '2024-01-03', minutes: 30 },
-                      { date: '2024-01-04', minutes: 75 },
-                      { date: '2024-01-05', minutes: 90 },
-                      { date: '2024-01-06', minutes: 45 },
-                      { date: '2024-01-07', minutes: 120 },
-                    ]}>
-                      <XAxis dataKey='date' />
-                      <YAxis />
-                      <Tooltip />
-                      <Area 
-                        type='monotone' 
-                        dataKey='minutes' 
-                        stroke='hsl(var(--primary))' 
-                        fill='hsl(var(--primary) / 0.2)' 
-                        strokeWidth={2}
-                      />
-                    </AreaChart>
-                  </ResponsiveContainer>
+                  {loading ? (
+                    <div className="flex items-center justify-center h-full">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                    </div>
+                  ) : (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={data?.sessions?.map((s:any)=> ({ 
+                        date: s.created_at?.slice(0,10), 
+                        minutes: s.duration_min 
+                      })) || []}>
+                        <XAxis dataKey='date' />
+                        <YAxis />
+                        <Tooltip />
+                        <Area 
+                          type='monotone' 
+                          dataKey='minutes' 
+                          stroke='hsl(var(--primary))' 
+                          fill='hsl(var(--primary) / 0.2)' 
+                          strokeWidth={2}
+                        />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -383,19 +396,25 @@ export default function DashboardPage(){
             {/* Weekly Quizzes */}
             <Card>
               <CardHeader>
-                <CardTitle>Weekly Quizzes</CardTitle>
-                <CardDescription>Quizzes taken in the last 7 days</CardDescription>
+                <CardTitle>Weekly Progress</CardTitle>
+                <CardDescription>Study time and completion over the last 4 weeks</CardDescription>
               </CardHeader>
               <CardContent>
                 <div style={{ width: '100%', height: 160 }}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={weekly}>
-                      <XAxis dataKey="date" />
-                      <YAxis />
-                      <Tooltip />
-                      <Area type="monotone" dataKey="quizzes" stroke="#8884d8" fill="#8884d8" />
-                    </AreaChart>
-                  </ResponsiveContainer>
+                  {loading ? (
+                    <div className="flex items-center justify-center h-full">
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                    </div>
+                  ) : (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={weekly}>
+                        <XAxis dataKey="week" />
+                        <YAxis />
+                        <Tooltip />
+                        <Area type="monotone" dataKey="study_time" stroke="#8884d8" fill="#8884d8" />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -403,27 +422,36 @@ export default function DashboardPage(){
             {/* Topic Mastery */}
             <Card>
               <CardHeader>
-                <CardTitle>Topic Mastery</CardTitle>
-                <CardDescription>Last known score per topic</CardDescription>
+                <CardTitle>Subject Performance</CardTitle>
+                <CardDescription>Completion rates by subject</CardDescription>
               </CardHeader>
               <CardContent>
                 <div style={{ width: '100%', height: 200 }}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={Object.entries(progress || {}).map(([k, v]: any) => ({ name: k, value: (v.last_score || 0) * 100 }))}
-                        dataKey="value"
-                        nameKey="name"
-                        outerRadius={70}
-                        fill="#82ca9d"
-                      >
-                        {Object.keys(progress || {}).map((k, idx) => (
-                          <Cell key={k} fill={chartColors[idx % chartColors.length]} />
-                        ))}
-                      </Pie>
-                      <Tooltip />
-                    </PieChart>
-                  </ResponsiveContainer>
+                  {loading ? (
+                    <div className="flex items-center justify-center h-full">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                    </div>
+                  ) : (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={data?.subject_performance?.map((subject: any) => ({
+                            name: subject.subject,
+                            value: subject.completion
+                          })) || []}
+                          dataKey="value"
+                          nameKey="name"
+                          outerRadius={70}
+                          fill="#82ca9d"
+                        >
+                          {(data?.subject_performance || []).map((_: any, idx: number) => (
+                            <Cell key={`cell-${idx}`} fill={chartColors[idx % chartColors.length]} />
+                          ))}
+                        </Pie>
+                        <Tooltip />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  )}
                 </div>
               </CardContent>
             </Card>

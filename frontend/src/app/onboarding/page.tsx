@@ -30,7 +30,7 @@ export default function OnboardingPage(){
 
   function next(){ setStep(s=> Math.min(4, s+1)) }
   function prev(){ setStep(s=> Math.max(1, s-1)) }
-  async function finish(){ router.push('/dashboard') }
+  async function finish(){ router.push('/upload') }
 
   const steps = [
     {
@@ -197,7 +197,7 @@ export default function OnboardingPage(){
         {/* Skip option */}
         <div className="text-center mt-6">
           <button 
-            onClick={() => router.push('/dashboard')}
+            onClick={() => router.push('/upload')}
             className="text-sm text-muted-foreground hover:text-foreground transition-all"
           >
             Skip for now

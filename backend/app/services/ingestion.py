@@ -86,7 +86,7 @@ def handle_upload(file_storage, user_id: str, artifact_type: str) -> Dict:
             supabase.storage.from_(bucket).upload(object_path, data, {"contentType": mime})
             print(f"☁️ File uploaded to newly created bucket: {object_path}")
         except Exception as e:
-            # Ignore storage errors in demo mode
+            # Ignore storage errors in development mode
             print(f"⚠️ Storage upload failed (continuing): {e}")
             pass
 
@@ -120,7 +120,7 @@ def handle_upload(file_storage, user_id: str, artifact_type: str) -> Dict:
             except Exception as e:
                 fk_like = 'foreign key' in str(e).lower() or '23503' in str(e)
                 if fk_like:
-                    print(f"Foreign key violation for user {norm_user_id}, treating as demo user")
+                    print(f"Foreign key violation for user {norm_user_id}, treating as development user")
                     record["user_id"] = None
                     break
                 elif attempt < max_retries - 1:
@@ -148,9 +148,18 @@ def handle_upload(file_storage, user_id: str, artifact_type: str) -> Dict:
                 topics.append(main_topic)
                 topics.extend(subtopics)
             
+            # Store topics in topic store for quiz generation
+            if topics:
+                store_add_topics(norm_user_id, topics)
+                print(f"📚 Stored {len(topics)} topics for user {norm_user_id}")
+            
         except Exception:
             from .weaktopics import extract_topics_from_text
             topics = extract_topics_from_text(text)
+            # Store fallback topics as well
+            if topics:
+                store_add_topics(norm_user_id, topics)
+                print(f"📚 Stored {len(topics)} fallback topics for user {norm_user_id}")
     elif artifact_type == "assessment":
         try:
             from .ai_providers import get_assessment_analysis

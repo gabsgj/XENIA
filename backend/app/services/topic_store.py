@@ -1,8 +1,8 @@
-"""In-memory topic store for non-persistent demo / invalid UUID users.
+"""In-memory topic store for non-persistent development / invalid UUID users.
 
 This allows the app to behave logically (plans include uploaded topics)
 even when we cannot persist to Supabase due to foreign key constraints
-on auth.users (e.g., using the placeholder 'demo-user').
+on auth.users (e.g., using development/test user IDs).
 
 NOTE: This is a lightweight, ephemeral store suitable for local dev only.
 Restarting the server clears the data.

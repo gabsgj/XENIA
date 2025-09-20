@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { api } from '@/lib/api'
+import { api, getUserId } from '@/lib/api'
 import { MainLayout } from '@/components/navigation'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -30,9 +30,10 @@ export default function TeacherPage(){
   
   async function tagIt(){
     try {
+      const userId = getUserId();
       await api('/api/teacher/tag',{ 
         method:'POST', 
-        body: JSON.stringify({ user_id:'demo-user', teacher_id:'demo-teacher', topic, tag }) 
+        body: JSON.stringify({ user_id: userId, teacher_id:'teacher-001', topic, tag }) 
       })
       setStatus('Topic tagged successfully!')
       setTopic('')

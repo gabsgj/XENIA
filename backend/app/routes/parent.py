@@ -528,7 +528,7 @@ def subscribe_alerts():
         return {"success": True, "message": "Alert subscription updated"}
     except Exception as e:
         # Return success even if database operation fails
-        return {"success": True, "message": "Alert subscription updated (demo mode)"}
+        return {"success": True, "message": "Alert subscription updated (development mode)"}
 
 
 @parent_bp.get("/reports/download")

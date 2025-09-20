@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { api } from "@/lib/api";
+import { api, getUserId } from "@/lib/api";
 import { useErrorContext } from "@/lib/error-context";
 import { MainLayout } from "@/components/navigation";
 import { 
@@ -69,7 +69,8 @@ export default function ParentPage() {
   const loadParentData = async () => {
     setLoading(true);
     try {
-      const response = await api('/api/parent/overview?parent_id=demo-parent');
+      const parentId = getUserId();
+      const response = await api(`/api/parent/overview?parent_id=${parentId}`);
       setData(response);
       if (response.children && response.children.length > 0) {
         setSelectedChild(response.children[0].user_id);

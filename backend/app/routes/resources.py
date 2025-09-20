@@ -52,7 +52,7 @@ def list_topics():
     if not raw_user_id:
         raise ApiError("AUTH_401", "Missing user_id")
     user_id = normalize_user_id(raw_user_id)
-    # If invalid UUID -> use in-memory store only (demo mode)
+    # If invalid UUID -> use in-memory store for development/testing
     if not is_valid_uuid(user_id):
         topics = store_get_topics(user_id)
         return {"topics": [
@@ -64,6 +64,19 @@ def list_topics():
         resp = sb.table("syllabus_topics").select(
             "id, topic, parent_topic, order_index, status, completed_at"
         ).eq("user_id", user_id).order("order_index").limit(500).execute()
+        
+        # If no topics found, return sample topics to get started
+        if not resp.data or len(resp.data) == 0:
+            logger.info(f"No topics found for user {user_id}, returning sample topics")
+            sample_topics = [
+                {"id": "sample-1", "topic": "Introduction to Programming", "parent_topic": None, "order_index": 1, "status": "pending", "completed_at": None},
+                {"id": "sample-2", "topic": "Data Structures", "parent_topic": None, "order_index": 2, "status": "pending", "completed_at": None},
+                {"id": "sample-3", "topic": "Algorithms", "parent_topic": None, "order_index": 3, "status": "pending", "completed_at": None},
+                {"id": "sample-4", "topic": "Web Development", "parent_topic": None, "order_index": 4, "status": "pending", "completed_at": None},
+                {"id": "sample-5", "topic": "Database Design", "parent_topic": None, "order_index": 5, "status": "pending", "completed_at": None}
+            ]
+            return {"topics": sample_topics}
+        
         return {"topics": resp.data or []}
     except Exception as e:
         logger.error(f"Topic fetch failed: {e}")
@@ -76,7 +89,7 @@ def list_resources():
         raise ApiError("AUTH_401", "Missing user_id")
     user_id = normalize_user_id(raw_user_id)
     if not is_valid_uuid(user_id):
-        # Demo mode: we currently don't store resources for demo users (no DB). Return empty list.
+        # Development mode: return empty list when no database connection
         return {"resources": []}
     data = get_resources(user_id)
     return {"resources": data}
@@ -90,9 +103,16 @@ def update_progress():
         raise ApiError("AUTH_401", "Missing user_id")
     user_id = normalize_user_id(raw_user_id)
     if not is_valid_uuid(user_id):
-        # Demo users: progress not persisted; return optimistic success
+        # Development mode: return optimistic success when no database connection
         return {"ok": True, "plan": {"sessions": []}}
     session_updates = data.get("sessions", [])  # [{date, topic, status}]
+    
+    # Check if any sessions reference sample topics - if so, return success without DB operations
+    has_sample_topics = any(upd.get("topic", "").startswith("sample-") for upd in session_updates)
+    if has_sample_topics:
+        logger.info(f"Sample topics detected in progress update for user {user_id}, returning optimistic success")
+        return {"ok": True, "plan": {"sessions": []}}
+    
     try:
         plan_resp = sb.table("plans").select("plan").eq("user_id", user_id).limit(1).execute()
         if not plan_resp.data:
@@ -149,8 +169,14 @@ def update_topic_status():
     if not raw_user_id or not topic or status not in ("pending","in-progress","completed"):
         raise ApiError("PLAN_400", "Invalid topic status payload")
     user_id = normalize_user_id(raw_user_id)
+    
+    # Handle sample topics
+    if topic.startswith("sample-"):
+        logger.info(f"Sample topic {topic} status update for user {user_id}, returning optimistic success")
+        return {"ok": True}
+    
     if not is_valid_uuid(user_id):
-        # Demo: pretend success
+        # Development: pretend success
         return {"ok": True}
     try:
         update = {"status": status}
@@ -173,8 +199,15 @@ def bulk_topic_status():
     if not raw_user_id or not isinstance(updates, list):
         raise ApiError("PLAN_400", "Invalid payload")
     user_id = normalize_user_id(raw_user_id)
+    
+    # Handle sample topics
+    has_sample_topics = any(u.get("topic", "").startswith("sample-") for u in updates)
+    if has_sample_topics:
+        logger.info(f"Sample topics detected in bulk status update for user {user_id}, returning optimistic success")
+        return {"ok": True, "updated": len(updates)}
+    
     if not is_valid_uuid(user_id):
-        # Demo: pretend success
+        # Development: pretend success
         return {"ok": True, "updated": len(updates)}
     from datetime import datetime, timezone
     completed_time = datetime.now(timezone.utc).isoformat()

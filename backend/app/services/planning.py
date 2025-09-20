@@ -113,7 +113,7 @@ def generate_plan(
             syllabus_topics = []
             enhanced_topic_data = []
     
-    # 3. Fallback to in-memory store (demo users)
+    # 3. Fallback to in-memory store (development users)
     if not syllabus_topics:
         syllabus_topics = store_get_topics(norm_user_id)
         enhanced_topic_data = [{"topic": t, "score": 5, "estimated_hours": 3} for t in syllabus_topics]

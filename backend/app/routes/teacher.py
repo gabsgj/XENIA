@@ -254,8 +254,8 @@ def tag_topic():
         return {"ok": True, "message": "Topic tagged successfully"}
     except Exception as e:
         logger.warning(f"Database error when tagging topic: {e}")
-        # Return success even if database operation fails in demo mode
-        return {"ok": True, "message": "Topic tagged successfully (demo mode)"}
+        # Return success even if database operation fails in development mode
+        return {"ok": True, "message": "Topic tagged successfully (development mode)"}
 
 
 @teacher_bp.get("/student/<student_id>")
@@ -310,7 +310,7 @@ def submit_feedback():
         return {"ok": True, "message": "Feedback submitted successfully"}
     except Exception as e:
         logger.warning(f"Database error when submitting feedback: {e}")
-        return {"ok": True, "message": "Feedback submitted successfully (demo mode)"}
+        return {"ok": True, "message": "Feedback submitted successfully (development mode)"}
 
 
 @teacher_bp.get("/reports")
@@ -376,7 +376,7 @@ def create_intervention():
         return {"ok": True, "message": "Intervention plan created successfully"}
     except Exception as e:
         logger.warning(f"Database error when creating intervention: {e}")
-        return {"ok": True, "message": "Intervention plan created successfully (demo mode)"}
+        return {"ok": True, "message": "Intervention plan created successfully (development mode)"}
 
 
 @teacher_bp.get("/analytics/class")
@@ -471,4 +471,4 @@ def create_assignment():
         return {"ok": True, "assignment_id": assignment_id, "message": "Assignment created successfully"}
     except Exception as e:
         logger.warning(f"Database error when creating assignment: {e}")
-        return {"ok": True, "assignment_id": "demo_assignment", "message": "Assignment created successfully (demo mode)"}
+        return {"ok": True, "assignment_id": "dev_assignment", "message": "Assignment created successfully (development mode)"}
