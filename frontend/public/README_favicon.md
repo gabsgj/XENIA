@@ -9,4 +9,4 @@ Recommended steps:
 
 Notes:
 - Next.js will prefer `public/favicon.ico` for `/favicon.ico` requests.
-- `layout.tsx` now references both `/favicon.ico` and `/logo.png` to maximize coverage.
+- `layout.tsx` now prefers `/logo.png` and falls back to `/favicon.ico` for maximum coverage.

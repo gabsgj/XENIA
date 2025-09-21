@@ -238,51 +238,55 @@ def solve_question(
         logger.info("Falling back to basic remediation steps")
         steps = get_remediation_steps(user_id=user_id, question_text=question)
         
-        # Try basic AI enrichment as additional fallback
+    # Try basic AI enrichment as additional fallback
+    try:
+      from .ai_providers import get_ai_response
+      enriched_raw = get_ai_response(f"Provide step JSON only for: {question}")
+      if enriched_raw:
+        import json
         try:
-            from .ai_providers import get_ai_response
-            enriched_raw = get_ai_response(f"Provide step JSON only for: {question}")
-            if enriched_raw:
-                import json
-                try:
-                    parsed = json.loads(enriched_raw)
-                    if isinstance(parsed, dict) and isinstance(parsed.get('steps'), list) and parsed['steps']:
-                        steps = parsed['steps']
-                        logger.info("Enhanced with basic AI steps")
-                except Exception as e:
-                    logger.warning(f"Basic AI enhancement failed: {e}")
+          parsed = json.loads(enriched_raw)
+          if isinstance(parsed, dict) and isinstance(parsed.get('steps'), list) and parsed['steps']:
+            steps = parsed['steps']
+            logger.info("Enhanced with basic AI steps")
         except Exception as e:
-            logger.warning(f"AI enrichment failed: {e}")
+          logger.warning(f"Basic AI enhancement failed: {e}")
+    except Exception as e:
+      logger.warning(f"AI enrichment failed: {e}")
 
     # Build comprehensive response with metadata
-    answer_lines = []
-    for idx, step in enumerate(steps):
+    # Per UI contract: if `steps` are present, keep `answer` as a short intro/summary only
+    if steps:
+      answer = "Here are the steps to solve the problem."
+    else:
+      answer_lines = []
+      for idx, step in enumerate(steps):
         step_title = step.get('title', f'Step {idx+1}')
         step_detail = step.get('detail', '')
         step_calc = step.get('calculation', '')
         step_code = step.get('code_snippet', '')
-        
+
         line = f"{idx+1}. {step_title}: {step_detail}"
         if step_calc:
-            line += f"\n   Calculation: {step_calc}"
+          line += f"\n   Calculation: {step_calc}"
         if step_code:
-            line += f"\n   Code: {step_code}"
-            
+          line += f"\n   Code: {step_code}"
         answer_lines.append(line)
-    
-    answer = "\n\n".join(answer_lines)
-    
+
+      answer = "\n\n".join(answer_lines) if answer_lines else "I'm sorry, I couldn't generate an answer."
+
     # Save conversation to history if valid user
     if is_valid_uuid(user_id):
-        try:
-            save_message(user_id, 'user', question)
-            save_message(user_id, 'ai', answer, steps=steps)
-            logger.info(f"Saved tutor conversation for user {user_id}")
-        except Exception as e:
-            logger.warning(f"Could not save conversation: {e}")
-    
+      try:
+        save_message(user_id, 'user', question)
+        save_message(user_id, 'ai', answer, steps=steps)
+        logger.info(f"Saved tutor conversation for user {user_id}")
+      except Exception as e:
+        logger.warning(f"Could not save conversation: {e}")
+
     # Get conversation history if requested
     history: List[Dict] = []
     if include_history and is_valid_uuid(user_id):
-        history = fetch_history(user_id)
+      history = fetch_history(user_id)
+
     return {"question": question, "steps": steps, "answer": answer, "history": history}
