@@ -7,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { LoadingButton, LoadingOverlay, SkeletonCard } from '@/components/ui/loading'
+import { StudyTimer } from '@/components/ui/study-timer'
 
 import { MainLayout } from '@/components/navigation'
 import { 
@@ -215,6 +216,35 @@ export default function PlannerPage() {
     }
   }
 
+  const updateSessionStatus = async (date: string, topic: string, newStatus: string) => {
+    try {
+      const resp = await api('/api/resources/progress', {
+        method: 'POST',
+        body: JSON.stringify({ sessions: [{ date, topic, status: newStatus }] })
+      })
+      if (resp.ok && resp.plan) {
+        setPlan(resp.plan)
+      }
+    } catch(e:any){
+      pushError({ errorCode: e?.errorCode||'PLAN_PROGRESS_FAIL', errorMessage: e?.errorMessage, details: e })
+    }
+  }
+
+  const markSessionCompleteAPI = async (date: string, topic: string, actualTime: number) => {
+    try {
+      // Update the session status to completed and potentially adjust the duration
+      const resp = await api('/api/resources/progress', {
+        method: 'POST',
+        body: JSON.stringify({ sessions: [{ date, topic, status: 'completed', duration_min: actualTime }] })
+      })
+      if (resp.ok && resp.plan) {
+        setPlan(resp.plan)
+      }
+    } catch(e:any){
+      pushError({ errorCode: e?.errorCode||'PLAN_PROGRESS_FAIL', errorMessage: e?.errorMessage, details: e })
+    }
+  }
+
   const getStatusColor = (status: string) => {
     switch(status) {
       case 'completed': return 'success'
@@ -306,6 +336,17 @@ export default function PlannerPage() {
                               {s.status || 'pending'}
                             </Badge>
                           </div>
+                          
+                          {/* Study Timer */}
+                          <div className="mb-3">
+                            <StudyTimer
+                              duration={s.duration_min}
+                              status={s.status || 'pending'}
+                              onStatusChange={(newStatus) => updateSessionStatus(s.date, s.topic, newStatus)}
+                              onComplete={(actualTime) => markSessionCompleteAPI(s.date, s.topic, actualTime)}
+                            />
+                          </div>
+                          
                           <p className='text-xs text-muted-foreground mb-2'>{s.focus}</p>
                           
                           {/* Resource suggestions for this topic */}
@@ -362,6 +403,7 @@ export default function PlannerPage() {
                           <th className='text-left p-3 font-semibold'>Topic</th>
                           <th className='text-left p-3 font-semibold'>Focus Area</th>
                           <th className='text-left p-3 font-semibold'>Duration</th>
+                          <th className='text-left p-3 font-semibold'>Timer</th>
                           <th className='text-left p-3 font-semibold'>Resources</th>
                           <th className='text-left p-3 font-semibold'>Status</th>
                           <th className='text-left p-3 font-semibold'>Actions</th>
@@ -377,6 +419,14 @@ export default function PlannerPage() {
                             <td className='p-3 text-muted-foreground'>{s.focus}</td>
                             <td className='p-3'>
                               <Badge variant="outline">{s.duration_min} min</Badge>
+                            </td>
+                            <td className='p-3'>
+                              <StudyTimer
+                                duration={s.duration_min}
+                                status={s.status || 'pending'}
+                                onStatusChange={(newStatus) => updateSessionStatus(s.date, s.topic, newStatus)}
+                                onComplete={(actualTime) => markSessionCompleteAPI(s.date, s.topic, actualTime)}
+                              />
                             </td>
                             <td className='p-3'>
                               {resources.filter((r:any) => r.topic === s.topic || s.topic.toLowerCase().includes(r.topic.toLowerCase()) || r.topic.toLowerCase().includes(s.topic.toLowerCase())).slice(0, 1).map((resource:any, rIdx:number) => (
