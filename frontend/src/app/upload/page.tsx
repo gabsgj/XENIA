@@ -423,8 +423,8 @@ export default function UploadPage() {
               <div className="flex items-center gap-3">
                 <Loader2 className="w-5 h-5 animate-spin text-primary" />
                 <div>
-                  <div className="text-sm font-medium">Processing your upload</div>
-                  <div className="text-xs text-muted-foreground">We are extracting text and analyzing topics — this may take a few moments.</div>
+                  <div className="text-sm font-medium">⚡ Fast Processing Mode Active</div>
+                  <div className="text-xs text-muted-foreground">Using optimized parallel processing for faster topic extraction and plan generation.</div>
                 </div>
               </div>
               <div className="text-sm text-muted-foreground">{uploadProgress}%</div>
@@ -455,10 +455,6 @@ export default function UploadPage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Main Upload Area */}
           <div className="lg:col-span-2 space-y-6 relative">
-            {/* Overlay while processing/uploading */}
-            {(uploading || processingTopics) && (
-              <LoadingOverlay show={true} />
-            )}
             {/* Upload Section */}
             <Card>
               <CardHeader>

@@ -1,6 +1,7 @@
 from flask import Blueprint, request
 from ..errors import ApiError
 from ..services.ingestion import handle_upload
+from ..services.ingestion_optimized import handle_upload_optimized, handle_text_upload_optimized
 
 
 ingest_bp = Blueprint("ingest", __name__)
@@ -38,7 +39,7 @@ def upload_assessment():
 
 @ingest_bp.post("/upload-document")
 def upload_document():
-    """General document upload endpoint that handles multiple files"""
+    """Optimized document upload endpoint with fast processing"""
     # Check if we have any files in the request
     files = []
     file_keys = [key for key in request.files.keys() if key.startswith('file')]
@@ -54,24 +55,33 @@ def upload_document():
 
     raw_uid = _extract_user_id()
     
-    # For now, treat uploaded documents as syllabus by default
-    # You can add logic here to determine document type based on filename, content, etc.
+    # Use optimized processing for faster results
     results = []
     for file in files:
         if file and file.filename:
             try:
-                data = handle_upload(file, user_id=raw_uid, artifact_type="syllabus")
+                # Use optimized handler for better performance
+                data = handle_upload_optimized(file, user_id=raw_uid, artifact_type="syllabus")
                 results.append({
                     "filename": file.filename,
                     "status": "success",
                     "data": data
                 })
             except Exception as e:
-                results.append({
-                    "filename": file.filename,
-                    "status": "error",
-                    "error": str(e)
-                })
+                # Fallback to regular handler if optimized fails
+                try:
+                    data = handle_upload(file, user_id=raw_uid, artifact_type="syllabus")
+                    results.append({
+                        "filename": file.filename,
+                        "status": "success",
+                        "data": data
+                    })
+                except Exception as fallback_e:
+                    results.append({
+                        "filename": file.filename,
+                        "status": "error",
+                        "error": str(fallback_e)
+                    })
     
     # If only one file, return the data directly for compatibility
     if len(results) == 1 and results[0]["status"] == "success":
@@ -82,7 +92,7 @@ def upload_document():
 
 @ingest_bp.post("/upload-text")
 def upload_text():
-    """Upload text content for processing"""
+    """Optimized text content upload for faster processing"""
     data = request.get_json()
     if not data or 'text' not in data:
         raise ApiError("TEXT_INVALID_FORMAT", "No text provided", status=400)
@@ -91,11 +101,15 @@ def upload_text():
     title = data.get('title', 'Pasted Text Document')
     raw_uid = _extract_user_id()
     
-    # Create a temporary file-like object from the text
-    from io import StringIO
-    text_file = StringIO(text_content)
-    text_file.filename = f"{title}.txt"
-    
-    # Process the text as a document
-    result = handle_upload(text_file, user_id=raw_uid, artifact_type="syllabus")
-    return result, 200
+    try:
+        # Use optimized text processing for faster results
+        result = handle_text_upload_optimized(text_content, title, raw_uid)
+        return result, 200
+    except Exception as e:
+        # Fallback to regular processing
+        from io import StringIO
+        text_file = StringIO(text_content)
+        text_file.filename = f"{title}.txt"
+        
+        result = handle_upload(text_file, user_id=raw_uid, artifact_type="syllabus")
+        return result, 200
