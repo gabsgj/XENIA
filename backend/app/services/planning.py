@@ -32,6 +32,7 @@ def _sync_plan_tasks(norm_user_id: str, plan: Dict) -> None:
                 "topic": s.get("topic"),
                 "status": s.get("status") or "todo",
                 "due_date": due,
+                "duration_minutes": s.get("duration_min", 45),
             })
         if rows:
             try:

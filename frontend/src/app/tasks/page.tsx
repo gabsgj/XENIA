@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { api } from '@/lib/api'
 import { MainLayout } from '@/components/navigation'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
@@ -15,8 +15,17 @@ import {
   Pause, 
   Plus, 
   BookOpen,
-  Timer
+  Timer,
+  Square
 } from 'lucide-react'
+
+interface Task {
+  id: string
+  topic: string
+  status: string
+  due_date: string
+  duration_minutes?: number
+}
 
 export default function TasksPage(){
   const [topic, setTopic] = useState('Algebra')
@@ -25,54 +34,63 @@ export default function TasksPage(){
   const [activeTimer, setActiveTimer] = useState<boolean>(false)
   const [timerMinutes, setTimerMinutes] = useState(0)
   const { pushError } = useErrorContext()
-  const [tasks, setTasks] = useState<any[]>([])
+  const [tasks, setTasks] = useState<Task[]>([])
   const [sessions, setSessions] = useState<any[]>([])
+  const [userId, setUserId] = useState<string>('')
+  const [activeTaskId, setActiveTaskId] = useState<string | null>(null)
+  const [elapsedTime, setElapsedTime] = useState(0)
+  const intervalRef = useRef<NodeJS.Timeout | null>(null)
 
-  useEffect(()=>{
-    (async()=>{
-      try{
-  const data = await api('/api/analytics/student')
-        setTasks(data.tasks||[])
-        setSessions(data.sessions||[])
-      }catch(e:any){
+  // Load user ID
+  useEffect(() => {
+    const stored = localStorage.getItem('userId')
+    if (stored) setUserId(stored)
+  }, [])
+
+  // Fetch today's tasks
+  useEffect(() => {
+    if (!userId) return
+    ;(async () => {
+      try {
+        const data = await api('/api/tasks')
+        setTasks(data.tasks || [])
+      } catch (e: any) {
         pushError({
-          errorCode: e?.errorCode||'CONTENT_API_FAIL',
-          errorMessage: e?.errorMessage,
+          errorCode: e?.errorCode || 'TASKS_FETCH_FAILED',
+          errorMessage: e?.errorMessage || 'Failed to load tasks',
           details: e
         })
       }
     })()
-  },[pushError])
+  }, [userId, pushError])
 
-  const mockTasks = [
-    {
-      id: 1,
-      title: "Complete Organic Chemistry Practice Problems",
-      subject: "Chemistry",
-      status: "in-progress",
-      progress: 60,
-      estimatedTime: 60,
-      completedTime: 36
-    },
-    {
-      id: 2,
-      title: "Review Calculus Derivatives",
-      subject: "Mathematics", 
-      status: "pending",
-      progress: 0,
-      estimatedTime: 45,
-      completedTime: 0
-    },
-    {
-      id: 3,
-      title: "Physics Lab Report",
-      subject: "Physics",
-      status: "completed", 
-      progress: 100,
-      estimatedTime: 90,
-      completedTime: 85
+  // Timer logic for active task
+  useEffect(() => {
+    if (activeTaskId) {
+      intervalRef.current = setInterval(() => {
+        setElapsedTime(prev => prev + 1)
+      }, 1000)
+    } else {
+      if (intervalRef.current) clearInterval(intervalRef.current)
+      setElapsedTime(0)
     }
-  ]
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current)
+    }
+  }, [activeTaskId])
+
+  const startTask = (taskId: string) => {
+    if (activeTaskId && activeTaskId !== taskId) {
+      // Stop current task
+      setActiveTaskId(null)
+    }
+    setActiveTaskId(taskId)
+    setElapsedTime(0)
+  }
+
+  const stopTask = () => {
+    setActiveTaskId(null)
+  }
 
   async function track(){
     try {
@@ -110,38 +128,54 @@ export default function TasksPage(){
           <div className="lg:col-span-2 space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle>Active Tasks</CardTitle>
-                <CardDescription>Your current study tasks and progress</CardDescription>
+                <CardTitle>Today's Tasks</CardTitle>
+                <CardDescription>Your study tasks for today</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                {(tasks.length?tasks:mockTasks).map((task:any) => (
-                  <div key={task.id} className="p-4 border rounded-lg hover:bg-muted/50 transition-all">
-                    <div className="flex items-center justify-between mb-3">
-                      <h3 className="font-semibold">{task.title||task.topic}</h3>
-                      <Badge variant={task.status === 'done' ? 'success' : task.status === 'in-progress' ? 'warning' : 'secondary'}>
-                        {task.status||'pending'}
-                      </Badge>
-                    </div>
-                    <p className="text-sm text-muted-foreground mb-3">{task.subject||'General'}</p>
-                    <div className="space-y-2 mb-4">
-                      <div className="flex justify-between text-sm">
-                        <span>Progress</span>
-                        <span>{task.progress||0}%</span>
+                {tasks.length === 0 ? (
+                  <p className="text-muted-foreground">No tasks for today.</p>
+                ) : (
+                  tasks.map((task: any) => {
+                    const isActive = activeTaskId === task.id
+                    const duration = task.duration_minutes || task.estimatedTime || 30
+                    const progress = isActive ? (elapsedTime / (duration * 60)) * 100 : (task.progress || 0)
+                    return (
+                      <div key={task.id} className="p-4 border rounded-lg hover:bg-muted/50 transition-all">
+                        <div className="flex items-center justify-between mb-3">
+                          <h3 className="font-semibold">{task.title || task.topic}</h3>
+                          <Badge variant={task.status === 'done' ? 'success' : task.status === 'in-progress' ? 'warning' : 'secondary'}>
+                            {task.status || 'pending'}
+                          </Badge>
+                        </div>
+                        <p className="text-sm text-muted-foreground mb-3">{task.subject || 'General'}</p>
+                        <div className="space-y-2 mb-4">
+                          <div className="flex justify-between text-sm">
+                            <span>Progress</span>
+                            <span>{Math.min(progress, 100).toFixed(1)}%</span>
+                          </div>
+                          <Progress value={Math.min(progress, 100)} className="h-2" />
+                          <div className="flex justify-between text-xs text-muted-foreground">
+                            <span>{isActive ? Math.floor(elapsedTime / 60) : (task.completedTime || 0)} min completed</span>
+                            <span>{duration} min total</span>
+                          </div>
+                        </div>
+                        {task.status !== 'completed' && (
+                          isActive ? (
+                            <Button size="sm" onClick={stopTask} variant="destructive">
+                              <Square className="w-3 h-3 mr-1" />
+                              Stop
+                            </Button>
+                          ) : (
+                            <Button size="sm" onClick={() => startTask(task.id)} disabled={!!activeTaskId}>
+                              <Play className="w-3 h-3 mr-1" />
+                              Start
+                            </Button>
+                          )
+                        )}
                       </div>
-                      <Progress value={task.progress||0} className="h-2" />
-                      <div className="flex justify-between text-xs text-muted-foreground">
-                        <span>{task.completedTime||0} min completed</span>
-                        <span>{task.estimatedTime||30} min total</span>
-                      </div>
-                    </div>
-                    {task.status !== 'completed' && (
-                      <Button size="sm">
-                        <Play className="w-3 h-3 mr-1" />
-                        {task.status === 'in-progress' ? 'Continue' : 'Start'}
-                      </Button>
-                    )}
-                  </div>
-                ))}
+                    )
+                  })
+                )}
               </CardContent>
             </Card>
           </div>

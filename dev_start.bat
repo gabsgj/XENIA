@@ -10,9 +10,18 @@ if not exist backend\venv (
   py -3 -m venv backend\venv || python -m venv backend\venv
 )
 
-call backend\venv\Scripts\activate.bat
-pip install --upgrade pip >NUL 2>&1
-pip install -r backend\requirements.txt || goto :pipfail
+rem Try to activate the venv; if activation script missing, fall back to system Python
+if exist backend\venv\Scripts\activate.bat (
+  call backend\venv\Scripts\activate.bat
+  set "USE_SYSTEM_PY="
+  pip install --upgrade pip >NUL 2>&1
+  pip install -r backend\requirements.txt || goto :pipfail
+) else (
+  echo WARNING: virtualenv activation script not found - using system Python
+  set "USE_SYSTEM_PY=1"
+  py -3 -m pip install --user --upgrade pip >NUL 2>&1
+  py -3 -m pip install --user -r backend\requirements.txt || goto :pipfail
+)
 
 echo.
 echo [Backend ENV Detection]
@@ -27,7 +36,11 @@ if exist .env (
 )
 
 echo Starting backend (port 8000)...
-start "xenia-backend" /D backend cmd /c "call venv\Scripts\activate.bat && python run.py"
+if defined USE_SYSTEM_PY (
+  start "xenia-backend" /D backend cmd /k "py -3 run.py"
+) else (
+  start "xenia-backend" /D backend cmd /k "call venv\Scripts\activate.bat && python run.py"
+)
 
 cd frontend
 if not exist node_modules (
@@ -36,7 +49,7 @@ if not exist node_modules (
 )
 
 echo Starting frontend (port 3000)...
-start "xenia-frontend" cmd /c "npm run dev"
+start "xenia-frontend" cmd /k "npm run dev"
 cd ..
 
 echo.
@@ -45,7 +58,6 @@ echo Press Ctrl+C in this window to exit monitors.
 
 :loop
 ping -n 6 127.0.0.1 >NUL
-if not exist backend\venv\Scripts\python.exe goto :end
 goto :loop
 
 :pipfail

@@ -8,6 +8,28 @@ logger = logging.getLogger('xenia')
 tasks_bp = Blueprint("tasks", __name__)
 
 
+@tasks_bp.get("/")
+def get_tasks():
+    logger.info("📋 Get tasks endpoint called")
+    sb = get_supabase()
+    user_id = request.headers.get("X-User-Id") or request.args.get("user_id")
+    if not user_id:
+        raise ApiError("AUTH_401", "Missing user_id")
+    
+    from ..utils import normalize_user_id
+    norm_user_id = normalize_user_id(user_id)
+    
+    today = datetime.now(timezone.utc).date().isoformat()
+    try:
+        resp = sb.table("tasks").select("*").eq("user_id", norm_user_id).eq("due_date", today).execute()
+        tasks = resp.data or []
+        logger.info(f"   Retrieved {len(tasks)} tasks for today")
+        return {"tasks": tasks}
+    except Exception as e:
+        logger.warning(f"   Failed to fetch tasks: {e}")
+        raise ApiError("DB_READ_FAIL", "Unable to fetch tasks")
+
+
 @tasks_bp.post("/track")
 def track_session():
     logger.info("📝 Track session endpoint called")
