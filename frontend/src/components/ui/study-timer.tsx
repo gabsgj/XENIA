@@ -16,11 +16,13 @@ export function StudyTimer({ duration, status, onStatusChange, onComplete }: Stu
   const [timeLeft, setTimeLeft] = useState(duration * 60) // convert to seconds
   const [isRunning, setIsRunning] = useState(false)
   const [startTime, setStartTime] = useState<number | null>(null)
+  const [progress, setProgress] = useState(0)
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
 
   // Reset timer when duration changes
   useEffect(() => {
     setTimeLeft(duration * 60)
+    setProgress(0)
     setIsRunning(false)
     setStartTime(null)
     if (intervalRef.current) {
@@ -34,12 +36,14 @@ export function StudyTimer({ duration, status, onStatusChange, onComplete }: Stu
     if (status === 'completed') {
       setIsRunning(false)
       setTimeLeft(0)
+      setProgress(100)
       if (intervalRef.current) {
         clearInterval(intervalRef.current)
         intervalRef.current = null
       }
     } else if (status === 'pending') {
       setTimeLeft(duration * 60)
+      setProgress(0)
       setIsRunning(false)
       setStartTime(null)
       if (intervalRef.current) {
@@ -68,6 +72,7 @@ export function StudyTimer({ duration, status, onStatusChange, onComplete }: Stu
   const resetTimer = () => {
     setIsRunning(false)
     setTimeLeft(duration * 60)
+    setProgress(0)
     setStartTime(null)
     if (intervalRef.current) {
       clearInterval(intervalRef.current)
@@ -100,7 +105,12 @@ export function StudyTimer({ duration, status, onStatusChange, onComplete }: Stu
             completeTimer()
             return 0
           }
-          return prev - 1
+          const newTimeLeft = prev - 1
+          // Update progress based on time elapsed
+          const elapsed = (duration * 60) - newTimeLeft
+          const newProgress = (elapsed / (duration * 60)) * 100
+          setProgress(Math.min(newProgress, 100))
+          return newTimeLeft
         })
       }, 1000)
     } else {
@@ -115,15 +125,13 @@ export function StudyTimer({ duration, status, onStatusChange, onComplete }: Stu
         clearInterval(intervalRef.current)
       }
     }
-  }, [isRunning, timeLeft])
+  }, [isRunning, timeLeft, duration])
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60)
     const secs = seconds % 60
     return `${mins}:${secs.toString().padStart(2, '0')}`
   }
-
-  const progress = ((duration * 60 - timeLeft) / (duration * 60)) * 100
 
   if (status === 'completed') {
     return (
@@ -135,12 +143,20 @@ export function StudyTimer({ duration, status, onStatusChange, onComplete }: Stu
   }
 
   return (
-    <div className="flex flex-col gap-2 min-w-[200px]">
-      <div className="flex items-center justify-between">
-        <span className="text-sm font-medium">{formatTime(timeLeft)}</span>
-        <div className="flex gap-1">
+    <div className="flex flex-col gap-3 min-w-[240px]">
+      {/* Timer Display and Controls Row */}
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-2">
+          <span className="text-lg font-mono font-semibold tabular-nums">
+            {formatTime(timeLeft)}
+          </span>
+          <span className="text-xs text-muted-foreground">
+            / {formatTime(duration * 60)}
+          </span>
+        </div>
+        <div className="flex gap-2">
           {status === 'pending' && (
-            <Button size="sm" onClick={startTimer}>
+            <Button size="sm" onClick={startTimer} className="px-3">
               <Play className="w-3 h-3 mr-1" />
               Start
             </Button>
@@ -148,21 +164,21 @@ export function StudyTimer({ duration, status, onStatusChange, onComplete }: Stu
           {status === 'in-progress' && (
             <>
               {isRunning ? (
-                <Button size="sm" variant="outline" onClick={pauseTimer}>
+                <Button size="sm" variant="outline" onClick={pauseTimer} className="px-3">
                   <Pause className="w-3 h-3 mr-1" />
                   Pause
                 </Button>
               ) : (
-                <Button size="sm" onClick={startTimer}>
+                <Button size="sm" onClick={startTimer} className="px-3">
                   <Play className="w-3 h-3 mr-1" />
                   Resume
                 </Button>
               )}
-              <Button size="sm" variant="outline" onClick={resetTimer}>
+              <Button size="sm" variant="outline" onClick={resetTimer} className="px-3">
                 <RotateCcw className="w-3 h-3 mr-1" />
                 Reset
               </Button>
-              <Button size="sm" onClick={completeTimer}>
+              <Button size="sm" onClick={completeTimer} className="px-3">
                 <CheckCircle className="w-3 h-3 mr-1" />
                 Complete
               </Button>
@@ -170,8 +186,20 @@ export function StudyTimer({ duration, status, onStatusChange, onComplete }: Stu
           )}
         </div>
       </div>
+
+      {/* Progress Bar */}
       {status === 'in-progress' && (
-        <Progress value={progress} className="h-2" />
+        <div className="space-y-1">
+          <Progress
+            value={progress}
+            className="h-2 transition-all duration-1000 ease-linear"
+          />
+          <div className="flex justify-between text-xs text-muted-foreground">
+            <span>0:00</span>
+            <span>{Math.round(progress)}% complete</span>
+            <span>{formatTime(duration * 60)}</span>
+          </div>
+        </div>
       )}
     </div>
   )

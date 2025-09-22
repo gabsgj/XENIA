@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useRef } from 'react'
-import { api } from '@/lib/api'
+import { api, getUserId } from '@/lib/api'
 import { MainLayout } from '@/components/navigation'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -18,6 +18,7 @@ import {
   Timer,
   Square
 } from 'lucide-react'
+import { StudyTimer } from '@/components/ui/study-timer'
 
 interface Task {
   id: string
@@ -31,20 +32,18 @@ export default function TasksPage(){
   const [topic, setTopic] = useState('Algebra')
   const [minutes, setMinutes] = useState(30)
   const [status, setStatus] = useState('')
-  const [activeTimer, setActiveTimer] = useState<boolean>(false)
-  const [timerMinutes, setTimerMinutes] = useState(0)
   const { pushError } = useErrorContext()
   const [tasks, setTasks] = useState<Task[]>([])
   const [sessions, setSessions] = useState<any[]>([])
   const [userId, setUserId] = useState<string>('')
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null)
-  const [elapsedTime, setElapsedTime] = useState(0)
+  const [timerStatus, setTimerStatus] = useState<'pending' | 'in-progress' | 'completed'>('pending')
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
 
   // Load user ID
   useEffect(() => {
-    const stored = localStorage.getItem('userId')
-    if (stored) setUserId(stored)
+    const userId = getUserId()
+    setUserId(userId)
   }, [])
 
   // Fetch today's tasks
@@ -64,32 +63,70 @@ export default function TasksPage(){
     })()
   }, [userId, pushError])
 
-  // Timer logic for active task
+  // Fetch recent sessions for progress
   useEffect(() => {
-    if (activeTaskId) {
-      intervalRef.current = setInterval(() => {
-        setElapsedTime(prev => prev + 1)
-      }, 1000)
-    } else {
-      if (intervalRef.current) clearInterval(intervalRef.current)
-      setElapsedTime(0)
-    }
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current)
-    }
-  }, [activeTaskId])
+    if (!userId) return
+    ;(async () => {
+      try {
+        const data = await api('/api/analytics/student')
+        setSessions(data.sessions || [])
+      } catch (e: any) {
+        // Sessions fetch is optional, don't show error
+        console.warn('Failed to load sessions:', e)
+      }
+    })()
+  }, [userId])
 
   const startTask = (taskId: string) => {
     if (activeTaskId && activeTaskId !== taskId) {
       // Stop current task
       setActiveTaskId(null)
+      setTimerStatus('pending')
     }
     setActiveTaskId(taskId)
-    setElapsedTime(0)
+    setTimerStatus('pending')
   }
 
   const stopTask = () => {
     setActiveTaskId(null)
+    setTimerStatus('pending')
+  }
+
+  const handleTimerStatusChange = (newStatus: 'pending' | 'in-progress' | 'completed') => {
+    setTimerStatus(newStatus)
+  }
+
+  const handleTimerComplete = async (actualTime: number) => {
+    if (!activeTaskId) return
+    
+    try {
+      // Find the active task to get its topic
+      const activeTask = tasks.find(t => t.id === activeTaskId)
+      if (!activeTask) return
+      
+      // Track the session
+      await api('/api/tasks/track', { 
+        method: 'POST', 
+        body: JSON.stringify({ 
+          topic: activeTask.topic, 
+          duration_min: actualTime 
+        }) 
+      })
+      
+      setStatus('Session logged successfully!')
+      setActiveTaskId(null)
+      setTimerStatus('pending')
+      
+      // Refresh tasks to show updated progress
+      const data = await api('/api/tasks')
+      setTasks(data.tasks || [])
+    } catch (e: any) {
+      pushError({
+        errorCode: e?.errorCode || 'TRACK_FAILED',
+        errorMessage: e?.errorMessage || 'Failed to track session',
+        details: e
+      })
+    }
   }
 
   async function track(){
@@ -117,7 +154,7 @@ export default function TasksPage(){
             <h1 className='text-3xl md:text-4xl font-bold tracking-tight'>Tasks & Sessions</h1>
             <p className='text-muted-foreground'>Manage your study tasks and track your learning sessions</p>
           </div>
-          <Button>
+          <Button disabled title="Tasks are automatically created from your study plans">
             <Plus className="w-4 h-4 mr-2" />
             New Task
           </Button>
@@ -138,7 +175,6 @@ export default function TasksPage(){
                   tasks.map((task: any) => {
                     const isActive = activeTaskId === task.id
                     const duration = task.duration_minutes || task.estimatedTime || 30
-                    const progress = isActive ? (elapsedTime / (duration * 60)) * 100 : (task.progress || 0)
                     return (
                       <div key={task.id} className="p-4 border rounded-lg hover:bg-muted/50 transition-all">
                         <div className="flex items-center justify-between mb-3">
@@ -150,14 +186,14 @@ export default function TasksPage(){
                         <p className="text-sm text-muted-foreground mb-3">{task.subject || 'General'}</p>
                         <div className="space-y-2 mb-4">
                           <div className="flex justify-between text-sm">
-                            <span>Progress</span>
-                            <span>{Math.min(progress, 100).toFixed(1)}%</span>
+                            <span>Duration</span>
+                            <span>{duration} minutes</span>
                           </div>
-                          <Progress value={Math.min(progress, 100)} className="h-2" />
-                          <div className="flex justify-between text-xs text-muted-foreground">
-                            <span>{isActive ? Math.floor(elapsedTime / 60) : (task.completedTime || 0)} min completed</span>
-                            <span>{duration} min total</span>
-                          </div>
+                          {isActive && timerStatus === 'in-progress' && (
+                            <div className="text-xs text-muted-foreground">
+                              Timer running...
+                            </div>
+                          )}
                         </div>
                         {task.status !== 'completed' && (
                           isActive ? (
@@ -191,17 +227,19 @@ export default function TasksPage(){
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-center space-y-4">
-                  <div className="text-4xl font-bold">{String(Math.floor(timerMinutes / 60)).padStart(2, '0')}:{String(timerMinutes % 60).padStart(2, '0')}</div>
-                  <div className="flex gap-2">
-                    <Button size="sm" className="flex-1" onClick={() => setActiveTimer(!activeTimer)}>
-                      {activeTimer ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />}
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={() => setTimerMinutes(0)}>
-                      Reset
-                    </Button>
+                {activeTaskId ? (
+                  <StudyTimer
+                    duration={tasks.find(t => t.id === activeTaskId)?.duration_minutes || 30}
+                    status={timerStatus}
+                    onStatusChange={handleTimerStatusChange}
+                    onComplete={handleTimerComplete}
+                  />
+                ) : (
+                  <div className="text-center text-muted-foreground py-8">
+                    <Timer className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                    <p>Select a task to start the timer</p>
                   </div>
-                </div>
+                )}
               </CardContent>
             </Card>
 
@@ -255,9 +293,17 @@ export default function TasksPage(){
                 <Progress value={tasks.length? Math.round((tasks.filter(t=>t.status==='done').length/Math.max(1,tasks.length))*100):33} className="h-2" />
                 <div className="flex items-center justify-between">
                   <span className="text-sm">Study Time Goal</span>
-                  <span className="font-semibold">{sessions.reduce((a,b)=>a+(b.duration_min||0),0)}/180 min</span>
+                  <span className="font-semibold">{sessions.filter(s => {
+                    const sessionDate = new Date(s.created_at).toDateString()
+                    const today = new Date().toDateString()
+                    return sessionDate === today
+                  }).reduce((a,b)=>a+(b.duration_min||0),0)}/180 min</span>
                 </div>
-                <Progress value={Math.min(100, Math.round((sessions.reduce((a,b)=>a+(b.duration_min||0),0)/180)*100))} className="h-2" />
+                <Progress value={Math.min(100, Math.round((sessions.filter(s => {
+                  const sessionDate = new Date(s.created_at).toDateString()
+                  const today = new Date().toDateString()
+                  return sessionDate === today
+                }).reduce((a,b)=>a+(b.duration_min||0),0)/180)*100))} className="h-2" />
               </CardContent>
             </Card>
           </div>

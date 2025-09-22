@@ -15,6 +15,7 @@ def normalize_user_id(raw: Optional[str]) -> str:
     """Return a deterministic UUID for any raw user identifier.
 
     - If raw is a valid UUID -> return as-is
+    - If raw starts with 'anon-' -> treat as anonymous but keep unique
     - Else hash via UUID5 for stability
     """
     if not raw:
@@ -23,6 +24,9 @@ def normalize_user_id(raw: Optional[str]) -> str:
         uuid.UUID(raw)
         return raw
     except Exception:
+        # For anonymous IDs starting with 'anon-', create a stable UUID
+        if raw.startswith('anon-'):
+            return str(uuid.uuid5(uuid.NAMESPACE_URL, raw))
         return str(uuid.uuid5(uuid.NAMESPACE_URL, raw))
 
 

@@ -48,7 +48,18 @@ export default function TutorPage(){
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // Load authenticated user id if available (Supabase); fallback handled by backend normalization
+  // Generate or load anonymous user ID for session-based conversations
+  const getAnonymousUserId = () => {
+    const storageKey = 'xenia-tutor-anonymous-id'
+    let anonymousId = localStorage.getItem(storageKey)
+    if (!anonymousId) {
+      anonymousId = `anon-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+      localStorage.setItem(storageKey, anonymousId)
+    }
+    return anonymousId
+  }
+
+  // Load authenticated user id if available (Supabase); fallback to anonymous ID
   useEffect(() => {
     let active = true
     ;(async () => {
@@ -57,7 +68,12 @@ export default function TutorPage(){
         const supabase = await getSupabaseClient()
         const { data } = await supabase.auth.getSession()
         if (!active) return
-        if (data.session?.user?.id) setUserId(data.session.user.id)
+        if (data.session?.user?.id) {
+          setUserId(data.session.user.id)
+        } else {
+          // Use anonymous ID for session-based conversations
+          setUserId(getAnonymousUserId())
+        }
       } catch {/* ignore */}
     })()
     return () => { active = false }
@@ -104,6 +120,13 @@ export default function TutorPage(){
   async function ask(){
     if (!question.trim() && !file) return
 
+    // Ensure we have a user ID (either authenticated or anonymous)
+    const currentUserId = userId || getAnonymousUserId()
+    if (!currentUserId) {
+      pushError({ errorCode: 'TUTOR_NO_USER', errorMessage: 'Unable to identify user session' })
+      return
+    }
+
     const userMessage: TutorMessage = {
       id: Date.now(),
       type: 'user',
@@ -121,12 +144,11 @@ export default function TutorPage(){
       if (file){
         const form = new FormData()
         form.append('file', file)
-        // only send user_id if we truly have one; backend will normalize implicitly
-        if (userId) form.append('user_id', userId)
+        form.append('user_id', currentUserId)
         const r = await fetch(`${API_BASE}/api/tutor/ask`, { 
           method:'POST', 
           body: form,
-          headers: userId ? { 'X-User-Id': userId } : undefined
+          headers: { 'X-User-Id': currentUserId }
         })
         const j = await r.json().catch(()=> null)
         if(!r.ok){ 
@@ -139,9 +161,9 @@ export default function TutorPage(){
           method:'POST', 
           headers:{
             'Content-Type':'application/json',
-            ...(userId ? { 'X-User-Id': userId } : {})
+            'X-User-Id': currentUserId
           }, 
-          body: JSON.stringify({ question, ...(userId ? { user_id: userId } : {}) }) 
+          body: JSON.stringify({ question, user_id: currentUserId }) 
         })
         const j = await r.json().catch(()=> null)
         if(!r.ok){ 

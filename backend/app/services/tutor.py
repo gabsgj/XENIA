@@ -8,6 +8,7 @@ from .tutor_storage import save_message, fetch_history
 from ..utils import is_valid_uuid
 from ..errors import ApiError
 import re
+import traceback
 
 logger = logging.getLogger('xenia')
 
@@ -249,36 +250,37 @@ def solve_question(
 ) -> Dict:
     """Enhanced question solving with advanced AI tutoring capabilities."""
     
-    if not question and not image_bytes:
-        raise ApiError("TUTOR_TIMEOUT", "No input provided to tutor", status=400)
-    
-    # Extract text from image if provided
-    if not question and image_bytes:
-        question = EnhancedTutor.extract_text_from_image(image_bytes)
-        logger.info(f"Extracted question from image: {question[:100]}...")
-    
-    if not question or len(question.strip()) < 3:
-        raise ApiError("TUTOR_INVALID_INPUT", "Question is too short or unclear", status=400)
-    
-    # Analyze question type for targeted tutoring
-    question_analysis = EnhancedTutor.analyze_question_type(question)
-    logger.info(f"Question analysis: {question_analysis}")
-    
-    # Try advanced AI-powered solution first
-    advanced_steps = EnhancedTutor.generate_advanced_solution(question, question_analysis)
-    
-    if advanced_steps:
-        steps = advanced_steps
-        logger.info(f"Using advanced AI solution with {len(steps)} steps")
-    else:
-        # Fallback to basic remediation steps
-        logger.info("Falling back to basic remediation steps")
-        steps = get_remediation_steps(user_id=user_id, question_text=question)
-        
-    # Try basic AI enrichment as additional fallback
     try:
-      from .ai_providers import get_ai_response
-      markdown_prompt = f"""
+        if not question and not image_bytes:
+            raise ApiError("TUTOR_TIMEOUT", "No input provided to tutor", status=400)
+        
+        # Extract text from image if provided
+        if not question and image_bytes:
+            question = EnhancedTutor.extract_text_from_image(image_bytes)
+            logger.info(f"Extracted question from image: {question[:100]}...")
+        
+        if not question or len(question.strip()) < 3:
+            raise ApiError("TUTOR_INVALID_INPUT", "Question is too short or unclear", status=400)
+        
+        # Analyze question type for targeted tutoring
+        question_analysis = EnhancedTutor.analyze_question_type(question)
+        logger.info(f"Question analysis: {question_analysis}")
+        
+        # Try advanced AI-powered solution first
+        advanced_steps = EnhancedTutor.generate_advanced_solution(question, question_analysis)
+        
+        if advanced_steps:
+            steps = advanced_steps
+            logger.info(f"Using advanced AI solution with {len(steps)} steps")
+        else:
+            # Fallback to basic remediation steps
+            logger.info("Falling back to basic remediation steps")
+            steps = get_remediation_steps(user_id=user_id, question_text=question)
+            
+        # Try basic AI enrichment as additional fallback
+        try:
+          from .ai_providers import get_ai_response
+          markdown_prompt = f"""
 Provide a step-by-step solution for this question in JSON format with Markdown formatting:
 
 QUESTION: {question}
@@ -300,69 +302,94 @@ Return only JSON in this format:
   ]
 }}
 """
-      enriched_raw = get_ai_response(markdown_prompt)
-      if enriched_raw:
-        import json
-        try:
-          parsed = json.loads(enriched_raw)
-          if isinstance(parsed, dict) and isinstance(parsed.get('steps'), list) and parsed['steps']:
-            steps = parsed['steps']
-            logger.info("Enhanced with basic AI steps")
+          enriched_raw = get_ai_response(markdown_prompt)
+          if enriched_raw:
+            import json
+            try:
+              parsed = json.loads(enriched_raw)
+              if isinstance(parsed, dict) and isinstance(parsed.get('steps'), list) and parsed['steps']:
+                steps = parsed['steps']
+                logger.info("Enhanced with basic AI steps")
+            except Exception as e:
+              logger.warning(f"Basic AI enhancement failed: {e}")
         except Exception as e:
-          logger.warning(f"Basic AI enhancement failed: {e}")
+          logger.warning(f"AI enrichment failed: {e}")
+
+        # Build comprehensive response with metadata
+        # Per UI contract: if `steps` are present, keep `answer` as a short intro/summary only
+        # Normalize and ensure sequential numbering on step titles so frontend can render them verbatim
+        def _renumber_steps(steps_list, add_numbers=True):
+          normalized = []
+          for idx, st in enumerate(steps_list, start=1):
+            if not isinstance(st, dict):
+              st = {'title': str(st)}
+            title = st.get('title', '') or ''
+            logger.info(f"Original title {idx}: '{title}'")
+            # strip existing leading numbering - be very aggressive
+            # Remove patterns like: 1., 1), Step 1:, **1.**, etc.
+            title_clean = re.sub(r'^\s*\*?\*?\s*(?:Step\s+)?\d+\s*[\)\.:\-\s]+\*?\*?\s*', '', title, flags=re.IGNORECASE).strip()
+            # Also remove any remaining number patterns at the start
+            title_clean = re.sub(r'^\s*\d+\s*[\)\.:\-\s]*', '', title_clean, flags=re.IGNORECASE).strip()
+            # Clean up any double spaces or weird formatting
+            title_clean = re.sub(r'\s+', ' ', title_clean).strip()
+            if add_numbers:
+              new_title = f"{idx}. {title_clean}" if title_clean else f"{idx}."
+            else:
+              new_title = title_clean
+            logger.info(f"Renumbered title {idx}: '{new_title}'")
+            st['title'] = new_title
+            normalized.append(st)
+          return normalized
+
+        if steps:
+          try:
+            steps = _renumber_steps(steps, add_numbers=True)  # Set to False to remove numbering
+          except Exception as e:
+            logger.warning(f"Failed to renumber steps: {e}")
+          answer = "Here are the steps to solve the problem."
+        else:
+          answer_lines = []
+          for idx, step in enumerate(steps):
+            step_title = step.get('title', f'Step {idx+1}')
+            step_detail = step.get('detail', '')
+            step_calc = step.get('calculation', '')
+            step_code = step.get('code_snippet', '')
+
+            line = f"{idx+1}. {step_title}: {step_detail}"
+            if step_calc:
+              line += f"\n   Calculation: {step_calc}"
+            if step_code:
+              line += f"\n   Code: {step_code}"
+            answer_lines.append(line)
+
+          answer = "\n\n".join(answer_lines) if answer_lines else "I'm sorry, I couldn't generate an answer."
+
+        # Save conversation to history if valid user
+        if is_valid_uuid(user_id):
+          try:
+            save_message(user_id, 'user', question)
+            save_message(user_id, 'ai', answer, steps=steps)
+            logger.info(f"Saved tutor conversation for user {user_id}")
+          except Exception as e:
+            logger.warning(f"Could not save conversation: {e}")
+
+        # Get conversation history if requested
+        history: List[Dict] = []
+        if include_history and is_valid_uuid(user_id):
+          history = fetch_history(user_id)
+
+        return {"question": question, "steps": steps, "answer": answer, "history": history}
+    
+    except ApiError:
+        # Re-raise API errors as-is
+        raise
     except Exception as e:
-      logger.warning(f"AI enrichment failed: {e}")
-
-    # Build comprehensive response with metadata
-    # Per UI contract: if `steps` are present, keep `answer` as a short intro/summary only
-    # Normalize and ensure sequential numbering on step titles so frontend can render them verbatim
-    def _renumber_steps(steps_list):
-      normalized = []
-      for idx, st in enumerate(steps_list, start=1):
-        if not isinstance(st, dict):
-          st = {'title': str(st)}
-        title = st.get('title', '') or ''
-        # strip existing leading numbering like '1.', 'Step 1:', '1) ', 'Step 1 - '
-        title_clean = re.sub(r'^\s*(?:Step\s*)?\d+[\)\.:\-\s]*', '', title, flags=re.IGNORECASE).strip()
-        st['title'] = f"{idx}. {title_clean}" if title_clean else f"{idx}."
-        normalized.append(st)
-      return normalized
-
-    if steps:
-      try:
-        steps = _renumber_steps(steps)
-      except Exception as e:
-        logger.warning(f"Failed to renumber steps: {e}")
-      answer = "Here are the steps to solve the problem."
-    else:
-      answer_lines = []
-      for idx, step in enumerate(steps):
-        step_title = step.get('title', f'Step {idx+1}')
-        step_detail = step.get('detail', '')
-        step_calc = step.get('calculation', '')
-        step_code = step.get('code_snippet', '')
-
-        line = f"{idx+1}. {step_title}: {step_detail}"
-        if step_calc:
-          line += f"\n   Calculation: {step_calc}"
-        if step_code:
-          line += f"\n   Code: {step_code}"
-        answer_lines.append(line)
-
-      answer = "\n\n".join(answer_lines) if answer_lines else "I'm sorry, I couldn't generate an answer."
-
-    # Save conversation to history if valid user
-    if is_valid_uuid(user_id):
-      try:
-        save_message(user_id, 'user', question)
-        save_message(user_id, 'ai', answer, steps=steps)
-        logger.info(f"Saved tutor conversation for user {user_id}")
-      except Exception as e:
-        logger.warning(f"Could not save conversation: {e}")
-
-    # Get conversation history if requested
-    history: List[Dict] = []
-    if include_history and is_valid_uuid(user_id):
-      history = fetch_history(user_id)
-
-    return {"question": question, "steps": steps, "answer": answer, "history": history}
+        logger.error(f"Unexpected error in solve_question: {e}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        # Return a fallback response instead of crashing
+        return {
+            "question": question or "Unknown question",
+            "steps": [],
+            "answer": "I'm experiencing technical difficulties right now. Please try again in a moment, or rephrase your question.",
+            "history": []
+        }

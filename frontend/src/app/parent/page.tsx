@@ -128,11 +128,12 @@ export default function ParentPage() {
   return (
     <MainLayout>
       {/* Demo Mode Indicator */}
-      <div className="bg-orange-100 dark:bg-orange-900/20 border border-orange-300 dark:border-orange-700 rounded-lg p-4 mb-6">
-        <div className="flex items-center gap-2">
-          <AlertTriangle className="w-5 h-5 text-orange-600 dark:text-orange-400" />
-          <span className="font-semibold text-orange-800 dark:text-orange-200">Demo Mode</span>
-          <span className="text-orange-700 dark:text-orange-300">This page is displaying mock data for demonstration purposes.</span>
+      <div className="fixed top-4 right-4 z-50">
+        <div className="bg-amber-50 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-800 rounded-full px-3 py-1.5 shadow-sm">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+            <span className="text-sm font-medium text-amber-800 dark:text-amber-200">Demo Mode</span>
+          </div>
         </div>
       </div>
 
