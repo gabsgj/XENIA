@@ -11,6 +11,38 @@ import logging
 logger = logging.getLogger('xenia')
 
 
+def _sync_plan_tasks(norm_user_id: str, plan: Dict) -> None:
+    """Sync plan sessions into the tasks table so frontend sees tasks immediately.
+
+    Creates/upserts a task per session (due_date set from session.date).
+    Best-effort: logs and continues on failure.
+    """
+    try:
+        if not is_valid_uuid(norm_user_id):
+            logger.info("   Not a valid UUID user - skipping task sync")
+            return
+        sb = get_supabase()
+        sessions = plan.get("sessions", []) or []
+        rows = []
+        for s in sessions:
+            # Map session date to due_date; fallback to generated_at
+            due = s.get("date")
+            rows.append({
+                "user_id": norm_user_id,
+                "topic": s.get("topic"),
+                "status": s.get("status") or "todo",
+                "due_date": due,
+            })
+        if rows:
+            try:
+                sb.table("tasks").upsert(rows).execute()
+                logger.info(f"   Synced {len(rows)} plan sessions into tasks for user {norm_user_id}")
+            except Exception as e:
+                logger.warning(f"   Failed to upsert tasks for user {norm_user_id}: {e}")
+    except Exception as e:
+        logger.warning(f"   Task sync failed unexpectedly: {e}")
+
+
 def _distribute_sessions(topics: List[Dict], days: int, hours_per_day: float) -> List[Dict]:
     sessions = []
     # Use timezone-aware UTC date (avoids deprecated datetime.utcnow())
@@ -223,6 +255,11 @@ def generate_plan(
                         try:
                             sb.table("plans").upsert({"user_id": norm_user_id, "plan": plan}).execute()
                             logger.info(f"   Plan stored in database for user {norm_user_id}")
+                            # Also create tasks from plan sessions so UI shows tasks immediately
+                            try:
+                                _sync_plan_tasks(norm_user_id, plan)
+                            except Exception as e:
+                                logger.warning(f"   Task sync after plan upsert failed: {e}")
                             break
                         except Exception as e:
                             if attempt < max_retries - 1:
@@ -287,6 +324,10 @@ def generate_plan(
                     try:
                         sb.table("plans").upsert({"user_id": norm_user_id, "plan": plan}).execute()
                         logger.info(f"   Advanced plan stored for user {norm_user_id}")
+                        try:
+                            _sync_plan_tasks(norm_user_id, plan)
+                        except Exception as e:
+                            logger.warning(f"   Task sync after advanced plan upsert failed: {e}")
                         break
                     except Exception as e:
                         if attempt < max_retries - 1:
@@ -326,6 +367,10 @@ def generate_plan(
                 try:
                     sb.table("plans").upsert({"user_id": norm_user_id, "plan": plan}).execute()
                     logger.info(f"   Traditional plan stored for user {norm_user_id}")
+                    try:
+                        _sync_plan_tasks(norm_user_id, plan)
+                    except Exception as e:
+                        logger.warning(f"   Task sync after traditional plan upsert failed: {e}")
                     break
                 except Exception as e:
                     if attempt < max_retries - 1:

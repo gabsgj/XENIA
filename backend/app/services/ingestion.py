@@ -167,19 +167,57 @@ def handle_upload(file_storage, user_id: str, artifact_type: str) -> Dict:
                 topics.append(main_topic)
                 topics.extend(subtopics)
             
-            # Store topics in topic store for quiz generation
+            # Store topics in topic store for quiz generation and persist to DB when possible
             if topics:
                 with _timer("store_topics"):
+                    # Keep in-memory for quick dev feedback
                     store_add_topics(norm_user_id, topics)
+                    # Attempt to persist to syllabus_topics table (best-effort)
+                    try:
+                        sb = get_supabase()
+                        rows = []
+                        for idx, t in enumerate(topics):
+                            rows.append({
+                                "user_id": norm_user_id if is_valid_uuid(norm_user_id) else None,
+                                "topic": t,
+                                "order_index": idx + 1,
+                                "source_artifact": artifact_id,
+                            })
+                        if rows and is_valid_uuid(norm_user_id):
+                            try:
+                                sb.table("syllabus_topics").upsert(rows).execute()
+                                print(f"📚 Persisted {len(rows)} topics to DB for user {norm_user_id}")
+                            except Exception as e:
+                                print(f"⚠️ Failed to persist topics to DB: {e}")
+                    except Exception as e:
+                        print(f"⚠️ Topic DB persistence skipped (supabase unavailable): {e}")
                 print(f"📚 Stored {len(topics)} topics for user {norm_user_id}")
             
         except Exception:
             from .weaktopics import extract_topics_from_text
             topics = extract_topics_from_text(text)
-            # Store fallback topics as well
+            # Store fallback topics as well and attempt DB persistence
             if topics:
                 with _timer("store_topics"):
                     store_add_topics(norm_user_id, topics)
+                    try:
+                        sb = get_supabase()
+                        rows = []
+                        for idx, t in enumerate(topics):
+                            rows.append({
+                                "user_id": norm_user_id if is_valid_uuid(norm_user_id) else None,
+                                "topic": t,
+                                "order_index": idx + 1,
+                                "source_artifact": artifact_id,
+                            })
+                        if rows and is_valid_uuid(norm_user_id):
+                            try:
+                                sb.table("syllabus_topics").upsert(rows).execute()
+                                print(f"📚 Persisted {len(rows)} fallback topics to DB for user {norm_user_id}")
+                            except Exception as e:
+                                print(f"⚠️ Failed to persist fallback topics to DB: {e}")
+                    except Exception as e:
+                        print(f"⚠️ Topic DB persistence skipped (supabase unavailable): {e}")
                 print(f"📚 Stored {len(topics)} fallback topics for user {norm_user_id}")
     elif artifact_type == "assessment":
         try:
