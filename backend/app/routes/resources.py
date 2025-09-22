@@ -128,13 +128,17 @@ def update_progress():
                 new_status = upd.get("status", "completed")
                 session_map[key]["status"] = new_status
                 
+                # Update duration if provided
+                if "duration_min" in upd:
+                    session_map[key]["duration_min"] = upd["duration_min"]
+                
                 # If session was just completed, record it in analytics
                 if old_status != "completed" and new_status == "completed":
                     session_data = session_map[key]
                     completed_sessions.append({
                         "user_id": user_id,
                         "topic": session_data.get("topic"),
-                        "duration_min": session_data.get("duration_min", 45),
+                        "duration_min": session_data.get("duration_min", 45),  # Now uses updated duration
                         "status": "completed",
                         "created_at": f"{upd.get('date')}T12:00:00Z"  # Use session date
                     })

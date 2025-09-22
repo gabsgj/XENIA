@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { LoadingButton, SkeletonCard } from "@/components/ui/loading";
+import { StudyTimer } from "@/components/ui/study-timer";
 import Link from "next/link";
 import { 
   Calendar, 
@@ -80,12 +81,28 @@ export default function DashboardPage(){
     }
   }, [])
 
-  const markSessionComplete = async (date: string, topic: string, currentStatus: string) => {
+  const updateSessionStatus = async (date: string, topic: string, newStatus: string) => {
     try {
-      const newStatus = currentStatus === 'completed' ? 'pending' : 'completed'
       const resp = await api('/api/resources/progress', {
         method: 'POST',
         body: JSON.stringify({ sessions: [{ date, topic, status: newStatus }] })
+      })
+      if (resp.ok && resp.plan) {
+        setPlan(resp.plan)
+        // Refresh all data to update analytics
+        setTimeout(fetchData, 500) // Small delay to ensure backend processing completes
+      }
+    } catch(e:any){
+      pushError({ errorCode: e?.errorCode||'PLAN_PROGRESS_FAIL', errorMessage: e?.errorMessage, details: e })
+    }
+  }
+
+  const markSessionComplete = async (date: string, topic: string, actualTime: number) => {
+    try {
+      // Update the session status to completed and potentially adjust the duration
+      const resp = await api('/api/resources/progress', {
+        method: 'POST',
+        body: JSON.stringify({ sessions: [{ date, topic, status: 'completed', duration_min: actualTime }] })
       })
       if (resp.ok && resp.plan) {
         setPlan(resp.plan)
@@ -340,23 +357,12 @@ export default function DashboardPage(){
                         <h4 className="font-semibold">{task.subject}</h4>
                         <p className="text-sm text-muted-foreground">{task.topic}</p>
                       </div>
-                      <div className="flex items-center gap-3">
-                        <span className="text-xs text-muted-foreground">{task.duration} min</span>
-                        {task.status === "completed" ? (
-                          <Button size="sm" variant="outline" onClick={() => markSessionComplete(task.date, task.topic, task.status)}>
-                            ✓ Done
-                          </Button>
-                        ) : task.status === "in-progress" ? (
-                          <Button size="sm" onClick={() => markSessionComplete(task.date, task.topic, task.status)}>
-                            <Play className="w-3 h-3 mr-1" />
-                            Complete
-                          </Button>
-                        ) : (
-                          <Button size="sm" variant="outline" onClick={() => markSessionComplete(task.date, task.topic, task.status)}>
-                            Start
-                          </Button>
-                        )}
-                      </div>
+                      <StudyTimer
+                        duration={task.duration}
+                        status={task.status}
+                        onStatusChange={(newStatus) => updateSessionStatus(task.date, task.topic, newStatus)}
+                        onComplete={(actualTime) => markSessionComplete(task.date, task.topic, actualTime)}
+                      />
                     </div>
                     <div className="space-y-2">
                       <div className="flex justify-between text-sm">
