@@ -108,11 +108,23 @@ export default function PlannerPage() {
       // Get user ID from Supabase authentication
       const userId = getUserId()
       
+      // Calculate horizon days based on deadline
+      let horizonDays = 14
+      if (deadline) {
+        const deadlineDate = new Date(deadline)
+        const today = new Date()
+        const diffTime = deadlineDate.getTime() - today.getTime()
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+        if (diffDays > 0) {
+          horizonDays = Math.min(diffDays, 90) // Cap at 90 days
+        }
+      }
+      
       setPlan(await api('/api/plan/generate', { 
         method:'POST', 
         body: JSON.stringify({ 
           user_id: userId, // Use actual user ID from authentication
-          horizon_days: 14, 
+          horizon_days: horizonDays, 
           preferred_hours_per_day: hoursPerDay, 
           deadline: deadline||undefined 
         }) 

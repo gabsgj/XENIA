@@ -7,8 +7,55 @@ from ..utils import normalize_user_id, is_valid_uuid
 from ..supabase_client import get_supabase
 from .deadline_manager import DeadlineManager, StudyPlanOptimizer
 import logging
+import uuid
 
 logger = logging.getLogger('xenia')
+
+
+def _create_tasks_from_sessions(user_id: str, sessions: List[Dict]) -> None:
+    """Create tasks in database from study sessions."""
+    if not is_valid_uuid(user_id) or not sessions:
+        return
+    
+    try:
+        supabase = get_supabase()
+        
+        # Clear existing tasks for this user to avoid duplicates
+        supabase.table("tasks").delete().eq("user_id", user_id).execute()
+        
+        # Create task records from sessions
+        task_records = []
+        for session in sessions:
+            task_record = {
+                "id": str(uuid.uuid4()),
+                "user_id": user_id,
+                "topic": session.get("topic", "Study Session"),
+                "description": session.get("focus", "Study and practice"),
+                "status": "pending",
+                "difficulty": session.get("difficulty", "medium"),
+                "priority": session.get("priority", "medium"),
+                "estimated_duration": session.get("duration_min", 45),
+                "due_date": session.get("date"),
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "metadata": {
+                    "session_type": session.get("session_type", "study"),
+                    "learning_objectives": session.get("learning_objectives", []),
+                    "resources": session.get("resources", [])
+                }
+            }
+            task_records.append(task_record)
+        
+        # Batch insert tasks
+        if task_records:
+            chunk_size = 50  # Supabase batch limit
+            for i in range(0, len(task_records), chunk_size):
+                chunk = task_records[i:i + chunk_size]
+                supabase.table("tasks").insert(chunk).execute()
+            
+            logger.info(f"✅ Created {len(task_records)} tasks from study sessions for user {user_id}")
+    
+    except Exception as e:
+        logger.error(f"⚠️ Failed to create tasks from sessions: {e}")
 
 
 def _distribute_sessions(topics: List[Dict], days: int, hours_per_day: float) -> List[Dict]:
@@ -236,6 +283,11 @@ def generate_plan(
             except Exception as e:
                 logger.warning(f"   Could not store plan in DB: {e}")
             
+            # Create tasks from study sessions
+            sessions = plan.get("study_sessions", [])
+            if sessions:
+                _create_tasks_from_sessions(norm_user_id, sessions)
+            
             return plan
             
     except Exception as e:
@@ -300,6 +352,11 @@ def generate_plan(
         except Exception as e:
             logger.warning(f"   Could not store advanced plan in DB: {e}")
         
+        # Create tasks from study sessions for advanced plan
+        sessions = plan.get("study_sessions", [])
+        if sessions:
+            _create_tasks_from_sessions(norm_user_id, sessions)
+        
         return plan
         
     except Exception as e:
@@ -339,6 +396,12 @@ def generate_plan(
     except Exception:
         # If DB is unavailable, still return the generated plan
         logger.warning("   Database unavailable, returning plan without storage")
+    
+    # Create tasks from study sessions for traditional plan
+    sessions = plan.get("study_sessions", [])
+    if sessions:
+        _create_tasks_from_sessions(norm_user_id, sessions)
+    
     return plan
 
 

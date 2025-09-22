@@ -51,6 +51,7 @@ export default function UploadPage() {
   const [learningStyle, setLearningStyle] = useState<string>('balanced')
   const [showPlanSettings, setShowPlanSettings] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [successMessage, setSuccessMessage] = useState<string | null>(null)
   
   // New state for text paste functionality
   const [activeTab, setActiveTab] = useState<'files' | 'text'>('files')
@@ -80,20 +81,43 @@ export default function UploadPage() {
     setFiles(prev => prev.filter((_, i) => i !== index))
   }
 
+  const clearAllFiles = () => {
+    setFiles([])
+    setTopics([])
+    setAnalysis(null)
+    setShowGeneratePlan(false)
+    setErrorMessage(null)
+    setSuccessMessage(null)
+  }
+
   const uploadFiles = async () => {
     if (files.length === 0) return
+
+    // Check if user already has topics/plan and warn them
+    const existingPlan = localStorage.getItem('latest_plan')
+    if (existingPlan && topics.length === 0) {
+      const shouldProceed = window.confirm(
+        '⚠️ You already have a study plan. Uploading new materials will replace your current plan and tasks. Do you want to continue?'
+      )
+      if (!shouldProceed) return
+    }
 
     setUploading(true)
     setUploadProgress(0)
     // Indicate that the upload+processing workflow is active
     setProcessingTopics(true)
     setErrorMessage(null) // Reset error
+    setSuccessMessage(null) // Reset success
 
     try {
+      // Get user ID for the request
+      const userId = getUserId()
+      
       const formData = new FormData()
       files.forEach((file, index) => {
         formData.append(`file${index}`, file)
       })
+      formData.append('user_id', userId)
 
       // Simulate upload progress
       const progressInterval = setInterval(() => {
@@ -108,6 +132,9 @@ export default function UploadPage() {
 
       const response = await fetch(`${API_BASE}/api/ingest/upload-document`, {
         method: 'POST',
+        headers: {
+          'X-User-Id': userId
+        },
         body: formData,
       })
 
@@ -149,10 +176,27 @@ export default function UploadPage() {
         })
         setTopics(normalized)
 
-  if (rawTopicList && rawTopicList.length > 0) setShowGeneratePlan(true)
+        if (rawTopicList && rawTopicList.length > 0) setShowGeneratePlan(true)
       }
       
-  setProcessingTopics(false)
+      // Check if plan was auto-generated
+      if (result.plan_preview && result.plan_preview.sessions && result.plan_preview.sessions.length > 0) {
+        console.log('Plan auto-generated during upload!', result.plan_preview)
+        // Store the auto-generated plan
+        localStorage.setItem('latest_plan', JSON.stringify(result.plan_preview))
+        
+        // Show success message
+        setErrorMessage(null)
+        const successMsg = `✅ Success! Extracted ${topics.length} topics and auto-generated study plan with ${result.plan_preview.sessions.length} sessions. Previous plan has been updated. Redirecting to dashboard...`
+        setSuccessMessage(successMsg)
+        
+        // Redirect to dashboard after showing success
+        setTimeout(() => {
+          window.location.href = '/dashboard'
+        }, 3000)
+      }
+      
+      setProcessingTopics(false)
       
       console.log('Upload successful:', result)
       
@@ -172,10 +216,20 @@ export default function UploadPage() {
   const uploadText = async () => {
     if (!pastedText.trim()) return
 
+    // Check if user already has topics/plan and warn them
+    const existingPlan = localStorage.getItem('latest_plan')
+    if (existingPlan && topics.length === 0) {
+      const shouldProceed = window.confirm(
+        '⚠️ You already have a study plan. Uploading new text will replace your current plan and tasks. Do you want to continue?'
+      )
+      if (!shouldProceed) return
+    }
+
     setUploading(true)
     setUploadProgress(0)
     setProcessingTopics(true)
     setErrorMessage(null)
+    setSuccessMessage(null)
 
     try {
       // Simulate upload progress
@@ -189,14 +243,19 @@ export default function UploadPage() {
         })
       }, 200)
 
+      // Get user ID for the request
+      const userId = getUserId()
+      
       const response = await fetch(`${API_BASE}/api/ingest/upload-text`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'X-User-Id': userId
         },
         body: JSON.stringify({
           text: pastedText,
-          title: textTitle || 'Pasted Text Document'
+          title: textTitle || 'Pasted Text Document',
+          user_id: userId
         }),
       })
 
@@ -239,7 +298,24 @@ export default function UploadPage() {
         if (rawTopicList && rawTopicList.length > 0) setShowGeneratePlan(true)
       }
       
-  setProcessingTopics(false)
+      // Check if plan was auto-generated for text upload too
+      if (result.plan_preview && result.plan_preview.sessions && result.plan_preview.sessions.length > 0) {
+        console.log('Plan auto-generated during text upload!', result.plan_preview)
+        // Store the auto-generated plan
+        localStorage.setItem('latest_plan', JSON.stringify(result.plan_preview))
+        
+        // Show success message
+        setErrorMessage(null)
+        const successMsg = `✅ Success! Extracted ${topics.length} topics and auto-generated study plan with ${result.plan_preview.sessions.length} sessions. Previous plan has been updated. Redirecting to dashboard...`
+        setSuccessMessage(successMsg)
+        
+        // Redirect to dashboard after showing success
+        setTimeout(() => {
+          window.location.href = '/dashboard'
+        }, 3000)
+      }
+      
+      setProcessingTopics(false)
       
       console.log('Text upload successful:', result)
       
@@ -333,6 +409,13 @@ export default function UploadPage() {
           </div>
         )}
 
+        {/* Show success message */}
+        {successMessage && (
+          <div className="mb-4 p-3 bg-green-100 text-green-700 rounded">
+            {successMessage}
+          </div>
+        )}
+
         {/* Processing Banner + Progress Indicator */}
         { (uploading || processingTopics) && (
           <div className="mb-4 max-w-2xl mx-auto">
@@ -374,7 +457,7 @@ export default function UploadPage() {
           <div className="lg:col-span-2 space-y-6 relative">
             {/* Overlay while processing/uploading */}
             {(uploading || processingTopics) && (
-              <LoadingOverlay className="z-20" />
+              <LoadingOverlay show={true} />
             )}
             {/* Upload Section */}
             <Card>
@@ -451,7 +534,18 @@ export default function UploadPage() {
                     {/* Selected Files */}
                     {files.length > 0 && (
                       <div className="mt-6 space-y-3">
-                        <h4 className="font-medium">Selected Files ({files.length})</h4>
+                        <div className="flex items-center justify-between">
+                          <h4 className="font-medium">Selected Files ({files.length})</h4>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={clearAllFiles}
+                            className="text-xs text-muted-foreground hover:text-foreground"
+                          >
+                            Clear All
+                          </Button>
+                        </div>
                         <div className="space-y-2">
                           {files.map((file, index) => (
                             <div key={index} className="flex items-center justify-between p-3 bg-muted rounded-lg">
@@ -520,7 +614,23 @@ export default function UploadPage() {
                       </div>
                       
                       <div className="space-y-2">
-                        <Label htmlFor="pastedText">Paste your text content</Label>
+                        <div className="flex items-center justify-between">
+                          <Label htmlFor="pastedText">Paste your text content</Label>
+                          {pastedText.trim() && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setPastedText('')
+                                setTextTitle('')
+                              }}
+                              className="text-xs text-muted-foreground hover:text-foreground"
+                            >
+                              Clear
+                            </Button>
+                          )}
+                        </div>
                         <textarea
                           id="pastedText"
                           className="w-full h-64 p-3 border border-input rounded-md bg-background text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
@@ -528,9 +638,16 @@ export default function UploadPage() {
                           value={pastedText}
                           onChange={(e) => setPastedText(e.target.value)}
                         />
-                        <p className="text-xs text-muted-foreground">
-                          Paste any text content like syllabi, notes, or study materials for AI analysis
-                        </p>
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs text-muted-foreground">
+                            Paste any text content like syllabi, notes, or study materials for AI analysis
+                          </p>
+                          {pastedText.trim() && (
+                            <p className="text-xs text-muted-foreground">
+                              {pastedText.length} characters
+                            </p>
+                          )}
+                        </div>
                       </div>
                     </div>
 

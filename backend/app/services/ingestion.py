@@ -167,20 +167,72 @@ def handle_upload(file_storage, user_id: str, artifact_type: str) -> Dict:
                 topics.append(main_topic)
                 topics.extend(subtopics)
             
-            # Store topics in topic store for quiz generation
+            # Store topics in both database and memory for persistence
             if topics:
                 with _timer("store_topics"):
+                    # Store in database if valid UUID user
+                    if is_valid_uuid(norm_user_id):
+                        try:
+                            # Clear existing topics first
+                            supabase.table("syllabus_topics").delete().eq("user_id", norm_user_id).execute()
+                            
+                            # Insert new topics with order
+                            topic_records = []
+                            for idx, topic in enumerate(topics):
+                                topic_records.append({
+                                    "user_id": norm_user_id,
+                                    "topic": topic,
+                                    "order_index": idx,
+                                    "metadata": {
+                                        "extracted_at": time.time(),
+                                        "source": "ai_extraction"
+                                    }
+                                })
+                            
+                            if topic_records:
+                                supabase.table("syllabus_topics").insert(topic_records).execute()
+                                print(f"📚 Stored {len(topics)} topics in database for user {norm_user_id}")
+                        except Exception as e:
+                            print(f"⚠️ Failed to store topics in database: {e}")
+                    
+                    # Always store in memory as fallback
                     store_add_topics(norm_user_id, topics)
-                print(f"📚 Stored {len(topics)} topics for user {norm_user_id}")
+                    print(f"📚 Stored {len(topics)} topics in memory for user {norm_user_id}")
             
         except Exception:
             from .weaktopics import extract_topics_from_text
             topics = extract_topics_from_text(text)
-            # Store fallback topics as well
+            # Store fallback topics in both database and memory
             if topics:
                 with _timer("store_topics"):
+                    # Store in database if valid UUID user
+                    if is_valid_uuid(norm_user_id):
+                        try:
+                            # Clear existing topics first
+                            supabase.table("syllabus_topics").delete().eq("user_id", norm_user_id).execute()
+                            
+                            # Insert new topics with order
+                            topic_records = []
+                            for idx, topic in enumerate(topics):
+                                topic_records.append({
+                                    "user_id": norm_user_id,
+                                    "topic": topic,
+                                    "order_index": idx,
+                                    "metadata": {
+                                        "extracted_at": time.time(),
+                                        "source": "fallback_extraction"
+                                    }
+                                })
+                            
+                            if topic_records:
+                                supabase.table("syllabus_topics").insert(topic_records).execute()
+                                print(f"📚 Stored {len(topics)} fallback topics in database for user {norm_user_id}")
+                        except Exception as e:
+                            print(f"⚠️ Failed to store fallback topics in database: {e}")
+                    
+                    # Always store in memory as fallback
                     store_add_topics(norm_user_id, topics)
-                print(f"📚 Stored {len(topics)} fallback topics for user {norm_user_id}")
+                    print(f"📚 Stored {len(topics)} fallback topics in memory for user {norm_user_id}")
     elif artifact_type == "assessment":
         try:
             from .ai_providers import get_assessment_analysis
@@ -192,10 +244,19 @@ def handle_upload(file_storage, user_id: str, artifact_type: str) -> Dict:
 
     plan_preview = None
     try:
-        # Always build dynamic plan preview (objective B & C)
-        with _timer("generate_plan"):
-            plan_preview = generate_plan(norm_user_id)
-    except Exception:
+        # Automatically generate study plan after topic extraction (objective B & C)
+        if artifact_type == "syllabus" and topics:
+            with _timer("generate_plan"):
+                # Generate plan using the extracted topics
+                plan_preview = generate_plan(
+                    user_id=norm_user_id,
+                    horizon_days=14,  # Default 2 weeks
+                    preferred_hours_per_day=2.0,  # Default 2 hours/day
+                    extracted_topics=topics
+                )
+                print(f"🎯 Auto-generated study plan with {len(plan_preview.get('sessions', []))} sessions")
+    except Exception as e:
+        print(f"⚠️ Auto plan generation failed: {e}")
         plan_preview = None
 
     return {
