@@ -7,6 +7,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { MainLayout } from '@/components/navigation'
+import { MarkdownRenderer } from '@/components/MarkdownRenderer'
 import { 
   Send, 
   Paperclip, 
@@ -23,7 +24,12 @@ export default function TutorPage(){
     id: number
     type: 'user' | 'ai'
     content: string
-    steps?: { title: string; detail: string }[]
+    steps?: { 
+      title: string; 
+      detail: string;
+      calculation?: string;
+      code_snippet?: string;
+    }[]
     file?: File | null
     timestamp: Date
   }
@@ -32,7 +38,7 @@ export default function TutorPage(){
     {
       id: 1,
       type: 'ai',
-      content: "Hello! I'm your AI tutor. I'm here to help you understand difficult concepts, solve problems, and answer any questions you have. You can ask me anything or upload an image of a problem you're working on.",
+      content: "**Hello! I'm your AI tutor.** 👋\n\nI'm here to help you understand *difficult concepts*, solve problems, and answer any questions you have. \n\n**What I can do:**\n- Solve **mathematical equations** with step-by-step solutions\n- Explain **scientific concepts** with real-world examples\n- Help with **programming problems** and code solutions\n- Answer **general questions** with detailed explanations\n\nYou can ask me anything or upload an image of a problem you're working on!",
       timestamp: new Date()
     }
   ])
@@ -76,7 +82,12 @@ export default function TutorPage(){
             id: Date.parse(h.created_at) || Math.random(),
             type: h.role === 'user' ? 'user' : 'ai',
             content: h.content,
-            steps: h.steps || undefined,
+            steps: h.steps ? h.steps.map((step: any) => ({
+              title: step.title || '',
+              detail: step.detail || '',
+              calculation: step.calculation,
+              code_snippet: step.code_snippet
+            })) : undefined,
             timestamp: new Date(h.created_at)
           }))
           setMessages(prev => {
@@ -144,7 +155,12 @@ export default function TutorPage(){
         id: Date.now() + 1,
         type: 'ai',
         content: response.answer || 'Here are your steps:',
-        steps: Array.isArray(response.steps) ? response.steps : undefined,
+        steps: Array.isArray(response.steps) ? response.steps.map((step: any) => ({
+          title: step.title || '',
+          detail: step.detail || '',
+          calculation: step.calculation,
+          code_snippet: step.code_snippet
+        })) : undefined,
         timestamp: new Date()
       }
       setMessages(prev => [...prev, aiMessage])
@@ -205,13 +221,29 @@ export default function TutorPage(){
                         <span className='text-sm'>{message.file.name}</span>
                       </div>
                     )}
-                    <p className='whitespace-pre-wrap font-medium'>{message.content}</p>
+                    <MarkdownRenderer content={message.content} />
                     {message.steps && message.steps.length > 0 && (
                       <div className='mt-3 space-y-3'>
                         {message.steps.map((s, i) => (
                           <div key={i} className='p-3 rounded border bg-background/50'>
-                            <div className='font-semibold text-sm mb-1'>{i+1}. {s.title}</div>
-                            <div className='text-sm leading-relaxed whitespace-pre-wrap'>{s.detail}</div>
+                            <div className='font-semibold text-sm mb-2'>
+                              <MarkdownRenderer content={`${i+1}. ${s.title}`} />
+                            </div>
+                            <div className='text-sm leading-relaxed'>
+                              <MarkdownRenderer content={s.detail} />
+                            </div>
+                            {s.calculation && (
+                              <div className='mt-2 text-sm'>
+                                <div className='font-medium text-muted-foreground mb-1'>Calculation:</div>
+                                <MarkdownRenderer content={s.calculation} />
+                              </div>
+                            )}
+                            {s.code_snippet && (
+                              <div className='mt-2 text-sm'>
+                                <div className='font-medium text-muted-foreground mb-1'>Code:</div>
+                                <MarkdownRenderer content={s.code_snippet} />
+                              </div>
+                            )}
                           </div>
                         ))}
                       </div>

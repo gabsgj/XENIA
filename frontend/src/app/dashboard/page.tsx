@@ -491,10 +491,10 @@ export default function DashboardPage(){
                     Upload Materials
                   </Button>
                 </Link>
-                <Link href="/analytics">
+                <Link href="/quiz">
                   <Button variant="outline" className="w-full justify-start">
-                    <TrendingUp className="w-4 h-4 mr-2" />
-                    View Analytics
+                    <BookOpen className="w-4 h-4 mr-2" />
+                    Take a Quiz
                   </Button>
                 </Link>
               </CardContent>

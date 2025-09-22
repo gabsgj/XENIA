@@ -6,6 +6,6 @@ export function middleware() {
 }
 
 export const config = {
-  matcher: ['/dashboard', '/planner', '/tasks', '/tutor', '/analytics', '/teacher', '/parent'],
+  matcher: ['/dashboard', '/planner', '/tasks', '/tutor', '/teacher', '/parent'],
 }
 

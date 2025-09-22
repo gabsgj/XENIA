@@ -1282,7 +1282,7 @@ export default function Home() {
             <ul className="space-y-2">
               <li><Link href="/planner" className="text-black/80 dark:text-slate-300/80 hover:text-black dark:hover:text-white transition-all">Study Planner</Link></li>
               <li><Link href="/tutor" className="text-black/80 dark:text-slate-300/80 hover:text-black dark:hover:text-white transition-all">AI Tutor</Link></li>
-              <li><Link href="/analytics" className="text-black/80 dark:text-slate-300/80 hover:text-black dark:hover:text-white transition-all">Analytics</Link></li>
+              <li><Link href="/quiz" className="text-black/80 dark:text-slate-300/80 hover:text-black dark:hover:text-white transition-all">Quiz</Link></li>
               <li><Link href="/upload" className="text-black/80 dark:text-slate-300/80 hover:text-black dark:hover:text-white transition-all">Upload</Link></li>
             </ul>
           </div>

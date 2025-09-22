@@ -558,46 +558,7 @@ export default function QuizPage() {
             </Card>
           </div>
 
-          {/* Performance Breakdown */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Performance Breakdown</CardTitle>
-              <CardDescription>Your quiz performance by topic</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {selectedTopics.map((topic: string) => {
-                  // Calculate performance for this topic (simplified)
-                  const topicCorrect = Math.floor(Math.random() * 3) + 1; // Mock data
-                  const topicTotal = Math.floor(Math.random() * 2) + 3; // Mock data
-                  const topicPercentage = Math.round((topicCorrect / topicTotal) * 100);
-
-                  return (
-                    <div key={topic} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
-                      <div className="flex items-center gap-3">
-                        <BookOpen className="w-4 h-4 text-muted-foreground" />
-                        <span className="font-medium">{topic}</span>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <span className="text-sm text-muted-foreground">
-                          {topicCorrect}/{topicTotal} ({topicPercentage}%)
-                        </span>
-                        <div className="w-16 bg-muted rounded-full h-2">
-                          <div
-                            className={`h-2 rounded-full ${
-                              topicPercentage >= 70 ? 'bg-green-500' :
-                              topicPercentage >= 50 ? 'bg-yellow-500' : 'bg-red-500'
-                            }`}
-                            style={{ width: `${topicPercentage}%` }}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </CardContent>
-          </Card>
+          {/* Performance Breakdown removed: awaiting real per-topic metrics from backend (no mock data). */}
 
           {/* Question Review */}
           <Card>

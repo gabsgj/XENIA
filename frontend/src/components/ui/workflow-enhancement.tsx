@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect } from "react";
@@ -6,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { CheckCircle, ArrowRight, Upload, BookOpen, Calendar, BarChart3, Play, Target } from "lucide-react";
+import { CheckCircle, ArrowRight, Upload, BookOpen, Calendar, Play, Target, Brain } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface WorkflowStep {
@@ -71,11 +72,11 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
       progress: 0
     },
     {
-      id: "track",
-      title: "Track Progress",
-      description: "Monitor your performance and achievements",
-      icon: BarChart3,
-      href: "/analytics",
+      id: "quiz",
+      title: "Take a Quiz",
+      description: "Practice with personalized quizzes and track improvement",
+      icon: Brain,
+      href: "/quiz",
       completed: false,
       enabled: false,
       progress: 0

@@ -69,113 +69,149 @@ class EnhancedTutor:
             # Craft specialized prompts based on question type
             if question_type == "mathematics":
                 prompt = f"""
-You are an expert mathematics tutor. Solve this step-by-step:
+You are an expert mathematics tutor. Solve this step-by-step and format your response in Markdown:
 
 QUESTION: {question}
+
+FORMATTING REQUIREMENTS:
+- Use **bold** for key terms, formulas, and important concepts
+- Use *italics* for emphasis and definitions
+- Use `inline code` for variables and simple formulas
+- Use LaTeX math notation wrapped in $...$ for equations (e.g., $F = ma$, $x = \\frac{{-b \\pm \\sqrt{{b^2-4ac}}}}{{2a}}$)
+- Use numbered lists for steps (1, 2, 3...)
+- Use bullet points (-) for examples or sub-points
+- Break content into short, scannable paragraphs
 
 Provide a structured solution in JSON format:
 {{
   "steps": [
     {{
-      "title": "Step 1: Identify what's given",
-      "detail": "Clear explanation of given information",
-      "calculation": "Any relevant formula or calculation"
+      "title": "**Step 1: Identify what's given**",
+      "detail": "Clear explanation of given information in **Markdown format** with proper $LaTeX$ math notation",
+      "calculation": "Any relevant formula like $F = ma$ or calculation steps"
     }},
     {{
-      "title": "Step 2: Apply appropriate method", 
-      "detail": "Explanation of the method being used",
-      "calculation": "Detailed calculation with work shown"
+      "title": "**Step 2: Apply appropriate method**", 
+      "detail": "Explanation of the *method* being used with **key concepts** highlighted",
+      "calculation": "Detailed calculation with $mathematical$ expressions shown step by step"
     }},
     {{
-      "title": "Step 3: Solve and verify",
-      "detail": "Final calculation and verification",
-      "calculation": "Final answer with units if applicable"
+      "title": "**Step 3: Solve and verify**",
+      "detail": "Final calculation and *verification* process explained clearly",
+      "calculation": "Final answer with units if applicable, formatted as $result = value$"
     }}
   ],
-  "final_answer": "Clear final answer",
+  "final_answer": "Clear final answer with proper **Markdown** formatting and $LaTeX$ if needed",
   "key_concepts": ["List of key mathematical concepts used"]
 }}
 """
             elif question_type == "science":
                 prompt = f"""
-You are an expert science tutor. Explain this scientific concept or solve this problem:
+You are an expert science tutor. Explain this scientific concept or solve this problem and format your response in Markdown:
 
 QUESTION: {question}
+
+FORMATTING REQUIREMENTS:
+- Use **bold** for key scientific terms, laws, and important concepts
+- Use *italics* for emphasis and definitions
+- Use `inline code` for formulas, variables, and chemical equations
+- Use LaTeX math notation wrapped in $...$ for equations (e.g., $E = mc^2$, $PV = nRT$)
+- Use numbered lists for steps (1, 2, 3...)
+- Use bullet points (-) for examples or sub-points
+- Break content into short, scannable paragraphs
 
 Provide a structured explanation in JSON format:
 {{
   "steps": [
     {{
-      "title": "Step 1: Understanding the concept",
-      "detail": "Clear explanation of underlying scientific principles"
+      "title": "**Step 1: Understanding the concept**",
+      "detail": "Clear explanation of underlying **scientific principles** with proper $LaTeX$ notation for formulas"
     }},
     {{
-      "title": "Step 2: Applying scientific method",
-      "detail": "How to approach this scientifically"
+      "title": "**Step 2: Applying scientific method**",
+      "detail": "How to approach this *scientifically* with **key concepts** highlighted"
     }},
     {{
-      "title": "Step 3: Solution or explanation",
-      "detail": "Detailed solution with scientific reasoning"
+      "title": "**Step 3: Solution or explanation**",
+      "detail": "Detailed solution with *scientific reasoning* and proper **Markdown** formatting"
     }}
   ],
-  "final_answer": "Clear conclusion or answer",
+  "final_answer": "Clear conclusion or answer with proper **Markdown** formatting and $LaTeX$ if needed",
   "key_concepts": ["List of key scientific concepts"],
   "real_world_applications": ["How this applies in real life"]
 }}
 """
             elif question_type == "programming":
                 prompt = f"""
-You are an expert programming tutor. Help solve this coding problem:
+You are an expert programming tutor. Help solve this coding problem and format your response in Markdown:
 
 QUESTION: {question}
+
+FORMATTING REQUIREMENTS:
+- Use **bold** for key programming terms, algorithms, and important concepts
+- Use *italics* for emphasis and definitions
+- Use `inline code` for variables, functions, and short code snippets
+- Use code blocks with language specification for longer code examples
+- Use numbered lists for steps (1, 2, 3...)
+- Use bullet points (-) for examples or sub-points
+- Break content into short, scannable paragraphs
 
 Provide a structured solution in JSON format:
 {{
   "steps": [
     {{
-      "title": "Step 1: Problem analysis",
-      "detail": "Break down what the problem is asking",
-      "code_snippet": "Relevant pseudocode or approach"
+      "title": "**Step 1: Problem analysis**",
+      "detail": "Break down what the problem is asking with **key requirements** highlighted",
+      "code_snippet": "```python\\n# Relevant pseudocode or approach\\nfunction_name(parameters)\\n```"
     }},
     {{
-      "title": "Step 2: Algorithm design",
-      "detail": "Explain the algorithm or approach",
-      "code_snippet": "Key algorithmic components"
+      "title": "**Step 2: Algorithm design**",
+      "detail": "Explain the *algorithm* or **approach** with proper Markdown formatting",
+      "code_snippet": "```python\\n# Key algorithmic components\\nfor item in collection:\\n    process(item)\\n```"
     }},
     {{
-      "title": "Step 3: Implementation",
-      "detail": "Complete working solution",
-      "code_snippet": "Full working code solution"
+      "title": "**Step 3: Implementation**",
+      "detail": "Complete working solution with *detailed explanation*",
+      "code_snippet": "```python\\n# Full working code solution\\ndef solve_problem():\\n    return result\\n```"
     }}
   ],
-  "final_answer": "Complete solution with explanation",
+  "final_answer": "Complete solution with **proper explanation** and Markdown formatting",
   "key_concepts": ["Programming concepts used"],
-  "time_complexity": "Big O analysis if applicable"
+  "time_complexity": "Big O analysis if applicable, formatted as $O(n)$ notation"
 }}
 """
             else:
                 prompt = f"""
-You are an expert tutor. Provide a comprehensive explanation for this question:
+You are an expert tutor. Provide a comprehensive explanation for this question and format your response in Markdown:
 
 QUESTION: {question}
+
+FORMATTING REQUIREMENTS:
+- Use **bold** for key terms, laws, and important concepts
+- Use *italics* for emphasis and definitions
+- Use `inline code` for formulas or variables
+- Use LaTeX math notation wrapped in $...$ for equations when applicable
+- Use numbered lists for steps (1, 2, 3...)
+- Use bullet points (-) for examples or sub-points
+- Break content into short, scannable paragraphs
 
 Provide a structured explanation in JSON format:
 {{
   "steps": [
     {{
-      "title": "Step 1: Understanding the question",
-      "detail": "What exactly is being asked"
+      "title": "**Step 1: Understanding the question**",
+      "detail": "What exactly is being asked, with **key terms** highlighted"
     }},
     {{
-      "title": "Step 2: Key information and context",
-      "detail": "Important background and context"
+      "title": "**Step 2: Key information and context**",
+      "detail": "Important *background* and **context** with proper Markdown formatting"
     }},
     {{
-      "title": "Step 3: Detailed explanation",
-      "detail": "Comprehensive answer with examples"
+      "title": "**Step 3: Detailed explanation**",
+      "detail": "Comprehensive answer with *examples* and **key concepts** clearly marked"
     }}
   ],
-  "final_answer": "Clear, complete answer",
+  "final_answer": "Clear, complete answer with proper **Markdown** formatting",
   "key_concepts": ["Important concepts covered"]
 }}
 """
@@ -241,7 +277,29 @@ def solve_question(
     # Try basic AI enrichment as additional fallback
     try:
       from .ai_providers import get_ai_response
-      enriched_raw = get_ai_response(f"Provide step JSON only for: {question}")
+      markdown_prompt = f"""
+Provide a step-by-step solution for this question in JSON format with Markdown formatting:
+
+QUESTION: {question}
+
+FORMATTING REQUIREMENTS:
+- Use **bold** for key terms and important concepts
+- Use *italics* for emphasis and definitions  
+- Use `inline code` for formulas or variables
+- Use LaTeX math notation wrapped in $...$ for equations
+- Break content into short, scannable paragraphs
+
+Return only JSON in this format:
+{{
+  "steps": [
+    {{
+      "title": "**Step 1: [Title]**",
+      "detail": "Explanation with proper **Markdown** formatting and $LaTeX$ if needed"
+    }}
+  ]
+}}
+"""
+      enriched_raw = get_ai_response(markdown_prompt)
       if enriched_raw:
         import json
         try:
