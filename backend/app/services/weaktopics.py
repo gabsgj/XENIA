@@ -239,12 +239,22 @@ def get_remediation_steps(user_id: str, question_text: str) -> List[Dict]:
         prompt = f"""
 You are an AI tutor. A student has asked: "{question_text}"
 
+CRITICAL: Each step title MUST use sequential numbering (Step 1, Step 2, Step 3, etc.). Do NOT repeat "1." for every step.
+
 Provide a step-by-step solution in JSON format with this exact structure:
 {{
   "steps": [
     {{
-      "title": "Step title",
-      "detail": "Detailed explanation of this step"
+      "title": "**Step 1: [Title]**",
+      "detail": "Detailed explanation of this step with **Markdown** formatting"
+    }},
+    {{
+      "title": "**Step 2: [Title]**", 
+      "detail": "Detailed explanation of this step with **Markdown** formatting"
+    }},
+    {{
+      "title": "**Step 3: [Title]**",
+      "detail": "Detailed explanation of this step with **Markdown** formatting"
     }}
   ]
 }}

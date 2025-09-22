@@ -82,6 +82,8 @@ FORMATTING REQUIREMENTS:
 - Use bullet points (-) for examples or sub-points
 - Break content into short, scannable paragraphs
 
+IMPORTANT: Each step title MUST use sequential numbering (Step 1, Step 2, Step 3, etc.). Do NOT repeat "1." for every step.
+
 Provide a structured solution in JSON format:
 {{
   "steps": [
@@ -119,6 +121,8 @@ FORMATTING REQUIREMENTS:
 - Use numbered lists for steps (1, 2, 3...)
 - Use bullet points (-) for examples or sub-points
 - Break content into short, scannable paragraphs
+
+IMPORTANT: Each step title MUST use sequential numbering (Step 1, Step 2, Step 3, etc.). Do NOT repeat "1." for every step.
 
 Provide a structured explanation in JSON format:
 {{
@@ -162,17 +166,17 @@ Provide a structured solution in JSON format:
     {{
       "title": "**Step 1: Problem analysis**",
       "detail": "Break down what the problem is asking with **key requirements** highlighted",
-      "code_snippet": "```python\\n# Relevant pseudocode or approach\\nfunction_name(parameters)\\n```"
+      "code_snippet": "```python\n# Relevant pseudocode or approach\nfunction_name(parameters)\n```"
     }},
     {{
       "title": "**Step 2: Algorithm design**",
       "detail": "Explain the *algorithm* or **approach** with proper Markdown formatting",
-      "code_snippet": "```python\\n# Key algorithmic components\\nfor item in collection:\\n    process(item)\\n```"
+      "code_snippet": "```python\n# Key algorithmic components\nfor item in collection:\n    process(item)\n```"
     }},
     {{
       "title": "**Step 3: Implementation**",
       "detail": "Complete working solution with *detailed explanation*",
-      "code_snippet": "```python\\n# Full working code solution\\ndef solve_problem():\\n    return result\\n```"
+      "code_snippet": "```python\n# Full working code solution\ndef solve_problem():\n    return result\n```"
     }}
   ],
   "final_answer": "Complete solution with **proper explanation** and Markdown formatting",
@@ -194,6 +198,8 @@ FORMATTING REQUIREMENTS:
 - Use numbered lists for steps (1, 2, 3...)
 - Use bullet points (-) for examples or sub-points
 - Break content into short, scannable paragraphs
+
+IMPORTANT: Each step title MUST use sequential numbering (Step 1, Step 2, Step 3, etc.). Do NOT repeat "1." for every step.
 
 Provide a structured explanation in JSON format:
 {{
@@ -289,11 +295,21 @@ FORMATTING REQUIREMENTS:
 - Use LaTeX math notation wrapped in $...$ for equations
 - Break content into short, scannable paragraphs
 
+CRITICAL: Each step title MUST use sequential numbering (Step 1, Step 2, Step 3, etc.). Do NOT repeat "1." for every step.
+
 Return only JSON in this format:
 {{
   "steps": [
     {{
       "title": "**Step 1: [Title]**",
+      "detail": "Explanation with proper **Markdown** formatting and $LaTeX$ if needed"
+    }},
+    {{
+      "title": "**Step 2: [Title]**",
+      "detail": "Explanation with proper **Markdown** formatting and $LaTeX$ if needed"
+    }},
+    {{
+      "title": "**Step 3: [Title]**",
       "detail": "Explanation with proper **Markdown** formatting and $LaTeX$ if needed"
     }}
   ]
