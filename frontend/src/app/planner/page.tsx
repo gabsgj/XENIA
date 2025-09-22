@@ -48,6 +48,19 @@ export default function PlannerPage() {
         setTopics(t.topics||[])
         setResources(r.resources||[])
         
+        // Initialize form state from plan data
+        if (p) {
+          if (p.preferred_hours_per_day) {
+            setHoursPerDay(p.preferred_hours_per_day)
+          }
+          if (p.deadline) {
+            // Convert ISO date to YYYY-MM-DD format for input
+            const deadlineDate = new Date(p.deadline)
+            const formattedDeadline = deadlineDate.toISOString().split('T')[0]
+            setDeadline(formattedDeadline)
+          }
+        }
+        
         // Also fetch topic-specific resources for current plan topics
         if (p?.sessions?.length > 0) {
           const uniqueTopics = [...new Set(p.sessions.map((s:any) => s.topic))] as string[]
@@ -108,13 +121,32 @@ export default function PlannerPage() {
       // Get user ID from Supabase authentication
       const userId = getUserId()
       
+      // Calculate horizon based on deadline or use current plan's horizon
+      let horizonDays = 14 // default
+      if (deadline) {
+        const deadlineDate = new Date(deadline)
+        const today = new Date()
+        const daysUntilDeadline = Math.ceil((deadlineDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+        if (daysUntilDeadline > 0) {
+          horizonDays = Math.min(daysUntilDeadline, 90) // Cap at 90 days max
+        }
+      } else if (plan?.horizon_days) {
+        horizonDays = plan.horizon_days
+      }
+      
+      // Extract topics from current plan for context
+      const extractedTopics = plan?.weak_topics?.map((t: any) => t.topic) || []
+      const topicDetails = plan?.weak_topics || []
+      
       setPlan(await api('/api/plan/generate', { 
         method:'POST', 
         body: JSON.stringify({ 
-          user_id: userId, // Use actual user ID from authentication
-          horizon_days: 14, 
+          user_id: userId,
+          horizon_days: horizonDays, 
           preferred_hours_per_day: hoursPerDay, 
-          deadline: deadline||undefined 
+          deadline: deadline || undefined,
+          extracted_topics: extractedTopics,
+          topic_details: topicDetails
         }) 
       }))
     } catch(e:any){ 
@@ -204,15 +236,20 @@ export default function PlannerPage() {
           <div className='flex flex-wrap items-center gap-3'>
             <div className='flex items-center gap-2'>
               <label className='text-xs text-muted-foreground'>Hours/day</label>
-              <input type='number' step='0.5' min='0.5' className='w-20 px-2 py-1 border rounded bg-background text-sm'
-                value={hoursPerDay} onChange={e=> setHoursPerDay(parseFloat(e.target.value)||1.5)} />
+              <input type='number' step='0.5' min='0.5' max='12' className='w-20 px-2 py-1 border rounded bg-background text-sm'
+                value={hoursPerDay} onChange={e=> {
+                  const val = parseFloat(e.target.value)
+                  if (!isNaN(val) && val >= 0.5 && val <= 12) {
+                    setHoursPerDay(val)
+                  }
+                }} />
             </div>
             <div className='flex items-center gap-2'>
               <label className='text-xs text-muted-foreground'>Deadline</label>
               <input type='date' className='px-2 py-1 border rounded bg-background text-sm'
                 value={deadline} onChange={e=> setDeadline(e.target.value)} />
             </div>
-            <Button variant="outline" size="sm">
+            <Button variant="outline" size="sm" disabled>
               <Filter className="w-4 h-4 mr-2" />
               Filter
             </Button>
@@ -243,7 +280,9 @@ export default function PlannerPage() {
 
             <TabsContent value='kanban' className="space-y-6">
               <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6'>
-                {(Array.from(new Set<string>((plan.sessions||[]).map((s:any)=> String(s.date)))) as string[]).slice(0,8).map((date: string)=> (
+                {(Array.from(new Set<string>((plan.sessions||[]).map((s:any)=> String(s.date)))) as string[])
+                  .sort((a, b) => new Date(a).getTime() - new Date(b).getTime())
+                  .slice(0,8).map((date: string)=> (
                   <Card key={date} className="hover:shadow-md transition-all">
                     <CardHeader className="pb-3">
                       <CardTitle className="text-lg flex items-center gap-2">
@@ -329,7 +368,9 @@ export default function PlannerPage() {
                         </tr>
                       </thead>
                       <tbody>
-                        {(plan.sessions||[]).map((s:any, idx:number)=> (
+                        {(plan.sessions||[])
+                          .sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime())
+                          .map((s:any, idx:number)=> (
                           <tr key={idx} className='border-b hover:bg-muted/50 transition-all'>
                             <td className='p-3'>{new Date(s.date).toLocaleDateString()}</td>
                             <td className='p-3 font-medium'>{s.topic}</td>
@@ -369,7 +410,9 @@ export default function PlannerPage() {
 
             <TabsContent value='list' className="space-y-6">
               <div className="space-y-4">
-                {(plan.sessions||[]).map((s:any, idx:number)=> (
+                {(plan.sessions||[])
+                  .sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime())
+                  .map((s:any, idx:number)=> (
                   <Card key={idx} className="hover:shadow-md transition-all">
                     <CardContent className="p-6">
                       <div className="flex items-center justify-between">
