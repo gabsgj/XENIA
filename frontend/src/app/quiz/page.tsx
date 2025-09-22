@@ -223,74 +223,116 @@ export default function QuizPage() {
   if (step === "setup") {
     return (
       <MainLayout>
-        <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
-          <div className="max-w-4xl mx-auto p-6 space-y-8">
-            {/* Hero Section */}
-            <div className="text-center space-y-4 py-8">
-              <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full mb-4">
-                <Brain className="w-8 h-8 text-white" />
+        <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
+          <div className="max-w-6xl mx-auto p-6 space-y-8">
+            {/* Header Section */}
+            <div className="text-center space-y-4 py-12">
+              <div className="inline-flex items-center justify-center w-16 h-16 bg-slate-100 dark:bg-slate-800 rounded-xl mb-6">
+                <Brain className="w-8 h-8 text-slate-600 dark:text-slate-300" />
               </div>
-              <h1 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                Quiz Master
+              <h1 className="text-4xl md:text-5xl font-bold text-slate-900 dark:text-slate-100">
+                Assessment Center
               </h1>
-              <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-                Challenge yourself with AI-powered quizzes tailored to your learning journey
+              <p className="text-xl text-slate-600 dark:text-slate-400 max-w-2xl mx-auto leading-relaxed">
+                Professional evaluation tools designed to measure your academic progress and knowledge mastery
               </p>
             </div>
 
-            {/* Quick Start Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-              <Card className="bg-gradient-to-r from-green-500 to-emerald-600 text-white border-0">
+            {/* Quick Assessment Options */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+              <Card className="border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:shadow-lg transition-all duration-200">
                 <CardContent className="p-6 text-center">
-                  <Zap className="w-8 h-8 mx-auto mb-2" />
-                  <h3 className="font-semibold mb-1">Quick Quiz</h3>
-                  <p className="text-sm opacity-90">5 questions, 5 minutes</p>
+                  <div className="w-12 h-12 bg-blue-50 dark:bg-blue-900/20 rounded-lg flex items-center justify-center mx-auto mb-4">
+                    <Zap className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+                  </div>
+                  <h3 className="font-semibold text-slate-900 dark:text-slate-100 mb-2">Quick Assessment</h3>
+                  <p className="text-sm text-slate-600 dark:text-slate-400">5 questions • 5 minutes</p>
+                  <Button
+                    className="w-full mt-4 bg-blue-600 hover:bg-blue-700 text-white"
+                    size="sm"
+                    onClick={() => {
+                      setNumQuestions(5);
+                      setDuration(5);
+                      setSelectedTopics(availableTopics.slice(0, 2));
+                    }}
+                  >
+                    Start Assessment
+                  </Button>
                 </CardContent>
               </Card>
-              <Card className="bg-gradient-to-r from-blue-500 to-cyan-600 text-white border-0">
+              <Card className="border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:shadow-lg transition-all duration-200">
                 <CardContent className="p-6 text-center">
-                  <Target className="w-8 h-8 mx-auto mb-2" />
-                  <h3 className="font-semibold mb-1">Focused Study</h3>
-                  <p className="text-sm opacity-90">10 questions, 15 minutes</p>
+                  <div className="w-12 h-12 bg-slate-100 dark:bg-slate-700 rounded-lg flex items-center justify-center mx-auto mb-4">
+                    <Target className="w-6 h-6 text-slate-600 dark:text-slate-400" />
+                  </div>
+                  <h3 className="font-semibold text-slate-900 dark:text-slate-100 mb-2">Focused Evaluation</h3>
+                  <p className="text-sm text-slate-600 dark:text-slate-400">10 questions • 15 minutes</p>
+                  <Button
+                    className="w-full mt-4 bg-slate-600 hover:bg-slate-700 text-white"
+                    size="sm"
+                    onClick={() => {
+                      setNumQuestions(10);
+                      setDuration(15);
+                      setSelectedTopics(availableTopics.slice(0, 3));
+                    }}
+                  >
+                    Start Assessment
+                  </Button>
                 </CardContent>
               </Card>
-              <Card className="bg-gradient-to-r from-purple-500 to-pink-600 text-white border-0">
+              <Card className="border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:shadow-lg transition-all duration-200">
                 <CardContent className="p-6 text-center">
-                  <Trophy className="w-8 h-8 mx-auto mb-2" />
-                  <h3 className="font-semibold mb-1">Challenge Mode</h3>
-                  <p className="text-sm opacity-90">20 questions, 30 minutes</p>
+                  <div className="w-12 h-12 bg-slate-100 dark:bg-slate-700 rounded-lg flex items-center justify-center mx-auto mb-4">
+                    <Award className="w-6 h-6 text-slate-600 dark:text-slate-400" />
+                  </div>
+                  <h3 className="font-semibold text-slate-900 dark:text-slate-100 mb-2">Comprehensive Exam</h3>
+                  <p className="text-sm text-slate-600 dark:text-slate-400">20 questions • 30 minutes</p>
+                  <Button
+                    className="w-full mt-4 bg-slate-800 hover:bg-slate-900 text-white"
+                    size="sm"
+                    onClick={() => {
+                      setNumQuestions(20);
+                      setDuration(30);
+                      setSelectedTopics(availableTopics.slice(0, 4));
+                    }}
+                  >
+                    Start Assessment
+                  </Button>
                 </CardContent>
               </Card>
             </div>
 
-            {/* Main Setup Card */}
-            <Card className="shadow-xl border-0 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm">
-              <CardHeader className="text-center pb-2">
-                <CardTitle className="flex items-center justify-center gap-2 text-2xl">
-                  <Sparkles className="w-6 h-6 text-yellow-500" />
-                  Customize Your Quiz
+            {/* Configuration Panel */}
+            <Card className="border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm">
+              <CardHeader className="border-b border-slate-200 dark:border-slate-700">
+                <CardTitle className="flex items-center gap-3 text-xl">
+                  <Settings className="w-5 h-5 text-slate-600 dark:text-slate-400" />
+                  Assessment Configuration
                 </CardTitle>
-                <CardDescription>
-                  Select topics and configure settings for your personalized quiz experience
+                <CardDescription className="text-slate-600 dark:text-slate-400">
+                  Customize your assessment parameters for optimal evaluation
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-8">
+              <CardContent className="space-y-8 p-8">
                 {/* Topic Selection */}
                 <div className="space-y-4">
-                  <div className="flex items-center gap-2 mb-4">
-                    <BookOpen className="w-5 h-5 text-blue-500" />
-                    <Label className="text-lg font-semibold">Select Topics</Label>
-                    {loadingTopics && <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />}
+                  <div className="flex items-center gap-3 pb-4 border-b border-slate-200 dark:border-slate-700">
+                    <BookOpen className="w-5 h-5 text-slate-600 dark:text-slate-400" />
+                    <div>
+                      <Label className="text-lg font-semibold text-slate-900 dark:text-slate-100">Subject Areas</Label>
+                      <p className="text-sm text-slate-600 dark:text-slate-400">Select the topics you want to assess</p>
+                    </div>
+                    {loadingTopics && <Loader2 className="w-4 h-4 animate-spin text-slate-400" />}
                   </div>
                   
-                  {/* Today's Tasks Section */}
+                  {/* Today's Study Tasks Section */}
                   {dailyTasks.length > 0 && (
-                    <div className="p-4 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 rounded-xl border border-green-200 dark:border-green-800">
-                      <h4 className="text-sm font-semibold text-green-800 dark:text-green-200 mb-3 flex items-center gap-2">
-                        <Calendar className="w-4 h-4" />
-                        Today's Study Tasks
-                      </h4>
-                      <div className="flex flex-wrap gap-2">
+                    <div className="p-6 bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-800 rounded-lg">
+                      <div className="flex items-center gap-2 mb-4">
+                        <Calendar className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                        <h4 className="text-sm font-semibold text-blue-900 dark:text-blue-100">Today's Scheduled Topics</h4>
+                      </div>
+                      <div className="flex flex-wrap gap-3">
                         {dailyTasks.map((topic: string) => (
                           <Button
                             key={`today-${topic}`}
@@ -303,7 +345,11 @@ export default function QuizPage() {
                                   : [...prev, topic]
                               )
                             }
-                            className="bg-white dark:bg-gray-800 hover:bg-green-100 dark:hover:bg-green-900/30"
+                            className={`border-slate-300 dark:border-slate-600 ${
+                              selectedTopics.includes(topic) 
+                                ? 'bg-blue-600 hover:bg-blue-700 text-white' 
+                                : 'hover:bg-blue-50 dark:hover:bg-blue-900/20'
+                            }`}
                           >
                             {topic}
                           </Button>
@@ -313,11 +359,11 @@ export default function QuizPage() {
                   )}
                   
                   {/* Available Topics */}
-                  <div className="space-y-3">
-                    <h4 className="text-sm font-medium text-muted-foreground">
-                      {dailyTasks.length > 0 ? 'Additional Topics' : 'Available Topics'}
+                  <div className="space-y-4">
+                    <h4 className="text-sm font-medium text-slate-700 dark:text-slate-300 uppercase tracking-wide">
+                      {dailyTasks.length > 0 ? 'Additional Subjects' : 'Available Subjects'}
                     </h4>
-                    <div className="flex flex-wrap gap-2">
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                       {availableTopics
                         .filter(topic => !dailyTasks.includes(topic))
                         .map((topic: string) => (
@@ -332,16 +378,19 @@ export default function QuizPage() {
                                 : [...prev, topic]
                             )
                           }
-                          className="transition-all hover:scale-105"
+                          className={`justify-start border-slate-300 dark:border-slate-600 transition-all ${
+                            selectedTopics.includes(topic) 
+                              ? 'bg-slate-900 hover:bg-slate-800 text-white' 
+                              : 'hover:bg-slate-50 dark:hover:bg-slate-800'
+                          }`}
                         >
                           {topic}
                         </Button>
                       ))}
                     </div>
-                    
                     {/* Fallback topics */}
                     {availableTopics.length === 0 && !loadingTopics && (
-                      <div className="flex flex-wrap gap-2">
+                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                         {DEFAULT_TOPICS.map((topic: string) => (
                           <Button
                             key={topic}
@@ -354,7 +403,11 @@ export default function QuizPage() {
                                   : [...prev, topic]
                               )
                             }
-                            className="transition-all hover:scale-105"
+                            className={`justify-start border-slate-300 dark:border-slate-600 transition-all ${
+                              selectedTopics.includes(topic) 
+                                ? 'bg-slate-900 hover:bg-slate-800 text-white' 
+                                : 'hover:bg-slate-50 dark:hover:bg-slate-800'
+                            }`}
                           >
                             {topic}
                           </Button>
@@ -364,22 +417,22 @@ export default function QuizPage() {
                   </div>
                   
                   {selectedTopics.length > 0 && (
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <CheckCircle className="w-4 h-4 text-green-500" />
-                      {selectedTopics.length} topic{selectedTopics.length !== 1 ? 's' : ''} selected
+                    <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 px-4 py-2 rounded-md">
+                      <CheckCircle className="w-4 h-4 text-green-600 dark:text-green-400" />
+                      <span className="font-medium">{selectedTopics.length} subject{selectedTopics.length !== 1 ? 's' : ''} selected</span>
                     </div>
                   )}
                 </div>
 
-                {/* Quiz Settings */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Assessment Parameters */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                   <div className="space-y-3">
-                    <Label className="flex items-center gap-2">
-                      <Timer className="w-4 h-4" />
-                      Duration
+                    <Label className="flex items-center gap-2 text-slate-900 dark:text-slate-100">
+                      <Clock className="w-4 h-4 text-slate-600 dark:text-slate-400" />
+                      Time Limit
                     </Label>
                     <Select value={duration.toString()} onValueChange={(value) => setDuration(Number(value))}>
-                      <SelectTrigger>
+                      <SelectTrigger className="border-slate-300 dark:border-slate-600">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -393,9 +446,9 @@ export default function QuizPage() {
                   </div>
 
                   <div className="space-y-3">
-                    <Label className="flex items-center gap-2">
-                      <Target className="w-4 h-4" />
-                      Number of Questions
+                    <Label className="flex items-center gap-2 text-slate-900 dark:text-slate-100">
+                      <Target className="w-4 h-4 text-slate-600 dark:text-slate-400" />
+                      Question Count
                     </Label>
                     <Input
                       type="number"
@@ -403,60 +456,63 @@ export default function QuizPage() {
                       max={50}
                       value={numQuestions}
                       onChange={(e) => setNumQuestions(Number(e.target.value))}
-                      className="text-center"
+                      className="border-slate-300 dark:border-slate-600"
                     />
                   </div>
                 </div>
 
-                {/* Advanced Options */}
-                <div className="space-y-4 pt-4 border-t">
+                {/* Advanced Configuration */}
+                <div className="space-y-4 pt-6 border-t border-slate-200 dark:border-slate-700">
                   <details className="group">
-                    <summary className="flex items-center gap-2 cursor-pointer text-sm font-medium hover:text-primary transition-colors">
-                      <Settings className="w-4 h-4" />
-                      Advanced Options
-                      <ChevronRight className="w-4 h-4 group-open:rotate-90 transition-transform" />
+                    <summary className="flex items-center gap-2 cursor-pointer text-sm font-medium text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100 transition-colors">
+                      <Settings className="w-4 h-4 text-slate-600 dark:text-slate-400" />
+                      Advanced Configuration
+                      <ChevronRight className="w-4 h-4 text-slate-400 group-open:rotate-90 transition-transform" />
                     </summary>
-                    <div className="mt-4 space-y-4 pl-6">
-                      <div className="space-y-2">
-                        <Label htmlFor="userProfile">Learning Profile (Optional)</Label>
+                    <div className="mt-6 space-y-6 pl-6">
+                      <div className="space-y-3">
+                        <Label htmlFor="userProfile" className="text-slate-900 dark:text-slate-100">Learning Profile (Optional)</Label>
                         <Input
                           id="userProfile"
-                          placeholder="e.g., High school student, visual learner"
+                          placeholder="e.g., High school student, visual learner, advanced mathematics"
                           value={userProfile}
                           onChange={(e) => setUserProfile(e.target.value)}
+                          className="border-slate-300 dark:border-slate-600"
                         />
+                        <p className="text-xs text-slate-500 dark:text-slate-400">Helps tailor question difficulty and style</p>
                       </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="syllabus">Syllabus Context (Optional)</Label>
+                      <div className="space-y-3">
+                        <Label htmlFor="syllabus" className="text-slate-900 dark:text-slate-100">Syllabus Context (Optional)</Label>
                         <Textarea
                           id="syllabus"
-                          placeholder="Paste topics or syllabus content for personalized questions"
+                          placeholder="Paste specific topics, chapters, or learning objectives for more targeted assessment"
                           value={syllabus}
                           onChange={(e) => setSyllabus(e.target.value)}
-                          className="min-h-[80px]"
+                          className="min-h-[100px] border-slate-300 dark:border-slate-600"
                         />
+                        <p className="text-xs text-slate-500 dark:text-slate-400">Enhances question relevance and accuracy</p>
                       </div>
                     </div>
                   </details>
                 </div>
 
-                {/* Action Buttons */}
-                <div className="flex flex-col sm:flex-row gap-3 pt-6 border-t">
+                {/* Action Panel */}
+                <div className="flex flex-col sm:flex-row gap-4 pt-8 border-t border-slate-200 dark:border-slate-700">
                   <Button
                     onClick={handleStartQuiz}
                     disabled={selectedTopics.length === 0 || numQuestions < 1 || loading}
-                    className="flex-1 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transition-all"
+                    className="flex-1 bg-slate-900 hover:bg-slate-800 text-white shadow-sm hover:shadow-md transition-all"
                     size="lg"
                   >
                     {loading ? (
                       <>
-                        <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                        Generating Quiz...
+                        <Loader2 className="w-5 h-5 mr-3 animate-spin" />
+                        Generating Assessment...
                       </>
                     ) : (
                       <>
-                        <Play className="w-5 h-5 mr-2" />
-                        Start Quiz
+                        <Play className="w-5 h-5 mr-3" />
+                        Begin Assessment
                       </>
                     )}
                   </Button>
@@ -471,9 +527,10 @@ export default function QuizPage() {
                       setDuration(10);
                     }}
                     size="lg"
+                    className="border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800"
                   >
                     <RotateCcw className="w-4 h-4 mr-2" />
-                    Reset
+                    Reset Form
                   </Button>
                 </div>
               </CardContent>
@@ -490,49 +547,44 @@ export default function QuizPage() {
 
     return (
       <MainLayout>
-        <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
-          <div className="max-w-4xl mx-auto p-6">
-            {/* Header with Progress */}
-            <div className="sticky top-0 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-b rounded-lg p-4 mb-6 shadow-sm">
-              <div className="flex items-center justify-between mb-4">
+        <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
+          <div className="max-w-5xl mx-auto p-6">
+            {/* Assessment Header */}
+            <div className="sticky top-0 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 p-6 mb-8 shadow-sm z-10">
+              <div className="flex items-center justify-between mb-6">
                 <div>
-                  <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                    Quiz in Progress
+                  <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-100">
+                    Assessment in Progress
                   </h1>
-                  <p className="text-sm text-muted-foreground">
+                  <p className="text-slate-600 dark:text-slate-400 mt-1">
                     Question {currentQuestionIndex + 1} of {quiz.questions.length}
                   </p>
                 </div>
                 <div className="flex items-center gap-4">
-                  <Badge variant="outline" className="flex items-center gap-2 px-3 py-1">
-                    <Clock className="w-4 h-4" />
-                    {quiz.duration} min
-                  </Badge>
-                  <Badge variant="secondary" className="flex items-center gap-2 px-3 py-1">
-                    <Timer className="w-4 h-4" />
-                    {questionTimer}s
-                  </Badge>
-                  <Badge variant="outline" className="flex items-center gap-2 px-3 py-1">
-                    <Zap className="w-4 h-4" />
-                    Streak: {streakCount}
-                  </Badge>
-                  <div className="hidden md:block max-w-[200px]">
-                    <div className="text-xs text-muted-foreground truncate">
-                      {selectedTopics.join(", ")}
-                    </div>
+                  <div className="text-right">
+                    <div className="text-sm font-medium text-slate-900 dark:text-slate-100">{quiz.duration} minutes</div>
+                    <div className="text-xs text-slate-500 dark:text-slate-400">Time limit</div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-sm font-medium text-slate-900 dark:text-slate-100">{questionTimer}s</div>
+                    <div className="text-xs text-slate-500 dark:text-slate-400">Elapsed</div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-sm font-medium text-slate-900 dark:text-slate-100">{streakCount}</div>
+                    <div className="text-xs text-slate-500 dark:text-slate-400">Current streak</div>
                   </div>
                 </div>
               </div>
 
               {/* Progress Bar */}
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm text-muted-foreground">
-                  <span>Progress</span>
-                  <span>{answeredCount}/{quiz.questions.length} answered</span>
+              <div className="space-y-3">
+                <div className="flex justify-between text-sm text-slate-600 dark:text-slate-400">
+                  <span>Assessment Progress</span>
+                  <span>{answeredCount} of {quiz.questions.length} completed</span>
                 </div>
-                <div className="w-full bg-muted rounded-full h-2">
+                <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-3">
                   <div
-                    className="bg-gradient-to-r from-blue-500 to-purple-600 h-2 rounded-full transition-all duration-500 ease-out"
+                    className="bg-slate-600 dark:bg-slate-400 h-3 rounded-full transition-all duration-500 ease-out"
                     style={{ width: `${progressPercentage}%` }}
                   />
                 </div>
@@ -540,50 +592,57 @@ export default function QuizPage() {
             </div>
 
             {/* Question Navigation */}
-            <div className="flex flex-wrap gap-2 mb-8 justify-center">
-              {quiz.questions.map((_: any, idx: number) => (
-                <button
-                  key={idx}
-                  onClick={() => {
-                    // Allow jumping to answered questions or next question
-                    if (idx <= answeredCount) {
-                      // Smooth scroll to question
-                      const questionElement = document.getElementById(`question-${idx}`);
-                      questionElement?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    }
-                  }}
-                  className={`w-10 h-10 rounded-full text-sm font-medium transition-all ${
-                    answers[idx] !== -1
-                      ? 'bg-green-500 text-white shadow-md'
-                      : idx === currentQuestionIndex
-                      ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-lg scale-110'
-                      : idx < currentQuestionIndex
-                      ? 'bg-muted text-muted-foreground'
-                      : 'bg-muted/50 text-muted-foreground cursor-not-allowed'
-                  }`}
-                >
-                  {idx + 1}
-                </button>
-              ))}
+            <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-6 mb-8">
+              <div className="text-center mb-4">
+                <h3 className="text-sm font-medium text-slate-900 dark:text-slate-100 uppercase tracking-wide">Question Navigator</h3>
+                <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">Click to review completed questions</p>
+              </div>
+              <div className="flex flex-wrap gap-3 justify-center">
+                {quiz.questions.map((_: any, idx: number) => (
+                  <button
+                    key={idx}
+                    onClick={() => {
+                      // Allow jumping to answered questions or next question
+                      if (idx <= answeredCount) {
+                        // Smooth scroll to question
+                        const questionElement = document.getElementById(`question-${idx}`);
+                        questionElement?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                      }
+                    }}
+                    className={`w-12 h-12 rounded-lg text-sm font-medium transition-all border ${
+                      answers[idx] !== -1
+                        ? 'bg-green-50 dark:bg-green-900/20 border-green-300 dark:border-green-700 text-green-700 dark:text-green-300'
+                        : idx === currentQuestionIndex
+                        ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 border-slate-900 dark:border-slate-100 shadow-md'
+                        : idx < currentQuestionIndex
+                        ? 'bg-slate-100 dark:bg-slate-700 border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-400'
+                        : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-600 cursor-not-allowed'
+                    }`}
+                  >
+                    {idx + 1}
+                  </button>
+                ))}
+              </div>
             </div>
 
             {/* Current Question */}
             {currentQuestion && (
-              <Card className="shadow-xl border-0 bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm mb-6">
+              <Card className="border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm mb-8">
                 <CardContent className="p-8">
-                  <div className="space-y-6">
-                    {/* Question */}
-                    <div className="text-center">
-                      <Badge variant="secondary" className="mb-4 px-3 py-1">
-                        {currentQuestion.topic}
-                      </Badge>
-                      <h2 className="text-xl md:text-2xl font-semibold leading-relaxed text-center">
+                  <div className="space-y-8">
+                    {/* Question Header */}
+                    <div className="text-center space-y-4">
+                      <div className="inline-flex items-center gap-2 px-4 py-2 bg-slate-100 dark:bg-slate-700 rounded-full">
+                        <BookOpen className="w-4 h-4 text-slate-600 dark:text-slate-400" />
+                        <span className="text-sm font-medium text-slate-900 dark:text-slate-100">{currentQuestion.topic}</span>
+                      </div>
+                      <h2 className="text-2xl md:text-3xl font-semibold leading-relaxed text-slate-900 dark:text-slate-100 max-w-4xl mx-auto">
                         {currentQuestion.question}
                       </h2>
                     </div>
 
-                    {/* Options */}
-                    <div className="grid grid-cols-1 gap-4 max-w-2xl mx-auto">
+                    {/* Answer Options */}
+                    <div className="grid grid-cols-1 gap-4 max-w-3xl mx-auto">
                       {currentQuestion.options.map((opt: string, oidx: number) => {
                         const isSelected = answers[currentQuestionIndex] === oidx;
                         return (
@@ -594,25 +653,24 @@ export default function QuizPage() {
                               const newAnswers = [...answers];
                               newAnswers[currentQuestionIndex] = oidx;
                               setAnswers(newAnswers);
-                              
+
                               // Update streak if this is the current question being answered
                               if (currentQuestionIndex === answeredCount) {
-                                // Check if answer is correct (we'll know after submission, but for now just track attempts)
                                 setStreakCount(prev => prev + 1);
                                 setMaxStreak(prev => Math.max(prev, streakCount + 1));
                               }
                             }}
-                            className={`justify-start text-left h-auto p-6 whitespace-normal transition-all hover:scale-[1.02] ${
+                            className={`justify-start text-left h-auto p-6 whitespace-normal transition-all border-2 ${
                               isSelected
-                                ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-lg'
-                                : 'hover:bg-muted/50'
+                                ? 'bg-slate-900 hover:bg-slate-800 text-white border-slate-900 shadow-md'
+                                : 'border-slate-300 dark:border-slate-600 hover:border-slate-400 dark:hover:border-slate-500 hover:bg-slate-50 dark:hover:bg-slate-700'
                             }`}
                             size="lg"
                           >
-                            <span className="font-bold mr-4 text-lg">
+                            <span className="font-bold mr-6 text-lg min-w-[2rem] text-center">
                               {String.fromCharCode(65 + oidx)}.
                             </span>
-                            <span className="flex-1">{opt}</span>
+                            <span className="flex-1 text-left leading-relaxed">{opt}</span>
                           </Button>
                         );
                       })}
@@ -654,47 +712,48 @@ export default function QuizPage() {
               </div>
             )}
 
-            {/* Submit Section */}
-            <Card className="sticky bottom-0 bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm border-t shadow-lg">
-              <CardContent className="py-4 px-6">
+            {/* Assessment Controls */}
+            <Card className="sticky bottom-0 bg-white dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700 shadow-lg">
+              <CardContent className="py-6 px-8">
                 <div className="flex items-center justify-between">
-                  <div className="text-sm text-muted-foreground">
+                  <div className="text-sm text-slate-600 dark:text-slate-400">
                     {answeredCount === quiz.questions.length ? (
-                      <span className="text-green-600 font-medium flex items-center gap-2">
+                      <span className="text-green-600 dark:text-green-400 font-medium flex items-center gap-2">
                         <CheckCircle className="w-4 h-4" />
-                        All questions answered! Ready to submit.
+                        Assessment complete. Ready for submission.
                       </span>
                     ) : (
-                      <span className="flex items-center gap-2">
+                      <span className="flex items-center gap-2 text-slate-500 dark:text-slate-500">
                         <AlertTriangle className="w-4 h-4" />
                         {quiz.questions.length - answeredCount} question{quiz.questions.length - answeredCount !== 1 ? 's' : ''} remaining
                       </span>
                     )}
                   </div>
-                  <div className="flex gap-3 items-center">
+                  <div className="flex gap-4 items-center">
                     <Button
                       variant="outline"
                       onClick={() => setStep("setup")}
-                      size="sm"
+                      size="lg"
+                      className="border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700"
                     >
                       <ArrowLeft className="w-4 h-4 mr-2" />
-                      Cancel
+                      Exit Assessment
                     </Button>
                     <Button
                       onClick={handleSubmitQuiz}
                       disabled={loading || answers.includes(-1)}
                       size="lg"
-                      className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white shadow-lg"
+                      className="bg-slate-900 hover:bg-slate-800 text-white shadow-md hover:shadow-lg transition-all px-8"
                     >
                       {loading ? (
                         <>
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          Submitting...
+                          <Loader2 className="w-5 h-5 mr-3 animate-spin" />
+                          Processing Results...
                         </>
                       ) : (
                         <>
-                          <Trophy className="w-4 h-4 mr-2" />
-                          Submit Quiz
+                          <Trophy className="w-5 h-5 mr-3" />
+                          Submit Assessment
                         </>
                       )}
                     </Button>
@@ -728,99 +787,125 @@ export default function QuizPage() {
 
     return (
       <MainLayout>
-        <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
-          <div className="max-w-4xl mx-auto p-6 space-y-8">
-            {/* Results Header */}
-            <div className="text-center space-y-6 py-8">
-              <div className={`inline-flex items-center justify-center w-24 h-24 bg-gradient-to-r ${performance.color} rounded-full shadow-2xl`}>
-                <PerformanceIcon className="w-12 h-12 text-white" />
+        <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
+          <div className="max-w-6xl mx-auto p-6 space-y-8">
+            {/* Assessment Results Header */}
+            <div className="text-center space-y-8 py-12">
+              <div className="inline-flex items-center justify-center w-20 h-20 bg-slate-100 dark:bg-slate-800 rounded-xl">
+                <PerformanceIcon className="w-10 h-10 text-slate-600 dark:text-slate-400" />
               </div>
-              <div>
-                <h1 className="text-4xl font-bold mb-2">Quiz Complete!</h1>
-                <p className="text-xl text-muted-foreground">You've earned the title of <span className="font-semibold text-primary">{performance.level}</span></p>
+              <div className="space-y-3">
+                <h1 className="text-4xl font-bold text-slate-900 dark:text-slate-100">
+                  Assessment Complete
+                </h1>
+                <p className="text-xl text-slate-600 dark:text-slate-400">
+                  Performance Level: <span className="font-semibold text-slate-900 dark:text-slate-100">{performance.level}</span>
+                </p>
+                <div className="inline-flex items-center gap-2 px-4 py-2 bg-slate-100 dark:bg-slate-800 rounded-full">
+                  <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Score: {score}/{total} ({percentage}%)</span>
+                </div>
               </div>
             </div>
 
-            {/* Score Overview Cards */}
+            {/* Performance Metrics */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-              <Card className="bg-gradient-to-r from-blue-500 to-purple-600 text-white border-0 shadow-lg">
+              <Card className="border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
                 <CardContent className="p-6 text-center">
-                  <div className="text-3xl font-bold mb-2">
+                  <div className="w-12 h-12 bg-blue-50 dark:bg-blue-900/20 rounded-lg flex items-center justify-center mx-auto mb-4">
+                    <Target className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+                  </div>
+                  <div className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-1">
                     {score}/{total}
                   </div>
-                  <p className="text-sm opacity-90">Questions Correct</p>
+                  <p className="text-sm text-slate-600 dark:text-slate-400">Correct Answers</p>
                 </CardContent>
               </Card>
 
-              <Card className="bg-gradient-to-r from-green-500 to-emerald-600 text-white border-0 shadow-lg">
+              <Card className="border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
                 <CardContent className="p-6 text-center">
-                  <div className="text-3xl font-bold mb-2">
+                  <div className="w-12 h-12 bg-green-50 dark:bg-green-900/20 rounded-lg flex items-center justify-center mx-auto mb-4">
+                    <TrendingUp className="w-6 h-6 text-green-600 dark:text-green-400" />
+                  </div>
+                  <div className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-1">
                     {percentage}%
                   </div>
-                  <p className="text-sm opacity-90">Accuracy Rate</p>
+                  <p className="text-sm text-slate-600 dark:text-slate-400">Accuracy Rate</p>
                 </CardContent>
               </Card>
 
-              <Card className="bg-gradient-to-r from-purple-500 to-pink-600 text-white border-0 shadow-lg">
+              <Card className="border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
                 <CardContent className="p-6 text-center">
-                  <div className="text-3xl font-bold mb-2">
+                  <div className="w-12 h-12 bg-slate-100 dark:bg-slate-700 rounded-lg flex items-center justify-center mx-auto mb-4">
+                    <Clock className="w-6 h-6 text-slate-600 dark:text-slate-400" />
+                  </div>
+                  <div className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-1">
                     {avgTime}s
                   </div>
-                  <p className="text-sm opacity-90">Avg per Question</p>
+                  <p className="text-sm text-slate-600 dark:text-slate-400">Avg per Question</p>
                 </CardContent>
               </Card>
 
-              <Card className="bg-gradient-to-r from-orange-500 to-red-600 text-white border-0 shadow-lg">
+              <Card className="border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
                 <CardContent className="p-6 text-center">
-                  <div className="text-3xl font-bold mb-2">
+                  <div className="w-12 h-12 bg-orange-50 dark:bg-orange-900/20 rounded-lg flex items-center justify-center mx-auto mb-4">
+                    <Zap className="w-6 h-6 text-orange-600 dark:text-orange-400" />
+                  </div>
+                  <div className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-1">
                     {maxStreak}
                   </div>
-                  <p className="text-sm opacity-90">Best Streak</p>
+                  <p className="text-sm text-slate-600 dark:text-slate-400">Best Streak</p>
                 </CardContent>
               </Card>
             </div>
 
-            {/* Performance Message */}
-            <Card className="bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-900/20 dark:to-purple-900/20 border-indigo-200 dark:border-indigo-800">
-              <CardContent className="p-6 text-center">
-                <h3 className="text-lg font-semibold mb-2">Performance Analysis</h3>
-                <p className="text-muted-foreground">
-                  {percentage >= 90 ? "Outstanding! You've mastered this material." :
-                   percentage >= 80 ? "Excellent work! You're showing strong understanding." :
-                   percentage >= 70 ? "Good job! Keep practicing to improve further." :
-                   percentage >= 60 ? "Not bad! Focus on the areas you missed." :
-                   "Keep studying! Practice makes perfect."}
-                  {maxStreak >= 5 && " Your impressive streak of " + maxStreak + " shows great momentum!"}
+            {/* Performance Analysis */}
+            <Card className="border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
+              <CardContent className="p-8 text-center">
+                <div className="w-12 h-12 bg-slate-100 dark:bg-slate-700 rounded-lg flex items-center justify-center mx-auto mb-4">
+                  <Brain className="w-6 h-6 text-slate-600 dark:text-slate-400" />
+                </div>
+                <h3 className="text-xl font-semibold text-slate-900 dark:text-slate-100 mb-4">Performance Analysis</h3>
+                <p className="text-slate-600 dark:text-slate-400 leading-relaxed max-w-2xl mx-auto">
+                  {percentage >= 90 ? "Outstanding performance! You demonstrate mastery of this material with exceptional accuracy." :
+                   percentage >= 80 ? "Excellent work! You show strong understanding and command of the subject matter." :
+                   percentage >= 70 ? "Good progress! You have solid foundational knowledge with room for continued improvement." :
+                   percentage >= 60 ? "Satisfactory performance. Focus on strengthening areas of difficulty to improve comprehension." :
+                   "Additional study recommended. Review fundamental concepts and consider additional practice sessions."}
+                  {maxStreak >= 5 && ` Your impressive streak of ${maxStreak} consecutive correct answers demonstrates strong momentum.`}
                 </p>
               </CardContent>
             </Card>
 
-            {/* Question Review */}
-            <Card className="shadow-xl border-0 bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <BookOpen className="w-5 h-5" />
-                  Question Review
+            {/* Detailed Review */}
+            <Card className="border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
+              <CardHeader className="border-b border-slate-200 dark:border-slate-700">
+                <CardTitle className="flex items-center gap-3 text-xl">
+                  <BookOpen className="w-5 h-5 text-slate-600 dark:text-slate-400" />
+                  Detailed Review
                 </CardTitle>
-                <CardDescription>
-                  Review your answers and learn from mistakes
+                <CardDescription className="text-slate-600 dark:text-slate-400">
+                  Comprehensive analysis of your responses for learning optimization
                 </CardDescription>
               </CardHeader>
-              <CardContent>
-                <div className="space-y-6">
+              <CardContent className="p-8">
+                <div className="space-y-8">
                   {stats.feedback.map((fb: any, idx: number) => (
-                    <div key={idx} className={`border rounded-xl p-6 transition-all ${
+                    <div key={idx} className={`border rounded-lg p-6 transition-all ${
                       fb.is_correct
-                        ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'
-                        : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
+                        ? 'bg-green-50 dark:bg-green-900/10 border-green-200 dark:border-green-800'
+                        : 'bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-800'
                     }`}>
                       <div className="flex items-start gap-4">
-                        <Badge variant={fb.is_correct ? "default" : "destructive"} className="mt-1 px-3 py-1">
-                          Q{idx + 1}
-                        </Badge>
+                        <div className={`flex items-center justify-center w-8 h-8 rounded-full text-sm font-semibold ${
+                          fb.is_correct
+                            ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200'
+                            : 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200'
+                        }`}>
+                          {idx + 1}
+                        </div>
                         <div className="flex-1">
-                          <h4 className="font-semibold mb-4 text-lg leading-relaxed">{fb.question}</h4>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+                          <h4 className="font-semibold mb-4 text-lg leading-relaxed text-slate-900 dark:text-slate-100">{fb.question}</h4>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                             {fb.options.map((opt: string, oidx: number) => (
                               <div
                                 key={oidx}
@@ -829,28 +914,28 @@ export default function QuizPage() {
                                     ? "bg-green-100 border-green-300 dark:bg-green-900/30 dark:border-green-700 text-green-800 dark:text-green-200"
                                     : oidx === fb.user_answer && !fb.is_correct
                                     ? "bg-red-100 border-red-300 dark:bg-red-900/30 dark:border-red-700 text-red-800 dark:text-red-200"
-                                    : "bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700"
+                                    : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300"
                                 }`}
                               >
-                                <span className="font-bold mr-2">{String.fromCharCode(65 + oidx)}.</span>
+                                <span className="font-bold mr-3">{String.fromCharCode(65 + oidx)}.</span>
                                 {opt}
                               </div>
                             ))}
                           </div>
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-3">
                             {fb.is_correct ? (
-                              <Badge variant="default" className="bg-green-500 hover:bg-green-600">
+                              <Badge className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-200 border-green-300 dark:border-green-700 px-3 py-1">
                                 <CheckCircle className="w-3 h-3 mr-1" />
                                 Correct
                               </Badge>
                             ) : (
-                              <Badge variant="destructive">
+                              <Badge variant="destructive" className="px-3 py-1">
                                 <X className="w-3 h-3 mr-1" />
                                 Incorrect
                               </Badge>
                             )}
                             {!fb.is_correct && (
-                              <span className="text-sm text-muted-foreground">
+                              <span className="text-sm text-slate-600 dark:text-slate-400">
                                 Correct answer: <span className="font-semibold">{String.fromCharCode(65 + fb.correct_index)}</span>
                               </span>
                             )}
