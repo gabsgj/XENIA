@@ -223,32 +223,30 @@ export default function TutorPage(){
                     )}
                     <MarkdownRenderer content={message.content} />
                     {message.steps && message.steps.length > 0 && (
-                      <div className='mt-3'>
-                        <ol className='list-decimal list-inside space-y-3'>
-                          {message.steps.map((s, i) => (
-                            <li key={i} className='p-3 rounded border bg-background/50'>
-                              <div className='font-semibold text-sm mb-2'>
-                                {/* Render the title without a manual numeric prefix so the <ol> handles numbering */}
-                                <MarkdownRenderer content={s.title || ''} />
+                      <div className='mt-3 space-y-3'>
+                        {message.steps.map((s, i) => (
+                          <div key={i} className='p-3 rounded border bg-background/50'>
+                            <div className='font-semibold text-sm mb-2'>
+                              {/* Backend supplies sequential numbering in the title (e.g., '1. Step title') */}
+                              <MarkdownRenderer content={s.title || ''} />
+                            </div>
+                            <div className='text-sm leading-relaxed'>
+                              <MarkdownRenderer content={s.detail || ''} />
+                            </div>
+                            {s.calculation && (
+                              <div className='mt-2 text-sm'>
+                                <div className='font-medium text-muted-foreground mb-1'>Calculation:</div>
+                                <MarkdownRenderer content={s.calculation} />
                               </div>
-                              <div className='text-sm leading-relaxed'>
-                                <MarkdownRenderer content={s.detail || ''} />
+                            )}
+                            {s.code_snippet && (
+                              <div className='mt-2 text-sm'>
+                                <div className='font-medium text-muted-foreground mb-1'>Code:</div>
+                                <MarkdownRenderer content={s.code_snippet} />
                               </div>
-                              {s.calculation && (
-                                <div className='mt-2 text-sm'>
-                                  <div className='font-medium text-muted-foreground mb-1'>Calculation:</div>
-                                  <MarkdownRenderer content={s.calculation} />
-                                </div>
-                              )}
-                              {s.code_snippet && (
-                                <div className='mt-2 text-sm'>
-                                  <div className='font-medium text-muted-foreground mb-1'>Code:</div>
-                                  <MarkdownRenderer content={s.code_snippet} />
-                                </div>
-                              )}
-                            </li>
-                          ))}
-                        </ol>
+                            )}
+                          </div>
+                        ))}
                       </div>
                     )}
                   </CardContent>

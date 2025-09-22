@@ -7,6 +7,7 @@ from ..services.weaktopics import get_remediation_steps
 from .tutor_storage import save_message, fetch_history
 from ..utils import is_valid_uuid
 from ..errors import ApiError
+import re
 
 logger = logging.getLogger('xenia')
 
@@ -314,7 +315,24 @@ Return only JSON in this format:
 
     # Build comprehensive response with metadata
     # Per UI contract: if `steps` are present, keep `answer` as a short intro/summary only
+    # Normalize and ensure sequential numbering on step titles so frontend can render them verbatim
+    def _renumber_steps(steps_list):
+      normalized = []
+      for idx, st in enumerate(steps_list, start=1):
+        if not isinstance(st, dict):
+          st = {'title': str(st)}
+        title = st.get('title', '') or ''
+        # strip existing leading numbering like '1.', 'Step 1:', '1) ', 'Step 1 - '
+        title_clean = re.sub(r'^\s*(?:Step\s*)?\d+[\)\.:\-\s]*', '', title, flags=re.IGNORECASE).strip()
+        st['title'] = f"{idx}. {title_clean}" if title_clean else f"{idx}."
+        normalized.append(st)
+      return normalized
+
     if steps:
+      try:
+        steps = _renumber_steps(steps)
+      except Exception as e:
+        logger.warning(f"Failed to renumber steps: {e}")
       answer = "Here are the steps to solve the problem."
     else:
       answer_lines = []
