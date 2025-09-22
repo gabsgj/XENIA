@@ -5,10 +5,70 @@ import pytesseract
 import logging
 from ..services.weaktopics import get_remediation_steps
 from .tutor_storage import save_message, fetch_history
-from ..utils import is_valid_uuid
+from ..utils import is_valid_uuid, normalize_user_id
 from ..errors import ApiError
+from ..supabase_client import get_supabase
 
 logger = logging.getLogger('xenia')
+
+def _load_user_syllabus_context(user_id: str) -> Dict:
+    """Load user's syllabus context from database for personalized tutoring."""
+    context = {
+        'topics': [],
+        'subject_area': 'General',
+        'extracted_text': '',
+        'has_context': False
+    }
+    
+    if not user_id or not is_valid_uuid(normalize_user_id(user_id)):
+        logger.info("No valid user ID provided, using generic context")
+        return context
+    
+    try:
+        sb = get_supabase()
+        norm_user_id = normalize_user_id(user_id)
+        
+        # Load syllabus topics
+        topics_resp = sb.table("syllabus_topics").select("topic, metadata").eq("user_id", norm_user_id).order("order_index").limit(50).execute()
+        
+        if topics_resp.data:
+            context['topics'] = [r['topic'] for r in topics_resp.data]
+            context['has_context'] = True
+            logger.info(f"Loaded {len(context['topics'])} syllabus topics for user {norm_user_id}")
+            
+            # Extract subject area from metadata if available
+            for topic_data in topics_resp.data:
+                metadata = topic_data.get('metadata', {})
+                if isinstance(metadata, dict) and 'category' in metadata:
+                    context['subject_area'] = metadata['category'].title()
+                    break
+        
+        # Load recent syllabus artifacts for additional context
+        artifacts_resp = sb.table("artifacts").select("extracted_text, artifact_type").eq("user_id", norm_user_id).eq("artifact_type", "syllabus").order("created_at", desc=True).limit(1).execute()
+        
+        if artifacts_resp.data:
+            extracted_text = artifacts_resp.data[0].get('extracted_text', '')
+            if extracted_text:
+                context['extracted_text'] = extracted_text[:2000]  # Limit context size
+                context['has_context'] = True
+                logger.info(f"Loaded syllabus text context ({len(extracted_text)} chars) for user {norm_user_id}")
+        
+        # Determine subject area from topics if not found in metadata
+        if context['subject_area'] == 'General' and context['topics']:
+            topics_text = ' '.join(context['topics'][:10]).lower()
+            if any(word in topics_text for word in ['math', 'algebra', 'calculus', 'geometry', 'equation']):
+                context['subject_area'] = 'Mathematics'
+            elif any(word in topics_text for word in ['physics', 'chemistry', 'biology', 'science']):
+                context['subject_area'] = 'Science'
+            elif any(word in topics_text for word in ['programming', 'code', 'algorithm', 'python', 'java']):
+                context['subject_area'] = 'Computer Science'
+            elif any(word in topics_text for word in ['literature', 'english', 'writing', 'essay']):
+                context['subject_area'] = 'English'
+        
+    except Exception as e:
+        logger.error(f"Failed to load syllabus context for user {user_id}: {e}")
+    
+    return context
 
 class EnhancedTutor:
     """Advanced AI tutor with sophisticated question understanding and OCR."""
@@ -58,7 +118,7 @@ class EnhancedTutor:
         return {"type": "general", "strategy": "comprehensive_explanation"}
     
     @staticmethod
-    def generate_advanced_solution(question: str, question_analysis: Dict) -> List[Dict]:
+    def generate_advanced_solution(question: str, question_analysis: Dict, syllabus_context: Optional[Dict] = None) -> List[Dict]:
         """Generate advanced solution using AI with question-type awareness."""
         try:
             from .ai_providers import get_ai_response
@@ -66,11 +126,26 @@ class EnhancedTutor:
             question_type = question_analysis.get("type", "general")
             strategy = question_analysis.get("strategy", "comprehensive_explanation")
             
+            # Build context-aware prompt with syllabus information
+            context_info = ""
+            if syllabus_context and syllabus_context.get('has_context'):
+                subject_area = syllabus_context.get('subject_area', 'General')
+                topics = syllabus_context.get('topics', [])
+                
+                context_info = f"""
+STUDENT CONTEXT:
+- Subject Area: {subject_area}
+- Current Syllabus Topics: {', '.join(topics[:10]) if topics else 'No specific topics'}
+- This question relates to the student's current curriculum
+
+IMPORTANT: Tailor your explanation to the student's {subject_area} curriculum and reference relevant syllabus topics when applicable.
+"""
+            
             # Craft specialized prompts based on question type
             if question_type == "mathematics":
                 prompt = f"""
 You are an expert mathematics tutor. Solve this step-by-step and format your response in Markdown:
-
+{context_info}
 QUESTION: {question}
 
 FORMATTING REQUIREMENTS:
@@ -110,7 +185,7 @@ Provide a structured solution in JSON format:
             elif question_type == "science":
                 prompt = f"""
 You are an expert science tutor. Explain this scientific concept or solve this problem and format your response in Markdown:
-
+{context_info}
 QUESTION: {question}
 
 FORMATTING REQUIREMENTS:
@@ -148,7 +223,7 @@ Provide a structured explanation in JSON format:
             elif question_type == "programming":
                 prompt = f"""
 You are an expert programming tutor. Help solve this coding problem and format your response in Markdown:
-
+{context_info}
 QUESTION: {question}
 
 FORMATTING REQUIREMENTS:
@@ -187,7 +262,7 @@ Provide a structured solution in JSON format:
             else:
                 prompt = f"""
 You are an expert tutor. Provide a comprehensive explanation for this question and format your response in Markdown:
-
+{context_info}
 QUESTION: {question}
 
 FORMATTING REQUIREMENTS:
@@ -265,27 +340,44 @@ def solve_question(
     if not question or len(question.strip()) < 3:
         raise ApiError("TUTOR_INVALID_INPUT", "Question is too short or unclear", status=400)
     
+    # Load user's syllabus context for personalized tutoring
+    syllabus_context = _load_user_syllabus_context(user_id)
+    logger.info(f"Loaded syllabus context: {len(syllabus_context.get('topics', []))} topics, subject: {syllabus_context.get('subject_area', 'General')}")
+    
     # Analyze question type for targeted tutoring
     question_analysis = EnhancedTutor.analyze_question_type(question)
     logger.info(f"Question analysis: {question_analysis}")
     
-    # Try advanced AI-powered solution first
-    advanced_steps = EnhancedTutor.generate_advanced_solution(question, question_analysis)
+    # Try advanced AI-powered solution first with syllabus context
+    advanced_steps = EnhancedTutor.generate_advanced_solution(question, question_analysis, syllabus_context)
     
     if advanced_steps:
         steps = advanced_steps
         logger.info(f"Using advanced AI solution with {len(steps)} steps")
     else:
-        # Fallback to basic remediation steps
+        # Fallback to basic remediation steps with context
         logger.info("Falling back to basic remediation steps")
-        steps = get_remediation_steps(user_id=user_id, question_text=question)
+        steps = get_remediation_steps(user_id=user_id, question_text=question, syllabus_context=syllabus_context)
         
     # Try basic AI enrichment as additional fallback
     try:
       from .ai_providers import get_ai_response
+      
+      # Build context info for fallback prompt too
+      fallback_context = ""
+      if syllabus_context and syllabus_context.get('has_context'):
+          subject_area = syllabus_context.get('subject_area', 'General')
+          topics = syllabus_context.get('topics', [])
+          fallback_context = f"""
+STUDENT CONTEXT:
+- Subject Area: {subject_area}
+- Current Syllabus Topics: {', '.join(topics[:10]) if topics else 'No specific topics'}
+- Tailor your response to the {subject_area} curriculum
+"""
+      
       markdown_prompt = f"""
 Provide a step-by-step solution for this question in JSON format with Markdown formatting:
-
+{fallback_context}
 QUESTION: {question}
 
 FORMATTING REQUIREMENTS:

@@ -1,4 +1,4 @@
-from typing import List, Dict
+from typing import List, Dict, Optional
 import re
 from ..supabase_client import get_supabase
 
@@ -226,7 +226,7 @@ def get_weak_topics(user_id: str) -> List[Dict]:
     return [{"topic": t, "score": s} for t, s in ranked[:20]]
 
 
-def get_remediation_steps(user_id: str, question_text: str) -> List[Dict]:
+def get_remediation_steps(user_id: str, question_text: str, syllabus_context: Optional[Dict] = None) -> List[Dict]:
     """Get step-by-step solution using AI"""
     import logging
     logger = logging.getLogger('xenia')
@@ -235,10 +235,25 @@ def get_remediation_steps(user_id: str, question_text: str) -> List[Dict]:
     from .ai_providers import get_ai_response
     
     try:
+        # Build context-aware prompt with syllabus information
+        context_info = ""
+        if syllabus_context and syllabus_context.get('has_context'):
+            subject_area = syllabus_context.get('subject_area', 'General')
+            topics = syllabus_context.get('topics', [])
+            
+            context_info = f"""
+STUDENT CONTEXT:
+- Subject Area: {subject_area}
+- Current Syllabus Topics: {', '.join(topics[:10]) if topics else 'No specific topics'}
+- This question relates to the student's current curriculum
+
+IMPORTANT: Tailor your explanation to the student's {subject_area} curriculum and reference relevant syllabus topics when applicable.
+"""
+        
         # Create a structured prompt for step-by-step tutoring
         prompt = f"""
 You are an AI tutor. A student has asked: "{question_text}"
-
+{context_info}
 CRITICAL: Each step title MUST use sequential numbering (Step 1, Step 2, Step 3, etc.). Do NOT repeat "1." for every step.
 
 Provide a step-by-step solution in JSON format with this exact structure:
