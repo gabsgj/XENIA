@@ -177,6 +177,8 @@ class AIProviderManager:
     def _call_gemini(self, prompt: str, config: ProviderConfig) -> str:
         """Call Gemini API with timeout handling."""
         import google.generativeai as genai
+        import threading
+        import platform
         
         genai.configure(api_key=config.api_key)
         model_name = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
@@ -189,33 +191,34 @@ class AIProviderManager:
             candidate_count=1,
         )
         
-        # Use asyncio for timeout handling
-        async def generate_with_timeout():
-            loop = asyncio.get_event_loop()
-            response = await loop.run_in_executor(
-                None, 
-                lambda: model.generate_content(prompt, generation_config=generation_config)
-            )
-            return response
+        # Cross-platform timeout handling using threading
+        result = [None]
+        exception = [None]
         
-        # Run with timeout
-        try:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            response = loop.run_until_complete(
-                asyncio.wait_for(generate_with_timeout(), timeout=config.timeout)
-            )
-            loop.close()
-            
-            if response and response.text:
-                return response.text.strip()
-            else:
-                raise Exception("Empty response from Gemini")
-                
-        except asyncio.TimeoutError:
+        def call_api():
+            try:
+                response = model.generate_content(prompt, generation_config=generation_config)
+                result[0] = response
+            except Exception as e:
+                exception[0] = e
+        
+        # Start API call in separate thread
+        thread = threading.Thread(target=call_api)
+        thread.daemon = True
+        thread.start()
+        thread.join(timeout=config.timeout)
+        
+        if thread.is_alive():
+            # Thread is still running, timeout occurred
             raise TimeoutError(f"Gemini API timeout after {config.timeout}s")
-        except Exception as e:
-            raise Exception(f"Gemini API error: {str(e)}")
+        
+        if exception[0]:
+            raise Exception(f"Gemini API error: {str(exception[0])}")
+        
+        if result[0] and result[0].text:
+            return result[0].text.strip()
+        else:
+            raise Exception("Empty response from Gemini")
     
     def _call_openai(self, prompt: str, config: ProviderConfig) -> str:
         """Call OpenAI API with timeout handling."""

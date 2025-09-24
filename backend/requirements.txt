@@ -29,9 +29,7 @@ marshmallow==3.23.2
 flask-wtf==1.2.1
 # Rate limiting and caching
 redis==5.2.1
-# File validation and security
-python-magic==0.4.27
-# Async support
-asyncio-timeout==4.0.3
+# File validation and security (compatible version)
+filetype==1.2.0
 # Error tracking (optional)
 sentry-sdk[flask]==2.19.2

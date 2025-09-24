@@ -2,6 +2,7 @@ from flask import Blueprint, request
 import logging
 from ..errors import ApiError
 from ..utils.api_response import APIResponseBuilder, api_endpoint, ErrorCode
+from ..utils.file_validator import validate_uploaded_file, FileValidationError
 from ..services.tutor import solve_question
 from ..utils import normalize_user_id, is_valid_uuid
 from ..services.tutor_storage import fetch_history
@@ -31,18 +32,24 @@ def ask_tutor():
             if file.filename == '':
                 return APIResponseBuilder.validation_error("No file selected")
             
-            # Validate file size (50MB limit)
+            # Read and validate file
             file_content = file.read()
-            max_size = 50 * 1024 * 1024  # 50MB
-            if len(file_content) > max_size:
-                return APIResponseBuilder.error(
-                    ErrorCode.FILE_TOO_LARGE,
-                    f"File too large. Maximum size is {max_size // (1024*1024)}MB",
-                    status_code=413
-                )
+            
+            try:
+                # Comprehensive file validation
+                validation_result = validate_uploaded_file(file.filename, file_content)
+                logger.info(f"File validation passed: {validation_result['filename']} ({validation_result['file_size']} bytes)")
+                
+            except FileValidationError as e:
+                if e.error_code == "FILE_TOO_LARGE":
+                    return APIResponseBuilder.error(ErrorCode.FILE_TOO_LARGE, e.message, status_code=413)
+                elif e.error_code == "FILE_TYPE_NOT_ALLOWED":
+                    return APIResponseBuilder.error(ErrorCode.FILE_TYPE_NOT_ALLOWED, e.message, status_code=400)
+                else:
+                    return APIResponseBuilder.error(ErrorCode.FILE_CORRUPTED, e.message, status_code=400)
             
             question = None
-            logger.info(f"Processing image file: {file.filename} ({len(file_content)} bytes)")
+            logger.info(f"Processing validated file: {file.filename} ({len(file_content)} bytes)")
         else:
             file_content = None
             question = (
