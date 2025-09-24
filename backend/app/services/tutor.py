@@ -9,7 +9,7 @@ from ..utils import is_valid_uuid
 from ..errors import ApiError
 import re
 import traceback
-from ..supabase_client import get_supabase_client
+from ..supabase_client import get_supabase
 import asyncio
 
 logger = logging.getLogger('xenia')
@@ -68,7 +68,7 @@ class EnhancedTutor:
             if not is_valid_uuid(user_id):
                 return {"context": "basic", "subject_area": "General", "topics": ""}
             
-            supabase = get_supabase_client()
+            supabase = get_supabase()
             
             # Load syllabus topics from database
             topics_response = supabase.table('syllabus_topics').select('*').eq('user_id', user_id).limit(20).execute()
