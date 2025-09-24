@@ -1,4 +1,4 @@
-'use client'
+"use client"
 
 import { useEffect, useState, useRef } from 'react'
 import { api, getUserId } from '@/lib/api'
@@ -18,22 +18,20 @@ import {
   Timer,
   Square
 } from 'lucide-react'
+import React from 'react'
 import { StudyTimer } from '@/components/ui/study-timer'
-
-interface Task {
-  id: string
-  topic: string
-  status: string
-  due_date: string
-  duration_minutes?: number
-}
+import TaskList from '@/components/TaskList'
+import RecommendationsPanel from '@/components/RecommendationsPanel'
+import { useTasks } from '@/hooks/useTasks'
+import { useStudySession } from '@/hooks/useStudySession'
 
 export default function TasksPage(){
   const [topic, setTopic] = useState('Algebra')
   const [minutes, setMinutes] = useState(30)
   const [status, setStatus] = useState('')
   const { pushError } = useErrorContext()
-  const [tasks, setTasks] = useState<Task[]>([])
+  const { today, upcoming, loading: tasksLoading, fetchToday, fetchUpcoming, completeTask } = useTasks()
+  const { activeSession, startSession, endSession } = useStudySession()
   const [planResources, setPlanResources] = useState<any[]>([])
   const [sessions, setSessions] = useState<any[]>([])
   const [userId, setUserId] = useState<string>('')
@@ -47,45 +45,33 @@ export default function TasksPage(){
     setUserId(userId)
   }, [])
 
-  // Fetch today's tasks
+  // Fetch plan resources and initial tasks
   useEffect(() => {
-    if (!userId) return
-    ;(async () => {
+    const load = async () => {
       try {
-        const data = await api('/api/tasks')
-        setTasks(data.tasks || [])
-        // also fetch current plan resources to show recommendations
-        try {
-          const plan = await api('/api/plan/current')
-          const resourcesResp = await api('/api/resources/list')
-          const topicResources: any[] = resourcesResp.resources || []
-          // additionally fetch topic specific resources if plan has sessions
-          if (plan?.sessions?.length) {
-            const uniqueTopics: string[] = (Array.from(new Set(plan.sessions.map((s:any)=> String(s.topic)))) as string[]).slice(0,5)
-            for (const t of uniqueTopics) {
-              try {
-                const tr = await api(`/api/plan/resources/${encodeURIComponent(t)}?learning_style=balanced`)
-                if (tr?.resources) {
-                  Object.entries(tr.resources).forEach(([k,v]: any) => {
-                    if (Array.isArray(v)) {
-                      v.forEach((r:any)=> topicResources.push({...r, topic: t}))
-                    }
-                  })
-                }
-              } catch(e){ /* ignore topic-specific failure */ }
-            }
+        const plan = await api('/api/plan/current')
+        const resourcesResp = await api('/api/resources/list')
+        const topicResources: any[] = resourcesResp.resources || []
+        if (plan?.sessions?.length) {
+          const uniqueTopics: string[] = (Array.from(new Set(plan.sessions.map((s:any)=> String(s.topic)))) as string[]).slice(0,5)
+          for (const t of uniqueTopics) {
+            try {
+              const tr = await api(`/api/plan/resources/${encodeURIComponent(t)}?learning_style=balanced`)
+              if (tr?.resources) {
+                Object.entries(tr.resources).forEach(([k,v]: any) => {
+                  if (Array.isArray(v)) {
+                    v.forEach((r:any)=> topicResources.push({...r, topic: t}))
+                  }
+                })
+              }
+            } catch(e){ /* ignore topic-specific failure */ }
           }
-          setPlanResources(topicResources)
-        } catch(e){ /* ignore */ }
-      } catch (e: any) {
-        pushError({
-          errorCode: e?.errorCode || 'TASKS_FETCH_FAILED',
-          errorMessage: e?.errorMessage || 'Failed to load tasks',
-          details: e
-        })
-      }
-    })()
-  }, [userId, pushError])
+        }
+        setPlanResources(topicResources)
+      } catch(e){ /* ignore */ }
+    }
+    load()
+  }, [])
 
   // Fetch recent sessions for progress
   useEffect(() => {
@@ -101,21 +87,23 @@ export default function TasksPage(){
     })()
   }, [userId])
 
-  const startTask = (taskId: string) => {
+  const startTask = async (taskId: string) => {
     if (activeTaskId && activeTaskId !== taskId) {
       // Stop current task
       setActiveTaskId(null)
       setTimerStatus('pending')
     }
-    setActiveTaskId(taskId)
-    setTimerStatus('pending')
+    // Start backend session
+    try{
+      const resp = await startSession({ taskId, durationMin: 25 })
+      setActiveTaskId(taskId)
+      setTimerStatus('in-progress')
+    }catch(e:any){ pushError({ errorCode: 'SESSION_START_FAIL', errorMessage: String(e), details: e }) }
   }
 
   const toggleTaskComplete = async (task: any) => {
     try {
-      const newStatus = task.status === 'completed' ? 'pending' : 'completed'
-      await api(`/api/tasks/${task.id}`, { method: 'PUT', body: JSON.stringify({ status: newStatus }) })
-      setTasks(prev => prev.map(t => t.id === task.id ? { ...t, status: newStatus } : t))
+      await completeTask(task.id)
     } catch (e:any) {
       pushError({ errorCode: e?.errorCode||'TASK_UPDATE_FAIL', errorMessage: e?.errorMessage, details: e })
     }
@@ -124,11 +112,18 @@ export default function TasksPage(){
   const deleteTask = async (taskId: string) => {
     try {
       await api(`/api/tasks/${taskId}`, { method: 'DELETE' })
-      setTasks(prev => prev.filter(t => t.id !== taskId))
+      await fetchToday()
+      await fetchUpcoming()
     } catch(e:any){ pushError({ errorCode: e?.errorCode||'TASK_DELETE_FAIL', errorMessage: e?.errorMessage, details: e }) }
   }
 
-  const stopTask = () => {
+  const stopTask = async () => {
+    // end active session if present
+    if (activeSession && activeSession.id) {
+      try{
+        await endSession({ sessionId: activeSession.id })
+      }catch(e:any){ console.warn('Failed to end session', e) }
+    }
     setActiveTaskId(null)
     setTimerStatus('pending')
   }
@@ -139,34 +134,22 @@ export default function TasksPage(){
 
   const handleTimerComplete = async (actualTime: number) => {
     if (!activeTaskId) return
-    
-    try {
-      // Find the active task to get its topic
-      const activeTask = tasks.find(t => t.id === activeTaskId)
-      if (!activeTask) return
-      
-      // Track the session
-      await api('/api/tasks/track', { 
-        method: 'POST', 
-        body: JSON.stringify({ 
-          topic: activeTask.topic, 
-          duration_min: actualTime 
-        }) 
-      })
-      
+    try{
+      // find active session id
+      const session = activeSession
+      // end session and mark task complete
+      if (session && session.id) {
+        await endSession({ sessionId: session.id, taskId: activeTaskId, actualMinutes: actualTime, completed: true })
+      } else {
+        // fallback: track manually
+        await api('/api/tasks/track', { method: 'POST', body: JSON.stringify({ topic: topic, duration_min: actualTime }) })
+      }
       setStatus('Session logged successfully!')
       setActiveTaskId(null)
       setTimerStatus('pending')
-      
-      // Refresh tasks to show updated progress
-      const data = await api('/api/tasks')
-      setTasks(data.tasks || [])
-    } catch (e: any) {
-      pushError({
-        errorCode: e?.errorCode || 'TRACK_FAILED',
-        errorMessage: e?.errorMessage || 'Failed to track session',
-        details: e
-      })
+      await fetchToday()
+    }catch(e:any){
+      pushError({ errorCode: e?.errorCode||'TRACK_FAILED', errorMessage: e?.errorMessage || String(e), details: e })
     }
   }
 
@@ -204,8 +187,8 @@ export default function TasksPage(){
             try {
               const created = await api('/api/tasks', { method: 'POST', body: JSON.stringify({ title, due_date: due, duration_minutes: duration }) })
               // refresh tasks
-              const data = await api('/api/tasks')
-              setTasks(data.tasks || [])
+              await fetchToday()
+              await fetchUpcoming()
             } catch(e:any){ pushError({ errorCode: e?.errorCode||'TASK_CREATE_FAIL', errorMessage: e?.errorMessage, details: e }) }
           }}>
             <Plus className="w-4 h-4 mr-2" />
@@ -223,66 +206,7 @@ export default function TasksPage(){
                 <CardDescription>Your study tasks for today</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                {tasks.filter((t:any) => {
-                  const d = new Date(t.due_date || t.date || t.due || null)
-                  return d.toDateString() === new Date().toDateString()
-                }).length === 0 ? (
-                  <p className="text-muted-foreground">No tasks for today.</p>
-                ) : (
-                  tasks.filter((t:any) => {
-                    const d = new Date(t.due_date || t.date || t.due || null)
-                    return d.toDateString() === new Date().toDateString()
-                  }).map((task: any) => {
-                    const isActive = activeTaskId === task.id
-                    const duration = task.duration_minutes || task.estimatedTime || 30
-                    return (
-                      <div key={task.id} className="p-4 border rounded-lg hover:bg-muted/50 transition-all">
-                        <div className="flex items-center justify-between mb-3">
-                          <div>
-                            <h3 className="font-semibold">{task.title || task.topic}</h3>
-                            <div className="text-xs text-muted-foreground">Due {new Date(task.due_date || task.date || task.due).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
-                          </div>
-                          <div className="flex flex-col items-end gap-2">
-                            <Badge variant={task.status === 'done' || task.status === 'completed' ? 'success' : task.status === 'in-progress' ? 'warning' : 'secondary'}>
-                              {task.status || 'pending'}
-                            </Badge>
-                            <div className="flex gap-2">
-                              <Button size="icon" variant="ghost" onClick={() => toggleTaskComplete(task)} title="Toggle complete">
-                                {task.status === 'completed' ? <Square className="w-4 h-4" /> : <Play className="w-4 h-4" />}
-                              </Button>
-                              <Button size="icon" variant="ghost" onClick={() => deleteTask(task.id)} title="Delete task">✕</Button>
-                            </div>
-                          </div>
-                        </div>
-                        <p className="text-sm text-muted-foreground mb-3">{task.subject || 'General'}</p>
-                        <div className="space-y-2 mb-4">
-                          <div className="flex justify-between text-sm">
-                            <span>Duration</span>
-                            <span>{duration} minutes</span>
-                          </div>
-                          {isActive && timerStatus === 'in-progress' && (
-                            <div className="text-xs text-muted-foreground">
-                              Timer running...
-                            </div>
-                          )}
-                        </div>
-                        {task.status !== 'completed' && (
-                          isActive ? (
-                            <Button size="sm" onClick={stopTask} variant="destructive">
-                              <Square className="w-3 h-3 mr-1" />
-                              Stop
-                            </Button>
-                          ) : (
-                            <Button size="sm" onClick={() => startTask(task.id)} disabled={!!activeTaskId}>
-                              <Play className="w-3 h-3 mr-1" />
-                              Start
-                            </Button>
-                          )
-                        )}
-                      </div>
-                    )
-                  })
-                )}
+                <TaskList tasks={today as any[]} onStart={(t:any)=>startTask(t.id)} onComplete={()=>{}} onToggle={(t:any)=>toggleTaskComplete(t)} onReorder={async (order)=>{ await fetch('/api/tasks/reorder', { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ order })}); await fetchToday(); await fetchUpcoming(); }} />
               </CardContent>
             </Card>
 
@@ -294,15 +218,9 @@ export default function TasksPage(){
               </CardHeader>
               <CardContent className="space-y-4">
                 {(() => {
-                  const upcoming = tasks.filter((t:any) => {
-                    const d = new Date(t.due_date || t.date || t.due || null)
-                    const today = new Date()
-                    // future or later today are upcoming here
-                    return d.toDateString() !== today.toDateString()
-                  })
                   const groups: Record<string, any[]> = {}
                   upcoming.forEach((t:any) => {
-                    const key = new Date(t.due_date || t.date || t.due || null).toDateString()
+                    const key = new Date(t.dueDate || t.due_date || t.date || t.due || null).toDateString()
                     if (!groups[key]) groups[key] = []
                     groups[key].push(t)
                   })
@@ -348,11 +266,17 @@ export default function TasksPage(){
               <CardContent>
                 {activeTaskId ? (
                   <StudyTimer
-                    duration={tasks.find(t => t.id === activeTaskId)?.duration_minutes || 30}
+                    duration={((): number => {
+                      const t: any = today.find((x:any)=>x.id===activeTaskId)
+                      return t?.estimatedMinutes || t?.estimated_minutes || t?.duration_minutes || 30
+                    })()}
                     status={timerStatus}
                     onStatusChange={handleTimerStatusChange}
                     onComplete={handleTimerComplete}
-                    externalProgress={(tasks.find(t => t.id === activeTaskId) as any)?.progress ?? 0}
+                    externalProgress={(today.find(t=>t.id===activeTaskId) as any)?.progress ?? 0}
+                    pomodoro={true}
+                    breakMinutes={5}
+                    taskId={activeTaskId}
                   />
                 ) : (
                   <div className="text-center text-muted-foreground py-8">
@@ -408,9 +332,9 @@ export default function TasksPage(){
               <CardContent className="space-y-4">
                 <div className="flex items-center justify-between">
                   <span className="text-sm">Tasks Completed</span>
-                  <span className="font-semibold">{tasks.filter(t=>t.status==='done').length}/{tasks.length||3}</span>
+                  <span className="font-semibold">{([...(today as any[]), ...(upcoming as any[])] as any[]).filter((t:any)=>t.status==='done' || t.completed).length}/{([...(today as any[]), ...(upcoming as any[])] as any[]).length || 3}</span>
                 </div>
-                <Progress value={tasks.length? Math.round((tasks.filter(t=>t.status==='done').length/Math.max(1,tasks.length))*100):33} className="h-2" />
+                <Progress value={([...(today as any[]), ...(upcoming as any[])] as any[]).length? Math.round((([...(today as any[]), ...(upcoming as any[])] as any[]).filter((t:any)=>t.status==='done' || t.completed).length/Math.max(1,([...(today as any[]), ...(upcoming as any[])] as any[]).length))*100):33} className="h-2" />
                 <div className="flex items-center justify-between">
                   <span className="text-sm">Study Time Goal</span>
                   <span className="font-semibold">{sessions.filter(s => {
@@ -427,36 +351,23 @@ export default function TasksPage(){
               </CardContent>
             </Card>
 
-            {/* Recommendations from Planner */}
+            {/* Recommendations from Planner / AI */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <BookOpen className="w-4 h-4" />
                   Recommended Resources
                 </CardTitle>
-                <CardDescription className="text-xs">Suggested study materials based on your plan</CardDescription>
+                <CardDescription className="text-xs">AI-powered suggestions for today's tasks</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
-                {planResources.length === 0 ? (
-                  <p className="text-muted-foreground text-sm">No recommendations yet. Generate a study plan to see suggested resources.</p>
-                ) : (
-                  planResources.slice(0,4).map((r:any, idx:number) => (
-                    <div key={idx} className="p-2 bg-surface/50 rounded border">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <div className="text-sm font-medium truncate">{r.title || r.name || r.url}</div>
-                          <div className="text-xs text-muted-foreground">{r.source ? r.source.toUpperCase() : (r.type||'Resource')}</div>
-                        </div>
-                        <a href={r.url||r.link|| '#'} target="_blank" rel="noreferrer" className="text-blue-600 dark:text-blue-300 text-xs">Open</a>
-                      </div>
-                    </div>
-                  ))
-                )}
-                {planResources.length > 4 && (
-                  <div className="text-center">
-                    <Button variant="ghost" size="sm" onClick={() => alert(planResources.map((p:any)=>`${p.title} - ${p.url}`).join('\n'))}>View more</Button>
-                  </div>
-                )}
+                {/* derive topics from today's tasks */}
+                <div>
+                  <React.Suspense fallback={<div className="text-sm text-muted-foreground">Loading recommendations…</div>}>
+                    {/* Dynamically import to keep initial bundle small */}
+                    <RecommendationsPanel topics={[...new Set(today.map((t:any)=> t.subject || t.topic).filter(Boolean))]} />
+                  </React.Suspense>
+                </div>
               </CardContent>
             </Card>
           </div>

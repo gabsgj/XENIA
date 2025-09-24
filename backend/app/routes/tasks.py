@@ -103,3 +103,127 @@ def complete_task():
     except Exception as e:
         logger.warning(f"   Task completion failed: {str(e)}")
         raise ApiError("DB_WRITE_FAIL", "Unable to complete task")
+
+
+@tasks_bp.get('/daily')
+def get_daily_tasks():
+    """Return today's tasks for the authenticated user (alias of /)."""
+    logger.info("📆 Get daily tasks")
+    return get_tasks()
+
+
+@tasks_bp.get('/upcoming')
+def get_upcoming_tasks():
+    logger.info("📅 Get upcoming tasks")
+    sb = get_supabase()
+    user_id = request.headers.get('X-User-Id') or request.args.get('user_id')
+    if not user_id:
+        raise ApiError('AUTH_401', 'Missing user_id')
+    from ..utils import normalize_user_id
+    norm_user_id = normalize_user_id(user_id)
+    from datetime import datetime, timezone, timedelta
+    today = datetime.now(timezone.utc).date()
+    end_date = (today + timedelta(days=7)).isoformat()
+    try:
+        # select tasks with due_date between today and next 7 days
+        resp = sb.table('tasks').select('*').eq('user_id', norm_user_id).execute()
+        rows = resp.data or []
+        upcoming = []
+        for r in rows:
+            due = r.get('due_date')
+            if not due:
+                continue
+            try:
+                from datetime import date
+                d = date.fromisoformat(due)
+                if today <= d <= (today + timedelta(days=7)):
+                    upcoming.append(r)
+            except Exception:
+                continue
+        return {'tasks': upcoming}
+    except Exception as e:
+        logger.warning(f'   Failed to fetch upcoming tasks: {e}')
+        raise ApiError('DB_READ_FAIL', 'Unable to fetch upcoming tasks')
+
+
+@tasks_bp.post('/session/start')
+def start_session():
+    """Create a study session tied to a task (status=in-progress)."""
+    logger.info('▶️ Start session')
+    sb = get_supabase()
+    data = request.get_json(silent=True) or {}
+    user_id = data.get('user_id') or request.headers.get('X-User-Id')
+    task_id = data.get('task_id')
+    duration_min = data.get('duration_min', 25)
+    if not user_id:
+        raise ApiError('AUTH_401', 'Missing user_id')
+    if not task_id:
+        raise ApiError('PLAN_400', 'Missing task_id')
+    try:
+        from datetime import datetime, timezone
+        record = {
+            'user_id': user_id,
+            'task_id': task_id,
+            'duration_min': duration_min,
+            'status': 'in-progress',
+            'started_at': datetime.now(timezone.utc).isoformat()
+        }
+        sb.table('sessions').insert(record).execute()
+        # mark task as in-progress
+        sb.table('tasks').update({'status': 'in-progress'}).eq('id', task_id).execute()
+        return {'ok': True, 'session': record}
+    except Exception as e:
+        logger.warning(f'   Failed to start session: {e}')
+        raise ApiError('DB_WRITE_FAIL', 'Unable to start session')
+
+
+@tasks_bp.put('/session/end')
+def end_session():
+    """End a study session and optionally mark complete and award XP."""
+    logger.info('⏹️ End session')
+    sb = get_supabase()
+    data = request.get_json(silent=True) or {}
+    session_id = data.get('session_id')
+    user_id = data.get('user_id') or request.headers.get('X-User-Id')
+    completed = data.get('completed', False)
+    actual_minutes = data.get('actual_minutes')
+    if not session_id:
+        raise ApiError('PLAN_400', 'Missing session_id')
+    try:
+        from datetime import datetime, timezone
+        updates = {'status': 'completed', 'ended_at': datetime.now(timezone.utc).isoformat()}
+        if actual_minutes is not None:
+            updates['actual_minutes'] = actual_minutes
+        sb.table('sessions').update(updates).eq('id', session_id).execute()
+        if completed and data.get('task_id'):
+            sb.table('tasks').update({'status': 'done'}).eq('id', data.get('task_id')).execute()
+            # award XP
+            xp = max(5, (int(actual_minutes or 30) // 30) * 10)
+            sb.rpc('add_xp', {'p_user_id': user_id, 'p_xp': xp}).execute()
+        return {'ok': True}
+    except Exception as e:
+        logger.warning(f'   Failed to end session: {e}')
+        raise ApiError('DB_WRITE_FAIL', 'Unable to end session')
+
+
+@tasks_bp.put('/reorder')
+def reorder_tasks():
+    """Persist a new ordering for tasks. Expects JSON: { order: [task_id,...], user_id?: string }"""
+    logger.info('🔀 Reorder tasks')
+    sb = get_supabase()
+    data = request.get_json(silent=True) or {}
+    order = data.get('order') or []
+    user_id = data.get('user_id') or request.headers.get('X-User-Id')
+    if not user_id:
+        raise ApiError('AUTH_401', 'Missing user_id')
+    try:
+        # Save an 'priority_index' on each task based on the order list
+        for idx, tid in enumerate(order):
+            try:
+                sb.table('tasks').update({'priority_index': idx}).eq('id', tid).execute()
+            except Exception:
+                logger.warning(f'   Failed to update task {tid} priority')
+        return {'ok': True}
+    except Exception as e:
+        logger.warning(f'   Failed to reorder tasks: {e}')
+        raise ApiError('DB_WRITE_FAIL', 'Unable to reorder tasks')

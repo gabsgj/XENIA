@@ -11,14 +11,19 @@ interface StudyTimerProps {
   onStatusChange: (newStatus: 'pending' | 'in-progress' | 'completed') => void
   onComplete: (actualTime: number) => void // actualTime in minutes
   externalProgress?: number // optional externally-provided progress (0-100)
+  // Pomodoro options
+  pomodoro?: boolean
+  breakMinutes?: number
+  taskId?: string | null
 }
 
-export function StudyTimer({ duration, status, onStatusChange, onComplete, externalProgress, className }: StudyTimerProps & { className?: string }) {
-  const initialSeconds = duration * 60
+export function StudyTimer({ duration, status, onStatusChange, onComplete, externalProgress, className, pomodoro = false, breakMinutes = 5, taskId = null }: StudyTimerProps & { className?: string }) {
+  const initialSeconds = Math.max(1, duration) * 60
   const [remaining, setRemaining] = useState<number>(initialSeconds)
   const [isRunning, setIsRunning] = useState(false)
   const [progress, setProgress] = useState<number>(() => externalProgress ?? 0)
   const [justCompleted, setJustCompleted] = useState(false)
+  const [inBreak, setInBreak] = useState(false)
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
 
   // Reset timer when duration changes
@@ -137,18 +142,32 @@ export function StudyTimer({ duration, status, onStatusChange, onComplete, exter
       intervalRef.current = setInterval(() => {
         setRemaining(prev => {
           if (prev <= 1) {
-            // complete
-            // clear interval before calling completeTimer to avoid double-calls
             if (intervalRef.current) {
               clearInterval(intervalRef.current)
               intervalRef.current = null
             }
+            // If pomodoro is enabled and we just finished a work interval, start break
+            if (pomodoro && !inBreak) {
+              setInBreak(true)
+              const breakSecs = Math.max(1, breakMinutes) * 60
+              setRemaining(breakSecs)
+              setProgress(0)
+              // short notification for break start
+              try {
+                if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+                  new Notification('Break time', { body: 'Take a short break!' })
+                }
+              } catch (e) {}
+              return breakSecs
+            }
+            // If we're in break or not pomodoro, complete session
             completeTimer()
             return 0
           }
           const next = prev - 1
           const elapsed = initialSeconds - next
-          const newProgress = (elapsed / initialSeconds) * 100
+          const denom = initialSeconds
+          const newProgress = denom > 0 ? (elapsed / denom) * 100 : 0
           setProgress(Math.min(Math.max(newProgress, 0), 100))
           return next
         })
@@ -166,7 +185,7 @@ export function StudyTimer({ duration, status, onStatusChange, onComplete, exter
         intervalRef.current = null
       }
     }
-  }, [isRunning, initialSeconds])
+  }, [isRunning, initialSeconds, pomodoro, breakMinutes, inBreak])
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60)

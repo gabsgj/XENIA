@@ -14,6 +14,7 @@ from .routes.dashboard import dashboard_bp
 from .routes.parent import parent_bp
 from .routes.plan import plan_bp
 from .routes.tasks import tasks_bp
+from .routes.ai import ai_bp
 from .routes.teacher import teacher_bp
 from .routes.tutor import tutor_bp
 from .routes.resources import resources_bp
@@ -106,6 +107,7 @@ def create_app() -> Flask:
     app.register_blueprint(tutor_bp, url_prefix="/api/tutor")
     app.register_blueprint(plan_bp, url_prefix="/api/plan")
     app.register_blueprint(tasks_bp, url_prefix="/api/tasks")
+    app.register_blueprint(ai_bp, url_prefix="/api/ai")
     app.register_blueprint(analytics_bp, url_prefix="/api/analytics")
     app.register_blueprint(dashboard_bp, url_prefix="/api/dashboard")
     app.register_blueprint(teacher_bp, url_prefix="/api/teacher")
