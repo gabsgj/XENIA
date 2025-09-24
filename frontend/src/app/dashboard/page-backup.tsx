@@ -235,11 +235,7 @@ export default function DashboardPage(){
                       </div>
                     </div>
                     <div className="space-y-2">
-                      <div className="flex justify-between text-sm">
-                        <span>Progress</span>
-                        <span>{task.progress}%</span>
-                      </div>
-                      <Progress value={task.progress} className="h-2" />
+                        {/* Progress displayed by StudyTimer/timeline elsewhere */}
                     </div>
                   </div>
                 ))}

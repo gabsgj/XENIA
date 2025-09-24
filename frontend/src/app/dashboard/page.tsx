@@ -364,15 +364,10 @@ export default function DashboardPage(){
                           status={task.status}
                           onStatusChange={(newStatus) => updateSessionStatus(task.date, task.topic, newStatus)}
                           onComplete={(actualTime) => markSessionComplete(task.date, task.topic, actualTime)}
+                          externalProgress={task.progress}
                         />
                       </div>
-                      <div className="space-y-2">
-                        <div className="flex justify-between text-sm">
-                          <span>Progress</span>
-                          <span>{task.progress}%</span>
-                        </div>
-                        <Progress value={task.progress} className="h-2" />
-                      </div>
+                      {/* Progress is shown by the StudyTimer timeline above */}
                     </div>
                   ))
                 ) : (

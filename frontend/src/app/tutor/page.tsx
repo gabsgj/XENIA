@@ -155,7 +155,9 @@ export default function TutorPage(){
           pushError({ errorCode: 'TUTOR_API_DOWN', errorMessage: j?.error || 'Tutor failed', details: j })
           return 
         }
-        response = j
+  // APIResponseBuilder wraps payload in a { success, data, meta } envelope.
+  // prefer the inner data if present so we get { answer, steps, history }
+  response = (j && j.data) ? j.data : j
       } else {
         const r = await fetch(`${API_BASE}/api/tutor/ask`, { 
           method:'POST', 
@@ -170,13 +172,16 @@ export default function TutorPage(){
           pushError({ errorCode:'TUTOR_TIMEOUT', errorMessage: j?.error || 'Tutor timed out', details:j})
           return 
         }
-        response = j
+  // APIResponseBuilder wraps payload in a { success, data, meta } envelope.
+  // prefer the inner data if present so we get { answer, steps, history }
+  response = (j && j.data) ? j.data : j
       }
 
       const aiMessage: TutorMessage = {
         id: Date.now() + 1,
         type: 'ai',
-        content: response.answer || 'Here are your steps:',
+        // response may be the API envelope or the inner data; earlier we normalized it
+        content: (response && response.answer) ? response.answer : 'Here are your steps:',
         steps: Array.isArray(response.steps) ? response.steps.map((step: any) => ({
           title: step.title || '',
           detail: step.detail || '',

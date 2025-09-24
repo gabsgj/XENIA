@@ -120,7 +120,7 @@ class EnhancedTutor:
             return {"context": "basic", "subject_area": "General", "topics": ""}
     
     @staticmethod
-    def generate_advanced_solution(question: str, question_analysis: Dict, syllabus_context: Optional[Dict] = None) -> List[Dict]:
+    def generate_advanced_solution(question: str, question_analysis: Dict, syllabus_context: Optional[Dict] = None) -> Dict:
         """Generate advanced solution using AI with question-type awareness.
 
         This implementation is intentionally compact and robust: it asks the AI
@@ -183,17 +183,28 @@ class EnhancedTutor:
 
             if isinstance(parsed, dict) and isinstance(parsed.get('steps'), list):
                 logger.info(f"✅ Generated {len(parsed['steps'])} solution steps (advanced)")
-                return parsed['steps']
+                # capture optional long-form answer/explanation if present in AI JSON
+                answer_text = ''
+                if isinstance(parsed.get('answer'), str) and parsed.get('answer').strip():
+                    answer_text = parsed.get('answer').strip()
+                elif isinstance(parsed.get('explanation'), str) and parsed.get('explanation').strip():
+                    answer_text = parsed.get('explanation').strip()
+                # return a structured dict so callers can access both steps and any full answer text
+                return {
+                    'steps': parsed['steps'],
+                    'answer': answer_text,
+                    'raw': clean_response
+                }
             else:
                 logger.warning("Advanced AI: parsed JSON missing 'steps' list")
-                return []
+                return {'steps': [], 'answer': '', 'raw': clean_response}
 
         except TimeoutError as e:
             logger.error(f"AI request timeout: {e}")
             raise ApiError("TUTOR_TIMEOUT", "The AI request timed out. Please try again.", status=408)
         except Exception as e:
             logger.warning(f"Advanced solution generation encountered an error but will fallback: {e}")
-            return []
+            return {'steps': [], 'answer': '', 'raw': ''}
 
 def solve_question(
     question: Optional[str], image_bytes: Optional[bytes], user_id: str, include_history: bool = True
@@ -222,8 +233,19 @@ def solve_question(
         
         # Try advanced AI-powered solution first with syllabus context
         advanced_steps = []
+        advanced_answer_text = ''
+        advanced_raw = ''
         try:
-            advanced_steps = EnhancedTutor.generate_advanced_solution(question, question_analysis, syllabus_context)
+            advanced_result = EnhancedTutor.generate_advanced_solution(question, question_analysis, syllabus_context)
+            # support legacy/list return for safety, but prefer structured dict
+            if isinstance(advanced_result, dict):
+                advanced_steps = advanced_result.get('steps', []) or []
+                advanced_answer_text = advanced_result.get('answer', '') or ''
+                advanced_raw = advanced_result.get('raw', '') or ''
+            elif isinstance(advanced_result, list):
+                advanced_steps = advanced_result
+            else:
+                advanced_steps = []
         except ApiError:
             # propagate API errors (timeouts, provider failures) up to caller so they can map to proper responses
             raise
@@ -234,6 +256,14 @@ def solve_question(
         if advanced_steps:
             steps = advanced_steps
             logger.info(f"Using advanced AI solution with {len(steps)} steps")
+            # Prefer a verbatim full answer/explanation from the AI when available
+            if advanced_answer_text:
+                answer = advanced_answer_text
+            elif advanced_raw:
+                # as a last resort, return the raw AI response (cleaned) so the frontend can render it
+                answer = advanced_raw
+            else:
+                answer = "Here are the steps to solve the problem."
         else:
             logger.info("Falling back to basic remediation steps from weak-topics module")
             try:
@@ -262,37 +292,53 @@ def solve_question(
         # Per UI contract: if `steps` are present, keep `answer` as a short intro/summary only
         # Normalize and ensure sequential numbering on step titles so frontend can render them verbatim
         def _renumber_steps(steps_list, add_numbers=True):
-          normalized = []
-          for idx, st in enumerate(steps_list, start=1):
-            if not isinstance(st, dict):
-              st = {'title': str(st)}
-            title = st.get('title', '') or ''
-            logger.info(f"Original title {idx}: '{title}'")
-            # strip existing leading numbering - be very aggressive
-            # Remove patterns like: 1., 1), Step 1:, **1.**, etc.
-            title_clean = re.sub(r'^\s*\*?\*?\s*(?:Step\s+)?\d+\s*[\)\.:\-\s]+\*?\*?\s*', '', title, flags=re.IGNORECASE).strip()
-            # Also remove any remaining number patterns at the start
-            title_clean = re.sub(r'^\s*\d+\s*[\)\.:\-\s]*', '', title_clean, flags=re.IGNORECASE).strip()
-            # Clean up any double spaces or weird formatting
-            title_clean = re.sub(r'\s+', ' ', title_clean).strip()
-            if add_numbers:
-              new_title = f"{idx}. {title_clean}" if title_clean else f"{idx}."
-            else:
-              new_title = title_clean
-            logger.info(f"Renumbered title {idx}: '{new_title}'")
-            st['title'] = new_title
-            normalized.append(st)
-          return normalized
+            normalized = []
+            for idx, st in enumerate(steps_list, start=1):
+                if not isinstance(st, dict):
+                    st = {'title': str(st)}
+                title = st.get('title', '') or ''
+                logger.info(f"Original title {idx}: '{title}'")
+                # strip existing leading numbering - be very aggressive
+                # Remove patterns like: 1., 1), Step 1:, **1.**, etc.
+                title_clean = re.sub(r'^\s*\*?\*?\s*(?:Step\s+)?\d+\s*[\)\.:\-\s]+\*?\*?\s*', '', title, flags=re.IGNORECASE).strip()
+                # Also remove any remaining number patterns at the start
+                title_clean = re.sub(r'^\s*\d+\s*[\)\.:\-\s]*', '', title_clean, flags=re.IGNORECASE).strip()
+                # Clean up any double spaces or weird formatting
+                title_clean = re.sub(r'\s+', ' ', title_clean).strip()
+                if add_numbers:
+                    new_title = f"{idx}. {title_clean}" if title_clean else f"{idx}."
+                else:
+                    new_title = title_clean
+                logger.info(f"Renumbered title {idx}: '{new_title}'")
+                st['title'] = new_title
+                normalized.append(st)
+            return normalized
 
+        # If we have steps, renumber and build a suitable 'answer' text if needed
         if steps:
-          try:
-            steps = _renumber_steps(steps, add_numbers=True)  # Set to False to remove numbering
-          except Exception as e:
-            logger.warning(f"Failed to renumber steps: {e}")
-          answer = "Here are the steps to solve the problem."
+            try:
+                steps = _renumber_steps(steps, add_numbers=True)  # Set to False to remove numbering
+            except Exception as e:
+                logger.warning(f"Failed to renumber steps: {e}")
+
+            # If answer hasn't been provided by the advanced AI, build one from steps
+            if not answer or answer == "Here are the steps to solve the problem.":
+                if advanced_answer_text:
+                    answer = advanced_answer_text
+                else:
+                    # Build a readable answer by concatenating step titles and details
+                    try:
+                        built = []
+                        for s in steps:
+                            t = s.get('title','')
+                            d = s.get('detail','') or ''
+                            built.append(f"{t}\n\n{d}".strip())
+                        answer = "\n\n".join(built)
+                    except Exception:
+                        answer = "Here are the steps to solve the problem."
         else:
-          # This else block should not be reachable anymore
-          answer = "I'm sorry, I couldn't generate an answer."
+            # No steps found
+            answer = "I'm sorry, I couldn't generate an answer."
 
         # Save conversation to history if valid user
         if is_valid_uuid(user_id):

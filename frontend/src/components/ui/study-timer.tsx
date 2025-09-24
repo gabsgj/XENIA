@@ -10,26 +10,27 @@ interface StudyTimerProps {
   status: 'pending' | 'in-progress' | 'completed'
   onStatusChange: (newStatus: 'pending' | 'in-progress' | 'completed') => void
   onComplete: (actualTime: number) => void // actualTime in minutes
+  externalProgress?: number // optional externally-provided progress (0-100)
 }
 
-export function StudyTimer({ duration, status, onStatusChange, onComplete }: StudyTimerProps) {
+export function StudyTimer({ duration, status, onStatusChange, onComplete, externalProgress }: StudyTimerProps) {
   const [timeLeft, setTimeLeft] = useState(duration * 60) // convert to seconds
   const [isRunning, setIsRunning] = useState(false)
   const [startTime, setStartTime] = useState<number | null>(null)
-  const [progress, setProgress] = useState(0)
+  const [progress, setProgress] = useState<number>(() => externalProgress ?? 0)
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
 
   // Reset timer when duration changes
   useEffect(() => {
     setTimeLeft(duration * 60)
-    setProgress(0)
+    setProgress(externalProgress ?? 0)
     setIsRunning(false)
     setStartTime(null)
     if (intervalRef.current) {
       clearInterval(intervalRef.current)
       intervalRef.current = null
     }
-  }, [duration])
+  }, [duration, externalProgress])
 
   // Handle status changes from parent
   useEffect(() => {
@@ -43,7 +44,7 @@ export function StudyTimer({ duration, status, onStatusChange, onComplete }: Stu
       }
     } else if (status === 'pending') {
       setTimeLeft(duration * 60)
-      setProgress(0)
+      setProgress(externalProgress ?? 0)
       setIsRunning(false)
       setStartTime(null)
       if (intervalRef.current) {
@@ -52,6 +53,13 @@ export function StudyTimer({ duration, status, onStatusChange, onComplete }: Stu
       }
     }
   }, [status, duration])
+
+  // Update progress when externalProgress prop changes while not running
+  useEffect(() => {
+    if (!isRunning && status !== 'in-progress') {
+      setProgress(externalProgress ?? 0)
+    }
+  }, [externalProgress, isRunning, status])
 
   const startTimer = () => {
     if (status !== 'in-progress') {
@@ -190,13 +198,19 @@ export function StudyTimer({ duration, status, onStatusChange, onComplete }: Stu
       {/* Progress Bar */}
       {status === 'in-progress' && (
         <div className="space-y-1">
+          {/* Single timeline progress bar that represents both elapsed time and percentage */}
           <Progress
             value={progress}
-            className="h-2 transition-all duration-1000 ease-linear"
+            className="h-3 transition-all duration-1000 ease-linear"
           />
-          <div className="flex justify-between text-xs text-muted-foreground">
+
+          {/* Timeline labels: left = 0:00, right = total time + percentage */}
+          <div className="flex justify-between items-center text-xs text-muted-foreground">
             <span>0:00</span>
-            <span>{formatTime(duration * 60)}</span>
+            <div className="flex items-center gap-3">
+              <span className="tabular-nums">{formatTime(duration * 60)}</span>
+              <span className="font-medium">{Math.round(progress)}%</span>
+            </div>
           </div>
         </div>
       )}
