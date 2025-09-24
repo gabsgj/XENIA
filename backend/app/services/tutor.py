@@ -121,220 +121,79 @@ class EnhancedTutor:
     
     @staticmethod
     def generate_advanced_solution(question: str, question_analysis: Dict, syllabus_context: Optional[Dict] = None) -> List[Dict]:
-        """Generate advanced solution using AI with question-type awareness and timeout handling."""
+        """Generate advanced solution using AI with question-type awareness.
+
+        This implementation is intentionally compact and robust: it asks the AI
+        to return a single JSON object containing a top-level `steps` array,
+        sanitizes the response, and returns the parsed steps list or an empty
+        list on parse/format errors so callers can apply fallbacks.
+        """
         from .ai_providers import get_ai_response
 
         question_type = question_analysis.get("type", "general")
-        strategy = question_analysis.get("strategy", "comprehensive_explanation")
-        
-        # Determine preferred provider based on question type
+
         preferred_provider = None
         if question_type == "mathematics":
-            preferred_provider = "gemini"  # Gemini often better for math
+            preferred_provider = "gemini"
         elif question_type == "programming":
-            preferred_provider = "openai"   # OpenAI often better for code
-        # Let system choose for other types
+            preferred_provider = "openai"
 
-        # Build context-aware prompt prefix
-        context_prefix = ""
-        if syllabus_context and syllabus_context.get("context") == "personalized":
-            context_prefix = f"""
-CONTEXT: You are tutoring a {syllabus_context.get('curriculum_level', 'student')} student in {syllabus_context.get('subject_area', 'General')}.
-Current syllabus topics include: {syllabus_context.get('topics', 'various topics')}.
-Please tailor your explanation to be relevant to their current curriculum and reference these topics when applicable.
-"""
-        
-        # Craft specialized prompts based on question type
-        if question_type == "mathematics":
-            prompt = f"""
-You are an expert mathematics tutor. Solve this step-by-step and format your response in Markdown:{context_prefix}
+        context_note = "Please tailor answers to the student's syllabus when available." if syllabus_context and syllabus_context.get("context") == "personalized" else ""
 
-QUESTION: {question}
-
-FORMATTING REQUIREMENTS:
-- Use **bold** for key terms, formulas, and important concepts
-- Use *italics* for emphasis and definitions
-- Use `inline code` for variables and simple formulas
-- Use LaTeX math notation wrapped in $...$ for equations (e.g., $F = ma$, $x = \\frac{{-b \\pm \\sqrt{{b^2-4ac}}}}{{2a}}$)
-- Use numbered lists for steps (1, 2, 3...)
-- Use bullet points (-) for examples or sub-points
-- Break content into short, scannable paragraphs
-
-Provide a structured solution in JSON format. IMPORTANT: Ensure the output is a single, valid JSON object with no extra text or markdown formatting. All keys and string values must be enclosed in double quotes.
-{{
-  "steps": [
-    {{
-      "title": "**Step 1: Identify what's given**",
-      "detail": "Clear explanation of given information in **Markdown format** with proper $LaTeX$ math notation",
-      "calculation": "Any relevant formula like $F = ma$ or calculation steps"
-    }},
-    {{
-      "title": "**Step 2: Apply appropriate method**", 
-      "detail": "Explanation of the *method* being used with **key concepts** highlighted",
-      "calculation": "Detailed calculation with $mathematical$ expressions shown step by step"
-    }},
-    {{
-      "title": "**Step 3: Solve and verify**",
-      "detail": "Final calculation and *verification* process explained clearly",
-      "calculation": "Final answer with units if applicable, formatted as $result = value$"
-    }}
-  ],
-  "final_answer": "Clear final answer with proper **Markdown** formatting and $LaTeX$ if needed",
-  "key_concepts": ["List of key mathematical concepts used"]
-}}
-"""
-        elif question_type == "science":
-            prompt = f"""
-You are an expert science tutor. Explain this scientific concept or solve this problem and format your response in Markdown:{context_prefix}
-
-QUESTION: {question}
-
-FORMATTING REQUIREMENTS:
-- Use **bold** for key scientific terms, laws, and important concepts
-- Use *italics* for emphasis and definitions
-- Use `inline code` for formulas, variables, and chemical equations
-- Use LaTeX math notation wrapped in $...$ for equations (e.g., $E = mc^2$, $PV = nRT$)
-- Use numbered lists for steps (1, 2, 3...)
-- Use bullet points (-) for examples or sub-points
-- Break content into short, scannable paragraphs
-
-Provide a structured explanation in JSON format. IMPORTANT: Ensure the output is a single, valid JSON object with no extra text or markdown formatting. All keys and string values must be enclosed in double quotes.
-{{
-  "steps": [
-    {{
-      "title": "**Step 1: Understanding the concept**",
-      "detail": "Clear explanation of underlying **scientific principles** with proper $LaTeX$ notation for formulas"
-    }},
-    {{
-      "title": "**Step 2: Applying scientific method**",
-      "detail": "How to approach this *scientifically* with **key concepts** highlighted"
-    }},
-    {{
-      "title": "**Step 3: Solution or explanation**",
-      "detail": "Detailed solution with *scientific reasoning* and proper **Markdown** formatting"
-    }}
-  ],
-  "final_answer": "Clear conclusion or answer with proper **Markdown** formatting and $LaTeX$ if needed",
-  "key_concepts": ["List of key scientific concepts"],
-  "real_world_applications": ["How this applies in real life"]
-}}
-"""
-        elif question_type == "programming":
-            prompt = f"""
-You are an expert programming tutor. Help solve this coding problem and format your response in Markdown:{context_prefix}
-
-QUESTION: {question}
-
-FORMATTING REQUIREMENTS:
-- Use **bold** for key programming terms, algorithms, and important concepts
-- Use *italics* for emphasis and definitions
-- Use `inline code` for variables, functions, and short code snippets
-- Use code blocks with language specification for longer code examples
-- Use numbered lists for steps (1, 2, 3...)
-- Use bullet points (-) for examples or sub-points
-- Break content into short, scannable paragraphs
-
-Provide a structured solution in JSON format. IMPORTANT: Ensure the output is a single, valid JSON object with no extra text or markdown formatting. All keys and string values must be enclosed in double quotes.
-{{
-  "steps": [
-    {{
-      "title": "**Step 1: Problem analysis**",
-      "detail": "Break down what the problem is asking with **key requirements** highlighted",
-      "code_snippet": "```python\\n# Relevant pseudocode or approach\\nfunction_name(parameters)\\n```"
-    }},
-    {{
-      "title": "**Step 2: Algorithm design**",
-      "detail": "Explain the *algorithm* or **approach** with proper Markdown formatting",
-      "code_snippet": "```python\\n# Key algorithmic components\\nfor item in collection:\\n    process(item)\\n```"
-    }},
-    {{
-      "title": "**Step 3: Implementation**",
-      "detail": "Complete working solution with *detailed explanation*",
-      "code_snippet": "```python\\n# Full working code solution\\ndef solve_problem():\\n    return result\\n```"
-    }}
-  ],
-  "final_answer": "Complete solution with **proper explanation** and Markdown formatting",
-  "key_concepts": ["Programming concepts used"],
-  "time_complexity": "Big O analysis if applicable, formatted as $O(n)$ notation"
-}}
-"""
-        else:
-            prompt = f"""
-You are an expert tutor. Provide a comprehensive explanation for this question and format your response in Markdown:{context_prefix}
-
-QUESTION: {question}
-
-FORMATTING REQUIREMENTS:
-- Use **bold** for key terms, laws, and important concepts
-- Use *italics* for emphasis and definitions
-- Use `inline code` for formulas or variables
-- Use LaTeX math notation wrapped in $...$ for equations when applicable
-- Use numbered lists for steps (1, 2, 3...)
-- Use bullet points (-) for examples or sub-points
-- Break content into short, scannable paragraphs
-
-Provide a structured explanation in JSON format. IMPORTANT: Ensure the output is a single, valid JSON object with no extra text or markdown formatting. All keys and string values must be enclosed in double quotes.
-{{
-  "steps": [
-    {{
-      "title": "**Step 1: Understanding the question**",
-      "detail": "What exactly is being asked, with **key terms** highlighted"
-    }},
-    {{
-      "title": "**Step 2: Key information and context**",
-      "detail": "Important *background* and **context** with proper Markdown formatting"
-    }},
-    {{
-      "title": "**Step 3: Detailed explanation**",
-      "detail": "Comprehensive answer with *examples* and **key concepts** clearly marked"
-    }}
-  ],
-  "final_answer": "Clear, complete answer with proper **Markdown** formatting",
-  "key_concepts": ["Important concepts covered"]
-}}
-"""
-
-        logger.info(f"Generating {question_type} solution using AI (preferred: {preferred_provider})...")
+        prompt = (
+            f"You are an expert tutor. Return ONLY a single JSON object with a top-level steps array. "
+            f"Each step should be an object with title and detail.\nQUESTION: {question}\n{context_note}"
+        )
 
         try:
-            # Use preferred provider if specified
             if preferred_provider:
                 response = get_ai_response(prompt, preferred_provider=preferred_provider)
             else:
                 response = get_ai_response(prompt)
-            
-            # Clean and parse the response more robustly
-            clean_response = response.strip()
-            
-            # Use regex to find the JSON object
-            match = re.search(r'\{.*\}', clean_response, re.DOTALL)
-            if match:
-                json_text = match.group(0)
-            else:
-                # Handle cases where no JSON object is found
-                raise ApiError("TUTOR_AI_INVALID_RESPONSE", "No JSON object found in AI response.", status=500)
+
+            clean_response = (response or "").strip()
+            # strip common fences and codeblocks
+            if clean_response.startswith('```json'):
+                clean_response = clean_response[len('```json'):].strip()
+            if clean_response.startswith('```') and clean_response.endswith('```'):
+                clean_response = clean_response[3:-3].strip()
+
+            # find JSON object
+            m = re.search(r"\{.*\}", clean_response, re.DOTALL)
+            if not m:
+                logger.warning("Advanced AI: no JSON object found in response")
+                return []
+
+            json_text = m.group(0)
+            # sanitize control characters
+            sanitized = ''.join(ch for ch in json_text if ord(ch) >= 32 or ch in '\n\r\t')
 
             import json
-            parsed = json.loads(json_text)
-            
-            if isinstance(parsed, dict) and 'steps' in parsed:
-                logger.info(f"✅ Generated {len(parsed['steps'])} solution steps")
+            try:
+                parsed = json.loads(sanitized)
+            except Exception:
+                # last-resort sanitization
+                alt = sanitized.replace('```', '').replace('\x0c', '')
+                alt = ''.join(ch for ch in alt if ord(ch) >= 32 or ch in '\n\r\t')
+                try:
+                    parsed = json.loads(alt)
+                except Exception as e:
+                    logger.warning(f"Advanced AI: failed to parse JSON: {e}")
+                    return []
+
+            if isinstance(parsed, dict) and isinstance(parsed.get('steps'), list):
+                logger.info(f"✅ Generated {len(parsed['steps'])} solution steps (advanced)")
                 return parsed['steps']
             else:
-                logger.warning("AI response didn't contain expected 'steps' format")
-                raise ApiError("TUTOR_AI_INVALID_RESPONSE", "AI response was not in the expected format.", status=500)
+                logger.warning("Advanced AI: parsed JSON missing 'steps' list")
+                return []
 
         except TimeoutError as e:
             logger.error(f"AI request timeout: {e}")
             raise ApiError("TUTOR_TIMEOUT", "The AI request timed out. Please try again.", status=408)
         except Exception as e:
-            error_msg = str(e)
-            if "timeout" in error_msg.lower():
-                logger.error(f"AI timeout error: {e}")
-                raise ApiError("TUTOR_TIMEOUT", "The AI request timed out. Please try again.", status=408)
-            else:
-                logger.error(f"Advanced solution generation failed: {e}")
-                raise ApiError("TUTOR_AI_FAILED", f"The AI provider failed to generate a response: {e}", status=502)
+            logger.warning(f"Advanced solution generation encountered an error but will fallback: {e}")
+            return []
 
 def solve_question(
     question: Optional[str], image_bytes: Optional[bytes], user_id: str, include_history: bool = True
@@ -362,12 +221,42 @@ def solve_question(
         logger.info(f"Question analysis: {question_analysis}")
         
         # Try advanced AI-powered solution first with syllabus context
-        steps = EnhancedTutor.generate_advanced_solution(question, question_analysis, syllabus_context)
-        
-        if not steps:
-            # This should ideally not be reached if generate_advanced_solution raises exceptions
-            logger.warning("generate_advanced_solution returned no steps. This indicates a problem.")
-            raise ApiError("TUTOR_NO_SOLUTION", "The AI tutor could not find a solution.", status=500)
+        advanced_steps = []
+        try:
+            advanced_steps = EnhancedTutor.generate_advanced_solution(question, question_analysis, syllabus_context)
+        except ApiError:
+            # propagate API errors (timeouts, provider failures) up to caller so they can map to proper responses
+            raise
+        except Exception as e:
+            logger.warning(f"generate_advanced_solution raised an exception, falling back: {e}")
+
+        # If advanced AI produced usable steps, use them; otherwise fall back to remediation steps
+        if advanced_steps:
+            steps = advanced_steps
+            logger.info(f"Using advanced AI solution with {len(steps)} steps")
+        else:
+            logger.info("Falling back to basic remediation steps from weak-topics module")
+            try:
+                steps = get_remediation_steps(user_id=user_id, question_text=question)
+            except Exception as e:
+                logger.warning(f"get_remediation_steps failed: {e}")
+                steps = []
+
+        # Try basic AI enrichment as an additional fallback: request a simple JSON-only steps response
+        try:
+            from .ai_providers import get_ai_response
+            enriched_raw = get_ai_response(f"Provide step JSON only for: {question}")
+            if enriched_raw:
+                import json
+                try:
+                    parsed = json.loads(enriched_raw)
+                    if isinstance(parsed, dict) and isinstance(parsed.get('steps'), list) and parsed['steps']:
+                        steps = parsed['steps']
+                        logger.info("Enhanced with basic AI steps")
+                except Exception as e:
+                    logger.warning(f"Basic AI enhancement failed to parse JSON: {e}")
+        except Exception as e:
+            logger.warning(f"AI enrichment failed: {e}")
 
         # Build comprehensive response with metadata
         # Per UI contract: if `steps` are present, keep `answer` as a short intro/summary only

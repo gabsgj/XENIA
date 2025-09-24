@@ -261,10 +261,10 @@ export function StudyTimer({ task, onComplete, onStatusChange, className }: Stud
               <span>{Math.round(progress)}%</span>
             </div>
             <div className="relative">
-              <Progress value={progress} className="h-3" />
-              <div 
-                className={`absolute top-0 left-0 h-3 rounded-full transition-all duration-1000 ease-out ${getProgressColor()}`}
-                style={{ width: `${progress}%` }}
+              <Progress
+                value={progress}
+                className="h-3"
+                indicatorClassName={`${getProgressColor()} rounded-full transition-all duration-1000 ease-out`}
               />
             </div>
             {progress >= 100 && (
