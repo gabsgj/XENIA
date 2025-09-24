@@ -177,17 +177,101 @@ export default function TutorPage(){
   response = (j && j.data) ? j.data : j
       }
 
+      // Helper: try to extract steps and a clean textual answer without raw JSON
+      function parseResponse(resp: any): { content: string | null; steps?: any[] } {
+        let content: string | null = null
+        let steps: any[] | undefined = undefined
+
+        // If resp is a string, check if it's JSON
+        if (typeof resp === 'string') {
+          const trimmed = resp.trim()
+          // If entire response is JSON (starts with { or [), try parse
+          if ((trimmed.startsWith('{') || trimmed.startsWith('['))) {
+            try {
+              const parsed = JSON.parse(trimmed)
+              if (Array.isArray(parsed.steps)) {
+                steps = parsed.steps
+                content = null
+                return { content, steps }
+              }
+            } catch(e){
+              // not valid json, render as text
+              content = resp
+              return { content }
+            }
+          }
+          // Not raw JSON string -> render as plain text
+          content = resp
+          return { content }
+        }
+
+        // If resp is an object
+        if (resp && typeof resp === 'object') {
+          // Prefer explicit steps array
+          if (Array.isArray(resp.steps) && resp.steps.length > 0) {
+            steps = resp.steps.map((step: any) => ({
+              title: step.title || '',
+              detail: step.detail || '',
+              calculation: step.calculation,
+              code_snippet: step.code_snippet
+            }))
+
+            // Decide whether to show resp.answer as content. Avoid showing raw JSON or duplicated text.
+            if (typeof resp.answer === 'string' && resp.answer.trim()) {
+              const a = resp.answer.trim()
+              const appearsJson = a.startsWith('{') || a.startsWith('[') || a.includes('```json')
+              if (!appearsJson) {
+                // Check for duplication: if answer contains a large portion of joined steps, skip
+                const joinedSteps = steps ? steps.map((s:any) => `${s.title} ${s.detail}`).join(' ') : ''
+                const overlap = joinedSteps && a.includes(joinedSteps.slice(0, Math.min(120, joinedSteps.length)))
+                if (!overlap) {
+                  content = a
+                } else {
+                  content = null
+                }
+              } else {
+                content = null
+              }
+            } else {
+              content = null
+            }
+            return { content, steps }
+          }
+
+          // If no steps array, but answer exists and is string
+          if (typeof resp.answer === 'string' && resp.answer.trim()) {
+            const a = resp.answer.trim()
+            // If answer looks like JSON, try to extract steps from it
+            if (a.startsWith('{') || a.startsWith('[') || a.includes('"steps"')) {
+              try {
+                const parsed = JSON.parse(a)
+                if (Array.isArray(parsed.steps)) {
+                  steps = parsed.steps
+                  content = null
+                  return { content, steps }
+                }
+              } catch(e){
+                // if parsing fails, fall back to rendering answer as text
+                content = a
+                return { content }
+              }
+            }
+            // Plain text answer
+            content = a
+            return { content }
+          }
+        }
+
+        // Fallback
+        return { content: null }
+      }
+
+      const parsed = parseResponse(response)
       const aiMessage: TutorMessage = {
         id: Date.now() + 1,
         type: 'ai',
-        // response may be the API envelope or the inner data; earlier we normalized it
-        content: (response && response.answer) ? response.answer : 'Here are your steps:',
-        steps: Array.isArray(response.steps) ? response.steps.map((step: any) => ({
-          title: step.title || '',
-          detail: step.detail || '',
-          calculation: step.calculation,
-          code_snippet: step.code_snippet
-        })) : undefined,
+        content: parsed.content || '',
+        steps: parsed.steps,
         timestamp: new Date()
       }
       setMessages(prev => [...prev, aiMessage])
@@ -248,14 +332,18 @@ export default function TutorPage(){
                         <span className='text-sm'>{message.file.name}</span>
                       </div>
                     )}
-                    <MarkdownRenderer content={message.content} />
+                    {message.content && (
+                      <div className='mb-3'>
+                        <MarkdownRenderer content={message.content} />
+                      </div>
+                    )}
+
                     {message.steps && message.steps.length > 0 && (
                       <div className='mt-3 space-y-3'>
                         {message.steps.map((s, i) => (
                           <div key={i} className='p-3 rounded border bg-background/50'>
                             <div className='font-semibold text-sm mb-2'>
-                              {/* Backend supplies sequential numbering in the title (e.g., '1. Step title') */}
-                              <MarkdownRenderer content={s.title || ''} />
+                              <strong>{s.title}</strong>
                             </div>
                             <div className='text-sm leading-relaxed'>
                               <MarkdownRenderer content={s.detail || ''} />
