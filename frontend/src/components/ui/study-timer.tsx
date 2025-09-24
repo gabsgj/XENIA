@@ -13,19 +13,21 @@ interface StudyTimerProps {
   externalProgress?: number // optional externally-provided progress (0-100)
 }
 
-export function StudyTimer({ duration, status, onStatusChange, onComplete, externalProgress }: StudyTimerProps) {
-  const [timeLeft, setTimeLeft] = useState(duration * 60) // convert to seconds
+export function StudyTimer({ duration, status, onStatusChange, onComplete, externalProgress, className }: StudyTimerProps & { className?: string }) {
+  const initialSeconds = duration * 60
+  const [remaining, setRemaining] = useState<number>(initialSeconds)
   const [isRunning, setIsRunning] = useState(false)
-  const [startTime, setStartTime] = useState<number | null>(null)
   const [progress, setProgress] = useState<number>(() => externalProgress ?? 0)
+  const [justCompleted, setJustCompleted] = useState(false)
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
 
   // Reset timer when duration changes
   useEffect(() => {
-    setTimeLeft(duration * 60)
+    const seconds = duration * 60
+    setRemaining(seconds)
     setProgress(externalProgress ?? 0)
     setIsRunning(false)
-    setStartTime(null)
+    setJustCompleted(false)
     if (intervalRef.current) {
       clearInterval(intervalRef.current)
       intervalRef.current = null
@@ -36,17 +38,16 @@ export function StudyTimer({ duration, status, onStatusChange, onComplete, exter
   useEffect(() => {
     if (status === 'completed') {
       setIsRunning(false)
-      setTimeLeft(0)
+      setRemaining(0)
       setProgress(100)
       if (intervalRef.current) {
         clearInterval(intervalRef.current)
         intervalRef.current = null
       }
     } else if (status === 'pending') {
-      setTimeLeft(duration * 60)
+      setRemaining(duration * 60)
       setProgress(externalProgress ?? 0)
       setIsRunning(false)
-      setStartTime(null)
       if (intervalRef.current) {
         clearInterval(intervalRef.current)
         intervalRef.current = null
@@ -66,7 +67,6 @@ export function StudyTimer({ duration, status, onStatusChange, onComplete, exter
       onStatusChange('in-progress')
     }
     setIsRunning(true)
-    setStartTime(Date.now())
   }
 
   const pauseTimer = () => {
@@ -79,9 +79,9 @@ export function StudyTimer({ duration, status, onStatusChange, onComplete, exter
 
   const resetTimer = () => {
     setIsRunning(false)
-    setTimeLeft(duration * 60)
+    setRemaining(duration * 60)
     setProgress(0)
-    setStartTime(null)
+    setJustCompleted(false)
     if (intervalRef.current) {
       clearInterval(intervalRef.current)
       intervalRef.current = null
@@ -93,32 +93,64 @@ export function StudyTimer({ duration, status, onStatusChange, onComplete, exter
   }
 
   const completeTimer = () => {
-    const actualTime = startTime ? Math.round((Date.now() - startTime) / 60000) : duration
+    const actualMinutes = Math.max(1, Math.round((initialSeconds - remaining) / 60))
     setIsRunning(false)
-    setTimeLeft(0)
+    setRemaining(0)
+    setProgress(100)
     if (intervalRef.current) {
       clearInterval(intervalRef.current)
       intervalRef.current = null
     }
     onStatusChange('completed')
-    onComplete(actualTime)
+    onComplete(actualMinutes)
+    setJustCompleted(true)
+    setTimeout(() => setJustCompleted(false), 2000)
+    // Play a short beep to notify completion (user gesture already occurred)
+    try {
+      if (typeof window !== 'undefined' && window.AudioContext) {
+        const ctx = new (window.AudioContext || (window as any).webkitAudioContext)()
+        const o = ctx.createOscillator()
+        const g = ctx.createGain()
+        o.type = 'sine'
+        o.frequency.value = 880
+        g.gain.value = 0.05
+        o.connect(g)
+        g.connect(ctx.destination)
+        o.start()
+        setTimeout(() => {
+          o.stop()
+          ctx.close()
+        }, 180)
+      }
+    } catch (e) {
+      // ignore audio errors
+    }
   }
 
-  // Timer countdown effect
+  // Timer countdown effect - single interval while running
   useEffect(() => {
-    if (isRunning && timeLeft > 0) {
+    if (isRunning) {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current)
+        intervalRef.current = null
+      }
       intervalRef.current = setInterval(() => {
-        setTimeLeft(prev => {
+        setRemaining(prev => {
           if (prev <= 1) {
+            // complete
+            // clear interval before calling completeTimer to avoid double-calls
+            if (intervalRef.current) {
+              clearInterval(intervalRef.current)
+              intervalRef.current = null
+            }
             completeTimer()
             return 0
           }
-          const newTimeLeft = prev - 1
-          // Update progress based on time elapsed
-          const elapsed = (duration * 60) - newTimeLeft
-          const newProgress = (elapsed / (duration * 60)) * 100
-          setProgress(Math.min(newProgress, 100))
-          return newTimeLeft
+          const next = prev - 1
+          const elapsed = initialSeconds - next
+          const newProgress = (elapsed / initialSeconds) * 100
+          setProgress(Math.min(Math.max(newProgress, 0), 100))
+          return next
         })
       }, 1000)
     } else {
@@ -131,9 +163,10 @@ export function StudyTimer({ duration, status, onStatusChange, onComplete, exter
     return () => {
       if (intervalRef.current) {
         clearInterval(intervalRef.current)
+        intervalRef.current = null
       }
     }
-  }, [isRunning, timeLeft, duration])
+  }, [isRunning, initialSeconds])
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60)
@@ -151,25 +184,25 @@ export function StudyTimer({ duration, status, onStatusChange, onComplete, exter
   }
 
   return (
-    <div className="flex flex-col gap-3 min-w-[240px]">
+    <div className={`${className ?? ''} flex flex-col sm:flex-row sm:items-center gap-3`}> 
       {/* Timer Display and Controls Row */}
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex items-center justify-between gap-4 w-full sm:w-auto">
         <div className="flex items-center gap-2">
           <span className="text-lg font-mono font-semibold tabular-nums">
-            {formatTime(timeLeft)}
+            {formatTime(remaining)}
           </span>
           <span className="text-xs text-muted-foreground">
             / {formatTime(duration * 60)}
           </span>
         </div>
         <div className="flex gap-2">
-          {status === 'pending' && (
+          {(!isRunning && status !== 'in-progress') && (
             <Button size="sm" onClick={startTimer} className="px-3">
               <Play className="w-3 h-3 mr-1" />
               Start
             </Button>
           )}
-          {status === 'in-progress' && (
+          {(isRunning || status === 'in-progress') && (
             <>
               {isRunning ? (
                 <Button size="sm" variant="outline" onClick={pauseTimer} className="px-3">
@@ -196,8 +229,8 @@ export function StudyTimer({ duration, status, onStatusChange, onComplete, exter
       </div>
 
       {/* Progress Bar */}
-      {status === 'in-progress' && (
-        <div className="space-y-1">
+      {(status === 'in-progress' || progress > 0) && (
+        <div className={`space-y-1 ${justCompleted ? 'animate-pulse' : ''}`}>
           {/* Single timeline progress bar that represents both elapsed time and percentage */}
           <Progress
             value={progress}

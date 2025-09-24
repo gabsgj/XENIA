@@ -10,6 +10,7 @@ from .errors import register_error_handlers
 from .routes.analytics import analytics_bp
 from .routes.analytics_progress import analytics_progress_bp
 from .routes.ingest import ingest_bp
+from .routes.dashboard import dashboard_bp
 from .routes.parent import parent_bp
 from .routes.plan import plan_bp
 from .routes.tasks import tasks_bp
@@ -106,6 +107,7 @@ def create_app() -> Flask:
     app.register_blueprint(plan_bp, url_prefix="/api/plan")
     app.register_blueprint(tasks_bp, url_prefix="/api/tasks")
     app.register_blueprint(analytics_bp, url_prefix="/api/analytics")
+    app.register_blueprint(dashboard_bp, url_prefix="/api/dashboard")
     app.register_blueprint(teacher_bp, url_prefix="/api/teacher")
     app.register_blueprint(parent_bp, url_prefix="/api/parent")
     app.register_blueprint(resources_bp, url_prefix="/api/resources")
