@@ -121,11 +121,19 @@ class EnhancedTutor:
     
     @staticmethod
     def generate_advanced_solution(question: str, question_analysis: Dict, syllabus_context: Optional[Dict] = None) -> List[Dict]:
-        """Generate advanced solution using AI with question-type awareness."""
+        """Generate advanced solution using AI with question-type awareness and timeout handling."""
         from .ai_providers import get_ai_response
 
         question_type = question_analysis.get("type", "general")
         strategy = question_analysis.get("strategy", "comprehensive_explanation")
+        
+        # Determine preferred provider based on question type
+        preferred_provider = None
+        if question_type == "mathematics":
+            preferred_provider = "gemini"  # Gemini often better for math
+        elif question_type == "programming":
+            preferred_provider = "openai"   # OpenAI often better for code
+        # Let system choose for other types
 
         # Build context-aware prompt prefix
         context_prefix = ""
@@ -286,10 +294,14 @@ Provide a structured explanation in JSON format. IMPORTANT: Ensure the output is
 }}
 """
 
-        logger.info(f"Generating {question_type} solution using AI...")
+        logger.info(f"Generating {question_type} solution using AI (preferred: {preferred_provider})...")
 
         try:
-            response = get_ai_response(prompt)
+            # Use preferred provider if specified
+            if preferred_provider:
+                response = get_ai_response(prompt, preferred_provider=preferred_provider)
+            else:
+                response = get_ai_response(prompt)
             
             # Clean and parse the response more robustly
             clean_response = response.strip()
@@ -312,9 +324,17 @@ Provide a structured explanation in JSON format. IMPORTANT: Ensure the output is
                 logger.warning("AI response didn't contain expected 'steps' format")
                 raise ApiError("TUTOR_AI_INVALID_RESPONSE", "AI response was not in the expected format.", status=500)
 
+        except TimeoutError as e:
+            logger.error(f"AI request timeout: {e}")
+            raise ApiError("TUTOR_TIMEOUT", "The AI request timed out. Please try again.", status=408)
         except Exception as e:
-            logger.error(f"Advanced solution generation failed: {e}")
-            raise ApiError("TUTOR_AI_FAILED", f"The AI provider failed to generate a response: {e}", status=502)
+            error_msg = str(e)
+            if "timeout" in error_msg.lower():
+                logger.error(f"AI timeout error: {e}")
+                raise ApiError("TUTOR_TIMEOUT", "The AI request timed out. Please try again.", status=408)
+            else:
+                logger.error(f"Advanced solution generation failed: {e}")
+                raise ApiError("TUTOR_AI_FAILED", f"The AI provider failed to generate a response: {e}", status=502)
 
 def solve_question(
     question: Optional[str], image_bytes: Optional[bytes], user_id: str, include_history: bool = True
@@ -323,7 +343,7 @@ def solve_question(
     
     try:
         if not question and not image_bytes:
-            raise ApiError("TUTOR_TIMEOUT", "No input provided to tutor", status=400)
+            raise ApiError("TUTOR_INVALID_INPUT", "No input provided to tutor", status=400)
         
         # Extract text from image if provided
         if not question and image_bytes:

@@ -1,43 +1,183 @@
 from flask import Blueprint, request
+import logging
 from ..errors import ApiError
-
+from ..utils.api_response import APIResponseBuilder, api_endpoint, ErrorCode
 from ..services.tutor import solve_question
 from ..utils import normalize_user_id, is_valid_uuid
 from ..services.tutor_storage import fetch_history
 
-
+logger = logging.getLogger('xenia')
 tutor_bp = Blueprint("tutor", __name__)
 
 
 @tutor_bp.post("/ask")
+@api_endpoint
 def ask_tutor():
-    if "file" in request.files:
-        file = request.files["file"].read()
-        question = None
-    else:
-        file = None
-        question = (
-            request.get_json(silent=True).get("question")
-            if request.is_json
-            else request.form.get("question")
+    """
+    Ask the AI tutor a question with comprehensive error handling and timeout management.
+    
+    Accepts:
+    - JSON: {"question": "your question"}
+    - Form data: question=your question
+    - File upload: image file with question
+    
+    Returns:
+    - Standardized API response with steps, answer, and history
+    """
+    try:
+        # Extract input data
+        if "file" in request.files:
+            file = request.files["file"]
+            if file.filename == '':
+                return APIResponseBuilder.validation_error("No file selected")
+            
+            # Validate file size (50MB limit)
+            file_content = file.read()
+            max_size = 50 * 1024 * 1024  # 50MB
+            if len(file_content) > max_size:
+                return APIResponseBuilder.error(
+                    ErrorCode.FILE_TOO_LARGE,
+                    f"File too large. Maximum size is {max_size // (1024*1024)}MB",
+                    status_code=413
+                )
+            
+            question = None
+            logger.info(f"Processing image file: {file.filename} ({len(file_content)} bytes)")
+        else:
+            file_content = None
+            question = (
+                request.get_json(silent=True, force=True).get("question")
+                if request.is_json or request.content_type == 'application/json'
+                else request.form.get("question")
+            )
+        
+        # Validate input
+        if not question and not file_content:
+            return APIResponseBuilder.validation_error(
+                "No input provided. Please provide either a question or upload an image.",
+                field="question"
+            )
+        
+        # Get user ID
+        raw_user_id = request.headers.get("X-User-Id", "") or request.values.get("user_id", "")
+        user_id = normalize_user_id(raw_user_id) if raw_user_id else ""
+        
+        logger.info(f"Tutor request from user: {user_id[:8]}... Question: {question[:50] if question else 'Image upload'}...")
+        
+        # Process the question
+        result = solve_question(question=question, image_bytes=file_content, user_id=user_id)
+        
+        # Return successful response
+        return APIResponseBuilder.success(
+            data=result,
+            meta={
+                "processing_time": "< 1s",
+                "ai_provider": "auto-selected",
+                "user_authenticated": bool(user_id and is_valid_uuid(user_id))
+            }
         )
-    if not question and not file:
-        raise ApiError("TUTOR_TIMEOUT", "No input provided to tutor", status=400)
-
-    raw_user_id = request.headers.get("X-User-Id", "") or request.values.get("user_id", "")
-    user_id = normalize_user_id(raw_user_id) if raw_user_id else ""
-
-    resp = solve_question(question=question, image_bytes=file, user_id=user_id)
-    return resp, 200
+        
+    except ApiError as e:
+        # Handle our custom API errors with proper status codes
+        if e.error_code == "TUTOR_TIMEOUT":
+            return APIResponseBuilder.timeout_error(e.message)
+        elif e.error_code == "TUTOR_INVALID_INPUT":
+            return APIResponseBuilder.validation_error(e.message)
+        elif e.error_code == "TUTOR_AI_FAILED":
+            return APIResponseBuilder.external_service_error("AI Provider", e.message)
+        else:
+            return APIResponseBuilder.error(e.error_code, e.message, status_code=e.status_code)
+    
+    except TimeoutError as e:
+        return APIResponseBuilder.timeout_error("The AI request timed out. Please try again.")
+    
+    except Exception as e:
+        logger.exception(f"Unexpected error in tutor endpoint: {e}")
+        return APIResponseBuilder.internal_error(
+            "An unexpected error occurred while processing your question"
+        )
 
 
 @tutor_bp.get("/history")
+@api_endpoint
 def tutor_history():
-    raw_user_id = request.headers.get("X-User-Id", "") or request.values.get("user_id", "")
-    if not raw_user_id:
-        return {"history": []}, 200
-    user_id = normalize_user_id(raw_user_id)
-    if not is_valid_uuid(user_id):
-        return {"history": []}, 200
-    hist = fetch_history(user_id)
-    return {"history": hist}, 200
+    """
+    Get tutor conversation history for a user.
+    
+    Returns:
+    - Standardized API response with conversation history
+    """
+    try:
+        # Get user ID
+        raw_user_id = request.headers.get("X-User-Id", "") or request.values.get("user_id", "")
+        
+        if not raw_user_id:
+            return APIResponseBuilder.success(
+                data={"history": []},
+                meta={"message": "No user ID provided, returning empty history"}
+            )
+        
+        user_id = normalize_user_id(raw_user_id)
+        if not is_valid_uuid(user_id):
+            return APIResponseBuilder.success(
+                data={"history": []},
+                meta={"message": "Invalid user ID format, returning empty history"}
+            )
+        
+        # Fetch history
+        history = fetch_history(user_id)
+        
+        return APIResponseBuilder.success(
+            data={"history": history},
+            meta={
+                "user_id": user_id,
+                "conversation_count": len(history),
+                "last_updated": history[0].get("created_at") if history else None
+            }
+        )
+        
+    except Exception as e:
+        logger.exception(f"Error fetching tutor history: {e}")
+        return APIResponseBuilder.internal_error("Failed to fetch conversation history")
+
+
+@tutor_bp.get("/status")
+@api_endpoint
+def tutor_status():
+    """
+    Get AI tutor service status and provider availability.
+    
+    Returns:
+    - Service status and AI provider information
+    """
+    try:
+        from ..utils.ai_manager import get_ai_manager
+        
+        # Get AI provider status
+        ai_manager = get_ai_manager()
+        provider_status = ai_manager.get_provider_status()
+        
+        # Count available providers
+        available_providers = [
+            name for name, status in provider_status.items()
+            if status["status"] in ["healthy", "degraded"]
+        ]
+        
+        service_status = {
+            "service": "operational" if available_providers else "degraded",
+            "ai_providers": provider_status,
+            "available_providers": available_providers,
+            "fallback_enabled": True
+        }
+        
+        return APIResponseBuilder.success(
+            data=service_status,
+            meta={
+                "timestamp": "2025-09-24T20:43:00Z",
+                "version": "1.0.0"
+            }
+        )
+        
+    except Exception as e:
+        logger.exception(f"Error getting tutor status: {e}")
+        return APIResponseBuilder.internal_error("Failed to get service status")

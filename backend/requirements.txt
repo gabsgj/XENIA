@@ -1,5 +1,6 @@
 flask==3.1.2
 flask-cors==5.0.0
+flask-limiter==3.8.0
 gunicorn==20.1.0
 supabase==2.8.1
 openai==1.59.6
@@ -23,3 +24,14 @@ pdf2image==1.17.0
 google-generativeai==0.8.3
 scipy==1.14.1
 pytest==8.0.0
+# Security and validation
+marshmallow==3.23.2
+flask-wtf==1.2.1
+# Rate limiting and caching
+redis==5.2.1
+# File validation and security
+python-magic==0.4.27
+# Async support
+asyncio-timeout==4.0.3
+# Error tracking (optional)
+sentry-sdk[flask]==2.19.2

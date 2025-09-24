@@ -1,6 +1,6 @@
 """
 AI Providers for real AI API integration.
-Supports OpenAI, Anthropic, and Gemini APIs.
+Supports OpenAI, Anthropic, and Gemini APIs with timeout handling and circuit breaker pattern.
 """
 import os
 import json
@@ -8,21 +8,43 @@ import re
 from typing import Optional, Dict, Any, List
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
+import logging
 
 # Load environment variables
 load_dotenv()
+logger = logging.getLogger('xenia')
 
-def get_ai_response(prompt: str, model: Optional[str] = None) -> str:
-    """Get AI response from configured provider."""
-    import logging
-    logger = logging.getLogger('xenia')
+def get_ai_response(prompt: str, model: Optional[str] = None, preferred_provider: Optional[str] = None) -> str:
+    """
+    Get AI response from configured provider with robust error handling.
     
+    Args:
+        prompt: The prompt to send to AI
+        model: Specific model to use (optional)
+        preferred_provider: Preferred AI provider (gemini, openai, anthropic)
+    
+    Returns:
+        AI response text
+        
+    Raises:
+        Exception: If all providers fail and fallback is disabled
+    """
     # Check if AI mock mode is explicitly enabled
     if os.getenv("AI_MOCK", "false").lower() == "true":
         logger.info("🎭 AI Mock mode explicitly enabled - using mock responses")
         from .ai_mock import get_mock_provider
         return get_mock_provider().get_tutor_response(prompt)["explanation"]
     
+    # Use the new AI manager for robust handling
+    try:
+        from ..utils.ai_manager import get_ai_response as manager_get_response
+        return manager_get_response(prompt, preferred_provider)
+    except ImportError:
+        logger.warning("AI Manager not available, falling back to legacy provider handling")
+        return _legacy_get_ai_response(prompt, model)
+
+def _legacy_get_ai_response(prompt: str, model: Optional[str] = None) -> str:
+    """Legacy AI response handling with basic timeout."""
     # Try Gemini first
     gemini_key = os.getenv("GEMINI_API_KEY")
     is_demo_gemini = (gemini_key and ("demo" in gemini_key.lower() or 
@@ -33,6 +55,11 @@ def get_ai_response(prompt: str, model: Optional[str] = None) -> str:
     if gemini_key and gemini_key.strip() and not is_demo_gemini:
         try:
             import google.generativeai as genai
+            import signal
+            
+            def timeout_handler(signum, frame):
+                raise TimeoutError("Gemini API timeout")
+            
             logger.info("   Configuring real Gemini API...")
             genai.configure(api_key=gemini_key.strip())
             
@@ -40,20 +67,30 @@ def get_ai_response(prompt: str, model: Optional[str] = None) -> str:
             gemini_model = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
             model_instance = genai.GenerativeModel(gemini_model)
             
-            logger.info("   Generating content...")
-            response = model_instance.generate_content(
-                prompt,
-                generation_config=genai.types.GenerationConfig(
-                    temperature=0.7,
-                    max_output_tokens=1000,
-                )
-            )
+            # Set timeout
+            timeout_seconds = int(os.getenv("AI_REQUEST_TIMEOUT_SECONDS", "30"))
+            signal.signal(signal.SIGALRM, timeout_handler)
+            signal.alarm(timeout_seconds)
             
-            if response and response.text:
-                logger.info(f"   ✅ Gemini response received: {len(response.text)} characters")
-                return response.text.strip()
-            else:
-                logger.warning("   ⚠️ Gemini returned empty response")
+            try:
+                logger.info("   Generating content...")
+                response = model_instance.generate_content(
+                    prompt,
+                    generation_config=genai.types.GenerationConfig(
+                        temperature=0.7,
+                        max_output_tokens=2000,
+                    )
+                )
+                signal.alarm(0)  # Cancel timeout
+                
+                if response and response.text:
+                    logger.info(f"   ✅ Gemini response received: {len(response.text)} characters")
+                    return response.text.strip()
+                else:
+                    logger.warning("   ⚠️ Gemini returned empty response")
+            except TimeoutError:
+                logger.error(f"   ⏰ Gemini API timeout after {timeout_seconds}s")
+                signal.alarm(0)  # Cancel timeout
                 
         except Exception as e:
             logger.error(f"   ❌ Gemini API error: {e}")
@@ -71,11 +108,18 @@ def get_ai_response(prompt: str, model: Optional[str] = None) -> str:
         try:
             from openai import OpenAI
             logger.info("   Using real OpenAI API...")
-            client = OpenAI(api_key=openai_key.strip())
+            
+            timeout_seconds = int(os.getenv("AI_REQUEST_TIMEOUT_SECONDS", "30"))
+            client = OpenAI(
+                api_key=openai_key.strip(),
+                timeout=timeout_seconds
+            )
+            
             response = client.chat.completions.create(
                 model="gpt-3.5-turbo",
                 messages=[{"role": "user", "content": prompt}],
-                max_tokens=1000
+                max_tokens=2000,
+                temperature=0.7
             )
             logger.info(f"   ✅ OpenAI response received: {len(response.choices[0].message.content)} characters")
             return response.choices[0].message.content
@@ -93,10 +137,17 @@ def get_ai_response(prompt: str, model: Optional[str] = None) -> str:
         try:
             import anthropic
             logger.info("   Using real Anthropic API...")
-            client = anthropic.Anthropic(api_key=anthropic_key.strip())
+            
+            timeout_seconds = int(os.getenv("AI_REQUEST_TIMEOUT_SECONDS", "30"))
+            client = anthropic.Anthropic(
+                api_key=anthropic_key.strip(),
+                timeout=timeout_seconds
+            )
+            
             response = client.messages.create(
                 model="claude-3-sonnet-20240229",
-                max_tokens=1000,
+                max_tokens=2000,
+                temperature=0.7,
                 messages=[{"role": "user", "content": prompt}]
             )
             logger.info(f"   ✅ Anthropic response received: {len(response.content[0].text)} characters")
