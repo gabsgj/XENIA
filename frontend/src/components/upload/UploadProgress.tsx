@@ -190,7 +190,6 @@ export function UploadProgress({ uploadId, onComplete, className }: UploadProgre
         <div className="space-y-2">
           <div className="flex justify-between text-sm">
             <span>{getStatusMessage(status.status)}</span>
-            <span>{status.progress}%</span>
           </div>
           <Progress 
             value={status.progress} 

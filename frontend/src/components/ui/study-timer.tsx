@@ -196,7 +196,6 @@ export function StudyTimer({ duration, status, onStatusChange, onComplete }: Stu
           />
           <div className="flex justify-between text-xs text-muted-foreground">
             <span>0:00</span>
-            <span>{Math.round(progress)}% complete</span>
             <span>{formatTime(duration * 60)}</span>
           </div>
         </div>

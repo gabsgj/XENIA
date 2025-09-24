@@ -257,9 +257,8 @@ export function StudyTimer({ task, onComplete, onStatusChange, className }: Stud
           {/* Dynamic Progress Bar */}
           <div className="space-y-2">
             <div className="flex justify-between text-sm">
-              <span>Progress</span>
-              <span>{Math.round(progress)}%</span>
-            </div>
+                <span>Progress</span>
+              </div>
             <div className="relative">
               <Progress
                 value={progress}

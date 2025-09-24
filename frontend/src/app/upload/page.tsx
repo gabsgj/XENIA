@@ -344,7 +344,7 @@ export default function UploadPage() {
                   <div className="text-xs text-muted-foreground">We are extracting text and analyzing topics — this may take a few moments.</div>
                 </div>
               </div>
-              <div className="text-sm text-muted-foreground">{uploadProgress}%</div>
+              <div className="text-sm text-muted-foreground">{uploadProgress >= 100 ? 'Done' : ''}</div>
             </div>
           </div>
         )}
@@ -373,9 +373,7 @@ export default function UploadPage() {
           {/* Main Upload Area */}
           <div className="lg:col-span-2 space-y-6 relative">
             {/* Overlay while processing/uploading */}
-            {(uploading || processingTopics) && (
-              <LoadingOverlay className="z-20" />
-            )}
+            <LoadingOverlay show={uploading || processingTopics} />
             {/* Upload Section */}
             <Card>
               <CardHeader>
@@ -485,7 +483,6 @@ export default function UploadPage() {
                           <div className="space-y-2">
                             <div className="flex justify-between text-sm">
                               <span>Uploading files...</span>
-                              <span>{uploadProgress}%</span>
                             </div>
                             <Progress value={uploadProgress} />
                           </div>
@@ -541,7 +538,6 @@ export default function UploadPage() {
                           <div className="space-y-2">
                             <div className="flex justify-between text-sm">
                               <span>Processing text...</span>
-                              <span>{uploadProgress}%</span>
                             </div>
                             <Progress value={uploadProgress} />
                           </div>
