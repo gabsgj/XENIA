@@ -8,7 +8,10 @@ It will (optionally) hit local endpoints if the backend is running.
 """
 from __future__ import annotations
 import os
-from requests import *
+import requests
+from dotenv import load_dotenv
+
+load_dotenv('backend/.env')
 
 
 def test_environment() -> bool:
@@ -65,7 +68,8 @@ def test_analytics_endpoint():
     print("\n📊 Testing analytics endpoint...")
     try:
         url = "http://localhost:8000/api/analytics/student"
-        response = requests.get(url, timeout=10)
+        headers = {'X-User-Id': 'test-user'}
+        response = requests.get(url, headers=headers, timeout=10)
         
         if response.status_code == 200:
             result = response.json()

@@ -7,9 +7,13 @@ def test_record_and_get_progress():
     user_id = "test-user-1"
     sb = get_supabase()
     # clear any existing mock rows for this user
-    if hasattr(sb, 'mock_data'):
-        sb.mock_data.setdefault('user_progress', [])[:] = [r for r in sb.mock_data.get('user_progress', []) if r.get('user_id') != user_id]
-        sb.mock_data.setdefault('user_progress_history', [])[:] = [r for r in sb.mock_data.get('user_progress_history', []) if r.get('user_id') != user_id]
+    if hasattr(sb, 'mock_data') and isinstance(sb.mock_data, dict):
+        sb.mock_data['user_progress'] = [r for r in sb.mock_data.get('user_progress', []) if r.get('user_id') != user_id]
+        sb.mock_data['user_progress_history'] = [r for r in sb.mock_data.get('user_progress_history', []) if r.get('user_id') != user_id]
+    elif hasattr(sb, 'mock_data'):
+        # This is a Mock object, so we can't easily clear it.
+        # For the purpose of this test, we can assume it's fresh.
+        pass
 
     topic_scores = [
         {"topic": "Algebra", "correct": 1, "wrong": 0, "score": 1.0},
