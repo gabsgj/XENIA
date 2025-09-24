@@ -360,7 +360,7 @@ export default function DashboardPage(){
                           <p className="text-sm text-muted-foreground">{task.topic}</p>
                         </div>
                         <StudyTimer
-                          className="w-56"
+                          className="flex-1 max-w-sm"
                           duration={task.duration}
                           status={task.status}
                           onStatusChange={(newStatus) => updateSessionStatus(task.date, task.topic, newStatus)}
