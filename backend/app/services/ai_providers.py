@@ -1348,10 +1348,6 @@ def filter_syllabus_content(extracted_text: str) -> str:
     import logging
     logger = logging.getLogger('xenia')
     
-    # If text is too short, return as-is
-    if len(extracted_text) < 500:
-        return extracted_text
-    
     try:
         # Use Gemini for advanced content filtering
         if os.getenv("GEMINI_API_KEY"):
@@ -1402,15 +1398,14 @@ def filter_syllabus_content(extracted_text: str) -> str:
     filtered_lines = []
     
     # Simple heuristic filtering
-    exclude_patterns = [
-        r'(?i)\b(?:grading|grade|marks?|points?|attendance|office hours?)\b',
-        r'(?i)\b(?:prerequisites?|textbooks?|materials?|resources?)\b',
-        r'(?i)\b(?:policies?|procedures?|administrative)\b',
-        r'(?i)\b(?:contact|email|phone|address|instructor|dr\.)\b',
-        r'(?i)\b(?:copyright|disclaimer|notice)\b',
-        r'(?i)\b(?:page \d+|table of contents)\b',
-        r'(?i)\b(?:university|college|department|school)\b',
-        r'(?i)\b(?:course description|learning objectives)\b'
+    exclude_keywords = [
+        'grading', 'grade', 'marks', 'points', 'attendance', 'office hours',
+        'prerequisites', 'textbooks', 'materials', 'resources',
+        'policies', 'procedures', 'administrative',
+        'contact', 'email', 'phone', 'address', 'instructor', 'dr.',
+        'copyright', 'disclaimer', 'notice',
+        'table of contents', 'university', 'college', 'department', 'school',
+        'course description', 'learning objectives'
     ]
     
     for line in lines:
@@ -1418,10 +1413,10 @@ def filter_syllabus_content(extracted_text: str) -> str:
         if not line_lower:
             continue
             
-        # Skip if matches exclusion patterns
+        # Skip if matches exclusion keywords
         should_exclude = False
-        for pattern in exclude_patterns:
-            if re.search(pattern, line_lower):
+        for keyword in exclude_keywords:
+            if keyword in line_lower:
                 should_exclude = True
                 break
         

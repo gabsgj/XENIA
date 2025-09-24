@@ -7,11 +7,10 @@ import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { ResponsiveContainer, XAxis, YAxis, Tooltip, LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from 'recharts'
+import { ResponsiveContainer, XAxis, YAxis, Tooltip, LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, RadarChart, PolarGrid, PolarAngleAxis, Radar } from 'recharts'
 import {
   Users,
   AlertTriangle,
-  Search,
   Plus,
   Clock,
   Target,
@@ -20,13 +19,9 @@ import {
   BookOpen,
   MessageSquare,
   Activity,
-  BarChart3,
-  PieChart as PieChartIcon,
   Download,
   Filter,
   Star,
-  CheckCircle,
-  XCircle,
   Calendar,
   UserCheck
 } from 'lucide-react'
@@ -63,18 +58,13 @@ export default function TeacherPage() {
         id: 1,
         name: "Emma Thompson",
         email: "emma.t@student.edu",
-        avatar: "/avatars/emma.jpg",
+        avatar: "/avatars/sarah.svg",
         grade: "A",
         gpa: 3.8,
         completionRate: 95,
         studyStreak: 18,
         totalStudyTime: 320,
         weakTopics: ["Organic Synthesis"],
-        recentActivity: [
-          { date: "2024-01-15", activity: "Lab Report Submission", score: 92 },
-          { date: "2024-01-12", activity: "Quiz - Acid-Base Chemistry", score: 88 },
-          { date: "2024-01-10", activity: "Homework - Molecular Structures", score: 95 }
-        ],
         attendance: 98,
         participation: 92
       },
@@ -82,18 +72,13 @@ export default function TeacherPage() {
         id: 2,
         name: "Marcus Rodriguez",
         email: "marcus.r@student.edu",
-        avatar: "/avatars/marcus.jpg",
+        avatar: "/avatars/ahmed.svg",
         grade: "B+",
         gpa: 3.5,
         completionRate: 87,
         studyStreak: 12,
         totalStudyTime: 285,
         weakTopics: ["Thermodynamics", "Kinetics"],
-        recentActivity: [
-          { date: "2024-01-14", activity: "Group Lab Project", score: 85 },
-          { date: "2024-01-11", activity: "Mid-term Exam", score: 82 },
-          { date: "2024-01-08", activity: "Problem Set - Equilibrium", score: 78 }
-        ],
         attendance: 95,
         participation: 88
       },
@@ -101,18 +86,13 @@ export default function TeacherPage() {
         id: 3,
         name: "Sophia Chen",
         email: "sophia.c@student.edu",
-        avatar: "/avatars/sophia.jpg",
+        avatar: "/avatars/yuki.svg",
         grade: "A-",
         gpa: 3.7,
         completionRate: 92,
         studyStreak: 22,
         totalStudyTime: 298,
         weakTopics: [],
-        recentActivity: [
-          { date: "2024-01-15", activity: "Research Presentation", score: 96 },
-          { date: "2024-01-13", activity: "Lab Practical", score: 94 },
-          { date: "2024-01-09", activity: "Essay - Chemical Reactions", score: 91 }
-        ],
         attendance: 100,
         participation: 98
       },
@@ -120,18 +100,13 @@ export default function TeacherPage() {
         id: 4,
         name: "James Wilson",
         email: "james.w@student.edu",
-        avatar: "/avatars/james.jpg",
+        avatar: "/avatars/liam.svg",
         grade: "B",
         gpa: 3.2,
         completionRate: 78,
         studyStreak: 5,
         totalStudyTime: 245,
         weakTopics: ["Organic Chemistry", "Spectroscopy", "Electrochemistry"],
-        recentActivity: [
-          { date: "2024-01-13", activity: "Quiz - Organic Reactions", score: 72 },
-          { date: "2024-01-10", activity: "Lab Safety Test", score: 85 },
-          { date: "2024-01-07", activity: "Homework - pH Calculations", score: 68 }
-        ],
         attendance: 88,
         participation: 75
       },
@@ -139,18 +114,13 @@ export default function TeacherPage() {
         id: 5,
         name: "Isabella Garcia",
         email: "isabella.g@student.edu",
-        avatar: "/avatars/isabella.jpg",
+        avatar: "/avatars/maria.svg",
         grade: "A",
         gpa: 3.9,
         completionRate: 98,
         studyStreak: 25,
         totalStudyTime: 345,
         weakTopics: [],
-        recentActivity: [
-          { date: "2024-01-15", activity: "Final Project Proposal", score: 98 },
-          { date: "2024-01-12", activity: "Advanced Lab Techniques", score: 96 },
-          { date: "2024-01-09", activity: "Peer Review Assignment", score: 97 }
-        ],
         attendance: 100,
         participation: 100
       }
@@ -169,27 +139,26 @@ export default function TeacherPage() {
     ]
   }
 
-  const subjectColors = ['#8884d8', '#82ca9d', '#ffc658', '#ff7c7c', '#8dd1e1']
   const gradeColors = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444']
 
   return (
     <MainLayout>
       {/* Demo Mode Indicator */}
-      <div className="fixed top-4 right-4 z-50">
-        <div className="bg-amber-50 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-800 rounded-full px-3 py-1.5 shadow-sm">
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 mt-4">
+        <div className="bg-yellow-100 dark:bg-yellow-900/50 border border-yellow-300 dark:border-yellow-700 rounded-full px-4 py-2 shadow-lg">
           <div className="flex items-center gap-2">
-            <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-            <span className="text-sm font-medium text-amber-800 dark:text-amber-200">Demo Mode</span>
+            <AlertTriangle className="w-5 h-5 text-yellow-600 dark:text-yellow-400" />
+            <span className="text-sm font-semibold text-yellow-800 dark:text-yellow-200">Demo Mode</span>
           </div>
         </div>
       </div>
 
-      <div className="p-6 space-y-8">
+      <div className="p-6 md:p-8 space-y-8">
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
             <h1 className="text-3xl md:text-4xl font-bold tracking-tight">Teacher Dashboard</h1>
-            <p className="text-muted-foreground">{classData.className} • Monitor student progress and provide targeted support</p>
+            <p className="text-muted-foreground mt-1">{classData.className}</p>
           </div>
           <div className="flex items-center gap-3">
             <Button variant="outline">
@@ -204,49 +173,33 @@ export default function TeacherPage() {
         </div>
 
         {/* Class Overview Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+          <Card>
             <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Total Students</p>
-                  <p className="text-3xl font-bold text-blue-600">{classData.totalStudents}</p>
-                </div>
-                <Users className="w-8 h-8 text-blue-500" />
-              </div>
+              <Users className="w-7 h-7 text-muted-foreground mb-2" />
+              <p className="text-3xl font-bold">{classData.totalStudents}</p>
+              <p className="text-sm text-muted-foreground">Total Students</p>
             </CardContent>
           </Card>
-          <Card className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950/20 dark:to-emerald-950/20">
+          <Card>
             <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Average Grade</p>
-                  <p className="text-3xl font-bold text-green-600">{classData.averageGrade}</p>
-                </div>
-                <Award className="w-8 h-8 text-green-500" />
-              </div>
+              <Award className="w-7 h-7 text-muted-foreground mb-2" />
+              <p className="text-3xl font-bold">{classData.averageGrade}</p>
+              <p className="text-sm text-muted-foreground">Average Grade</p>
             </CardContent>
           </Card>
-          <Card className="bg-gradient-to-r from-orange-50 to-amber-50 dark:from-orange-950/20 dark:to-amber-950/20">
+          <Card>
             <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Completion Rate</p>
-                  <p className="text-3xl font-bold text-orange-600">{classData.averageCompletion}%</p>
-                </div>
-                <Target className="w-8 h-8 text-orange-500" />
-              </div>
+              <Target className="w-7 h-7 text-muted-foreground mb-2" />
+              <p className="text-3xl font-bold">{classData.averageCompletion}%</p>
+              <p className="text-sm text-muted-foreground">Completion Rate</p>
             </CardContent>
           </Card>
-          <Card className="bg-gradient-to-r from-purple-50 to-violet-50 dark:from-purple-950/20 dark:to-violet-950/20">
+          <Card>
             <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Study Hours</p>
-                  <p className="text-3xl font-bold text-purple-600">{classData.totalStudyHours}h</p>
-                </div>
-                <Clock className="w-8 h-8 text-purple-500" />
-              </div>
+              <Clock className="w-7 h-7 text-muted-foreground mb-2" />
+              <p className="text-3xl font-bold">{classData.totalStudyHours}h</p>
+              <p className="text-sm text-muted-foreground">Total Study Hours</p>
             </CardContent>
           </Card>
         </div>
@@ -279,8 +232,8 @@ export default function TeacherPage() {
                         <YAxis yAxisId="gpa" orientation="left" />
                         <YAxis yAxisId="completion" orientation="right" />
                         <Tooltip />
-                        <Line yAxisId="gpa" type="monotone" dataKey="avgGrade" stroke="#8884d8" strokeWidth={2} name="Avg GPA" />
-                        <Line yAxisId="completion" type="monotone" dataKey="completion" stroke="#82ca9d" strokeWidth={2} name="Completion %" />
+                        <Line yAxisId="gpa" type="monotone" dataKey="avgGrade" stroke="hsl(var(--primary))" strokeWidth={2} name="Avg GPA" />
+                        <Line yAxisId="completion" type="monotone" dataKey="completion" stroke="hsl(var(--secondary))" strokeWidth={2} name="Completion %" />
                       </LineChart>
                     </ResponsiveContainer>
                   </div>
@@ -290,10 +243,7 @@ export default function TeacherPage() {
               {/* Grade Distribution */}
               <Card>
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <PieChartIcon className="w-5 h-5" />
-                    Grade Distribution
-                  </CardTitle>
+                  <CardTitle>Grade Distribution</CardTitle>
                   <CardDescription>Current grade breakdown across all students</CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -320,30 +270,6 @@ export default function TeacherPage() {
               </Card>
             </div>
 
-            {/* Subject Performance */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Subject Performance Overview</CardTitle>
-                <CardDescription>Average scores across different chemistry topics</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                  {classData.subjectBreakdown.map((subject, index) => (
-                    <div key={subject.subject} className="p-4 border rounded-lg">
-                      <div className="flex items-center justify-between mb-2">
-                        <h4 className="font-semibold text-sm">{subject.subject}</h4>
-                        <Badge variant="secondary" className="text-xs">
-                          {subject.students} students
-                        </Badge>
-                      </div>
-                      <div className="text-2xl font-bold text-blue-600 mb-1">{subject.avgScore}%</div>
-                      <Progress value={subject.avgScore} className="h-2" />
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-
             {/* Upcoming Assessments */}
             <Card>
               <CardHeader>
@@ -356,7 +282,7 @@ export default function TeacherPage() {
               <CardContent>
                 <div className="space-y-4">
                   {classData.upcomingAssessments.map((assessment, index) => (
-                    <div key={index} className="flex items-center justify-between p-4 border rounded-lg">
+                    <div key={index} className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50">
                       <div className="flex items-center gap-4">
                         <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
                           <BookOpen className="w-5 h-5 text-primary" />
@@ -379,7 +305,7 @@ export default function TeacherPage() {
           <TabsContent value="students" className="space-y-6">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-2xl font-bold">Student Performance</h2>
+                <h2 className="text-2xl font-bold">Student Roster</h2>
                 <p className="text-muted-foreground">Detailed view of individual student progress</p>
               </div>
               <div className="flex items-center gap-2">
@@ -394,91 +320,56 @@ export default function TeacherPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 gap-6">
-              {classData.students.map((student) => (
-                <Card key={student.id} className="hover:shadow-md transition-all">
-                  <CardContent className="p-6">
-                    <div className="flex items-start gap-6">
-                      <Avatar className="w-16 h-16">
-                        <AvatarImage src={student.avatar} alt={student.name} />
-                        <AvatarFallback className="text-lg">{student.name.split(' ').map(n => n[0]).join('')}</AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1">
-                        <div className="flex items-center justify-between mb-4">
-                          <div>
-                            <h3 className="text-xl font-bold">{student.name}</h3>
-                            <p className="text-muted-foreground">{student.email}</p>
-                          </div>
-                          <div className="text-right">
-                            <Badge variant={student.grade.startsWith('A') ? 'default' : 'secondary'} className="text-lg px-3 py-1">
-                              {student.grade}
-                            </Badge>
-                            <p className="text-sm text-muted-foreground mt-1">GPA: {student.gpa}</p>
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                          <div className="text-center">
-                            <div className="flex items-center justify-center gap-1 mb-1">
-                              <Target className="w-4 h-4 text-green-500" />
-                              <span className="text-xl font-bold text-green-600">{student.completionRate}%</span>
+            <Card>
+              <CardContent className="p-0">
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-muted/50">
+                      <tr>
+                        <th className="p-4 text-left font-semibold">Student</th>
+                        <th className="p-4 text-center font-semibold">Grade</th>
+                        <th className="p-4 text-center font-semibold">Completion</th>
+                        <th className="p-4 text-center font-semibold">Streak</th>
+                        <th className="p-4 text-center font-semibold">Attendance</th>
+                        <th className="p-4 text-right font-semibold">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {classData.students.map((student) => (
+                        <tr key={student.id} className="border-b hover:bg-muted/50">
+                          <td className="p-4">
+                            <div className="flex items-center gap-3">
+                              <Avatar className="w-10 h-10">
+                                <AvatarImage src={student.avatar} alt={student.name} />
+                                <AvatarFallback>{student.name.split(' ').map(n => n[0]).join('')}</AvatarFallback>
+                              </Avatar>
+                              <div>
+                                <p className="font-semibold">{student.name}</p>
+                                <p className="text-sm text-muted-foreground">{student.email}</p>
+                              </div>
                             </div>
-                            <p className="text-xs text-muted-foreground">Completion</p>
-                          </div>
-                          <div className="text-center">
-                            <div className="flex items-center justify-center gap-1 mb-1">
-                              <Award className="w-4 h-4 text-orange-500" />
-                              <span className="text-xl font-bold text-orange-600">{student.studyStreak}</span>
+                          </td>
+                          <td className="p-4 text-center">
+                            <Badge variant={student.grade.startsWith('A') ? 'default' : 'secondary'}>{student.grade}</Badge>
+                          </td>
+                          <td className="p-4 text-center">
+                            <div className="flex items-center justify-center gap-2">
+                              <Progress value={student.completionRate} className="w-24 h-2" />
+                              <span className="text-sm text-muted-foreground">{student.completionRate}%</span>
                             </div>
-                            <p className="text-xs text-muted-foreground">Day Streak</p>
-                          </div>
-                          <div className="text-center">
-                            <div className="flex items-center justify-center gap-1 mb-1">
-                              <Clock className="w-4 h-4 text-blue-500" />
-                              <span className="text-xl font-bold text-blue-600">{student.totalStudyTime}</span>
-                            </div>
-                            <p className="text-xs text-muted-foreground">Min/Week</p>
-                          </div>
-                          <div className="text-center">
-                            <div className="flex items-center justify-center gap-1 mb-1">
-                              <UserCheck className="w-4 h-4 text-purple-500" />
-                              <span className="text-xl font-bold text-purple-600">{student.attendance}%</span>
-                            </div>
-                            <p className="text-xs text-muted-foreground">Attendance</p>
-                          </div>
-                        </div>
-
-                        {student.weakTopics.length > 0 && (
-                          <div className="mb-4">
-                            <p className="text-sm font-medium mb-2 flex items-center gap-1">
-                              <AlertTriangle className="w-3 h-3 text-orange-500" />
-                              Areas Needing Attention:
-                            </p>
-                            <div className="flex flex-wrap gap-1">
-                              {student.weakTopics.map(topic => (
-                                <Badge key={topic} variant="outline" className="text-xs">
-                                  {topic}
-                                </Badge>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
-                        <div className="flex items-center gap-4">
-                          <Button size="sm" variant="outline">
-                            <MessageSquare className="w-4 h-4 mr-2" />
-                            Send Message
-                          </Button>
-                          <Button size="sm">
-                            View Details
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+                          </td>
+                          <td className="p-4 text-center font-medium">{student.studyStreak} days</td>
+                          <td className="p-4 text-center font-medium">{student.attendance}%</td>
+                          <td className="p-4 text-right">
+                            <Button size="sm" variant="ghost">View Details</Button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
 
           <TabsContent value="analytics" className="space-y-6">
@@ -486,10 +377,7 @@ export default function TeacherPage() {
               {/* Study Time Distribution */}
               <Card>
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <BarChart3 className="w-5 h-5" />
-                    Weekly Study Time Distribution
-                  </CardTitle>
+                  <CardTitle>Weekly Study Time Distribution</CardTitle>
                   <CardDescription>Average study hours per student</CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -509,10 +397,7 @@ export default function TeacherPage() {
               {/* Participation vs Performance */}
               <Card>
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Activity className="w-5 h-5" />
-                    Participation vs Performance
-                  </CardTitle>
+                  <CardTitle>Participation vs Performance</CardTitle>
                   <CardDescription>Correlation between class participation and grades</CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -521,9 +406,8 @@ export default function TeacherPage() {
                       <RadarChart data={classData.students.slice(0, 5)}>
                         <PolarGrid />
                         <PolarAngleAxis dataKey="name" />
-                        <PolarRadiusAxis angle={90} domain={[0, 100]} />
-                        <Radar name="Participation %" dataKey="participation" stroke="#8884d8" fill="#8884d8" fillOpacity={0.3} />
-                        <Radar name="Completion %" dataKey="completionRate" stroke="#82ca9d" fill="#82ca9d" fillOpacity={0.3} />
+                        <Radar name="Participation %" dataKey="participation" stroke="#8884d8" fill="#8884d8" fillOpacity={0.6} />
+                        <Radar name="Completion %" dataKey="completionRate" stroke="#82ca9d" fill="#82ca9d" fillOpacity={0.6} />
                         <Tooltip />
                       </RadarChart>
                     </ResponsiveContainer>
@@ -559,14 +443,14 @@ export default function TeacherPage() {
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    <AlertTriangle className="w-5 h-5" />
+                    <AlertTriangle className="w-5 h-5 text-destructive" />
                     Common Weak Topics
                   </CardTitle>
                   <CardDescription>Topics that multiple students struggle with</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {classData.commonWeakTopics.map((topic, index) => (
+                    {classData.commonWeakTopics.map((topic) => (
                       <div key={topic.topic} className="flex items-center justify-between p-3 border rounded-lg">
                         <div className="flex items-center gap-3">
                           <div className={`w-3 h-3 rounded-full ${
@@ -594,28 +478,28 @@ export default function TeacherPage() {
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    <Star className="w-5 h-5" />
+                    <Star className="w-5 h-5 text-primary" />
                     Class Recommendations
                   </CardTitle>
                   <CardDescription>AI-powered suggestions for improvement</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    <div className="p-4 border-l-4 border-blue-500 bg-blue-50 dark:bg-blue-900/20">
-                      <h4 className="font-semibold text-blue-900 dark:text-blue-100">Focus on Organic Chemistry</h4>
-                      <p className="text-sm text-blue-800 dark:text-blue-200">
+                    <div className="p-4 border-l-4 border-primary bg-primary/10">
+                      <h4 className="font-semibold text-primary-foreground">Focus on Organic Chemistry</h4>
+                      <p className="text-sm text-primary-foreground/80">
                         12 students need additional support. Consider review sessions and extra practice problems.
                       </p>
                     </div>
-                    <div className="p-4 border-l-4 border-green-500 bg-green-50 dark:bg-green-900/20">
-                      <h4 className="font-semibold text-green-900 dark:text-green-100">Encourage Peer Learning</h4>
-                      <p className="text-sm text-green-800 dark:text-green-200">
+                    <div className="p-4 border-l-4 border-secondary-foreground bg-secondary">
+                      <h4 className="font-semibold text-secondary-foreground">Encourage Peer Learning</h4>
+                      <p className="text-sm text-secondary-foreground/80">
                         High-performing students could mentor others in Thermodynamics and Kinetics.
                       </p>
                     </div>
-                    <div className="p-4 border-l-4 border-purple-500 bg-purple-50 dark:bg-purple-900/20">
-                      <h4 className="font-semibold text-purple-900 dark:text-purple-100">Lab Safety Review</h4>
-                      <p className="text-sm text-purple-800 dark:text-purple-200">
+                    <div className="p-4 border-l-4 border-accent-foreground bg-accent">
+                      <h4 className="font-semibold text-accent-foreground">Lab Safety Review</h4>
+                      <p className="text-sm text-accent-foreground/80">
                         Schedule a refresher session on lab procedures and safety protocols.
                       </p>
                     </div>

@@ -7,22 +7,20 @@ import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { ResponsiveContainer, XAxis, YAxis, Tooltip, LineChart, Line, BarChart, Bar, PieChart, Pie, Cell } from 'recharts'
+import { ResponsiveContainer, XAxis, YAxis, Tooltip, LineChart, Line, BarChart, Bar } from 'recharts'
 import {
-  User,
   Clock,
   Target,
   Award,
   BookOpen,
   AlertTriangle,
-  CheckCircle,
-  Calendar,
   Download,
   TrendingUp,
   Star,
   MessageSquare,
   Activity,
-  BarChart3
+  BarChart3,
+  Users
 } from 'lucide-react'
 
 export default function ParentPage() {
@@ -30,7 +28,7 @@ export default function ParentPage() {
   const childData = {
     name: "Emma Thompson",
     grade: "11th Grade",
-    avatar: "/avatars/emma.jpg",
+    avatar: "/avatars/yuki.svg",
     currentGPA: 3.8,
     studyStreak: 15,
     totalStudyTime: 320,
@@ -128,21 +126,21 @@ export default function ParentPage() {
   return (
     <MainLayout>
       {/* Demo Mode Indicator */}
-      <div className="fixed top-4 right-4 z-50">
-        <div className="bg-amber-50 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-800 rounded-full px-3 py-1.5 shadow-sm">
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 mt-4">
+        <div className="bg-yellow-100 dark:bg-yellow-900/50 border border-yellow-300 dark:border-yellow-700 rounded-full px-4 py-2 shadow-lg">
           <div className="flex items-center gap-2">
-            <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-            <span className="text-sm font-medium text-amber-800 dark:text-amber-200">Demo Mode</span>
+            <AlertTriangle className="w-5 h-5 text-yellow-600 dark:text-yellow-400" />
+            <span className="text-sm font-semibold text-yellow-800 dark:text-yellow-200">Demo Mode</span>
           </div>
         </div>
       </div>
 
-      <div className="p-6 space-y-8">
+      <div className="p-6 md:p-8 space-y-8">
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
             <h1 className="text-3xl md:text-4xl font-bold tracking-tight">Parent Dashboard</h1>
-            <p className="text-muted-foreground">Monitor {childData.name}&apos;s academic journey and achievements</p>
+            <p className="text-muted-foreground mt-1">Monitor {childData.name}&apos;s academic journey and achievements</p>
           </div>
           <div className="flex items-center gap-3">
             <Button variant="outline">
@@ -150,56 +148,46 @@ export default function ParentPage() {
               Export Report
             </Button>
             <Button>
-              <MessageSquare className="w-4 h-4 mr-2" />
-              Contact Teachers
+              <Users className="w-4 h-4 mr-2" />
+              Manage Children
             </Button>
           </div>
         </div>
 
         {/* Child Profile Card */}
-        <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20 border-blue-200 dark:border-blue-800">
-          <CardContent className="p-8">
-            <div className="flex items-center gap-6">
-              <Avatar className="w-24 h-24">
-                <AvatarImage src={childData.avatar} alt={childData.name} />
-                <AvatarFallback className="text-2xl">{childData.name.split(' ').map(n => n[0]).join('')}</AvatarFallback>
-              </Avatar>
-              <div className="flex-1">
-                <div className="flex items-center gap-3 mb-2">
-                  <h2 className="text-3xl font-bold">{childData.name}</h2>
-                  <Badge variant="secondary" className="text-sm">{childData.grade}</Badge>
-                </div>
-                <p className="text-muted-foreground text-lg mb-4">Current GPA: <span className="font-semibold text-green-600">{childData.currentGPA}</span></p>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className="text-center">
-                    <div className="flex items-center justify-center gap-1 mb-1">
-                      <Award className="w-4 h-4 text-orange-500" />
-                      <span className="text-2xl font-bold text-orange-600">{childData.studyStreak}</span>
-                    </div>
-                    <p className="text-xs text-muted-foreground">Day Streak</p>
-                  </div>
-                  <div className="text-center">
-                    <div className="flex items-center justify-center gap-1 mb-1">
-                      <Clock className="w-4 h-4 text-blue-500" />
-                      <span className="text-2xl font-bold text-blue-600">{childData.totalStudyTime}</span>
-                    </div>
-                    <p className="text-xs text-muted-foreground">Min This Week</p>
-                  </div>
-                  <div className="text-center">
-                    <div className="flex items-center justify-center gap-1 mb-1">
-                      <Target className="w-4 h-4 text-green-500" />
-                      <span className="text-2xl font-bold text-green-600">{childData.completionRate}%</span>
-                    </div>
-                    <p className="text-xs text-muted-foreground">Completion</p>
-                  </div>
-                  <div className="text-center">
-                    <div className="flex items-center justify-center gap-1 mb-1">
-                      <Star className="w-4 h-4 text-purple-500" />
-                      <span className="text-2xl font-bold text-purple-600">{childData.achievements}</span>
-                    </div>
-                    <p className="text-xs text-muted-foreground">Achievements</p>
-                  </div>
-                </div>
+        <Card>
+          <CardContent className="p-6 flex flex-col md:flex-row items-center gap-6">
+            <Avatar className="w-24 h-24 border-4 border-primary/20">
+              <AvatarImage src={childData.avatar} alt={childData.name} />
+              <AvatarFallback className="text-2xl">{childData.name.split(' ').map(n => n[0]).join('')}</AvatarFallback>
+            </Avatar>
+            <div className="flex-1 text-center md:text-left">
+              <div className="flex items-center justify-center md:justify-start gap-3 mb-2">
+                <h2 className="text-3xl font-bold">{childData.name}</h2>
+                <Badge variant="secondary" className="text-sm">{childData.grade}</Badge>
+              </div>
+              <p className="text-muted-foreground text-lg">Current GPA: <span className="font-semibold text-primary">{childData.currentGPA}</span></p>
+            </div>
+            <div className="w-full md:w-auto grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+              <div className="p-3 rounded-lg bg-muted/50">
+                <Award className="w-6 h-6 text-orange-500 mx-auto mb-1" />
+                <p className="text-xl font-bold">{childData.studyStreak}</p>
+                <p className="text-xs text-muted-foreground">Day Streak</p>
+              </div>
+              <div className="p-3 rounded-lg bg-muted/50">
+                <Clock className="w-6 h-6 text-blue-500 mx-auto mb-1" />
+                <p className="text-xl font-bold">{childData.totalStudyTime}</p>
+                <p className="text-xs text-muted-foreground">Mins This Week</p>
+              </div>
+              <div className="p-3 rounded-lg bg-muted/50">
+                <Target className="w-6 h-6 text-green-500 mx-auto mb-1" />
+                <p className="text-xl font-bold">{childData.completionRate}%</p>
+                <p className="text-xs text-muted-foreground">Completion</p>
+              </div>
+              <div className="p-3 rounded-lg bg-muted/50">
+                <Star className="w-6 h-6 text-purple-500 mx-auto mb-1" />
+                <p className="text-xl font-bold">{childData.achievements}</p>
+                <p className="text-xs text-muted-foreground">Achievements</p>
               </div>
             </div>
           </CardContent>
@@ -272,8 +260,8 @@ export default function ParentPage() {
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                  {childData.subjects.map((subject, index) => (
-                    <div key={subject.name} className="p-4 border rounded-lg">
+                  {childData.subjects.map((subject) => (
+                    <Card key={subject.name} className="p-4">
                       <div className="flex items-center justify-between mb-2">
                         <h4 className="font-semibold">{subject.name}</h4>
                         <Badge variant={subject.grade.startsWith('A') ? 'default' : subject.grade.startsWith('B') ? 'secondary' : 'destructive'}>
@@ -283,7 +271,7 @@ export default function ParentPage() {
                       <Progress value={subject.progress} className="mb-2" />
                       <p className="text-sm text-muted-foreground">{subject.progress}% complete</p>
                       <p className="text-xs text-muted-foreground mt-1">Teacher: {subject.teacher}</p>
-                    </div>
+                    </Card>
                   ))}
                 </div>
               </CardContent>
@@ -356,7 +344,7 @@ export default function ParentPage() {
               <CardContent>
                 <div className="space-y-4">
                   {childData.recentActivity.map((activity, index) => (
-                    <div key={index} className="flex items-center justify-between p-4 border rounded-lg">
+                    <div key={index} className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50">
                       <div className="flex items-center gap-4">
                         <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
                           <BookOpen className="w-5 h-5 text-primary" />

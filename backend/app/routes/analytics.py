@@ -161,7 +161,7 @@ def student_analytics():
     try:
         sessions_resp = (
             sb.table("sessions")
-            .select("duration_min, topic, created_at, status")
+            .select("duration_min, topic, created_at")
             .eq("user_id", user_id)
             .order("created_at", desc=True)
             .limit(200)
@@ -174,7 +174,7 @@ def student_analytics():
     try:
         tasks_resp = (
             sb.table("tasks")
-            .select("status, topic, created_at, difficulty, priority")
+            .select("status, topic, created_at, due_date")
             .eq("user_id", user_id)
             .order("created_at", desc=True)
             .limit(200)
@@ -187,7 +187,7 @@ def student_analytics():
     try:
         prof_resp = (
             sb.table("profiles")
-            .select("xp, level, streak_days, achievements, preferences")
+            .select("xp, level, streak_days, last_active_date")
             .eq("user_id", user_id)
             .limit(1)
             .execute()

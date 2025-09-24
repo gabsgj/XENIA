@@ -62,15 +62,14 @@ class EnhancedTutor:
     @staticmethod
     def generate_advanced_solution(question: str, question_analysis: Dict) -> List[Dict]:
         """Generate advanced solution using AI with question-type awareness."""
-        try:
-            from .ai_providers import get_ai_response
-            
-            question_type = question_analysis.get("type", "general")
-            strategy = question_analysis.get("strategy", "comprehensive_explanation")
-            
-            # Craft specialized prompts based on question type
-            if question_type == "mathematics":
-                prompt = f"""
+        from .ai_providers import get_ai_response
+
+        question_type = question_analysis.get("type", "general")
+        strategy = question_analysis.get("strategy", "comprehensive_explanation")
+
+        # Craft specialized prompts based on question type
+        if question_type == "mathematics":
+            prompt = f"""
 You are an expert mathematics tutor. Solve this step-by-step and format your response in Markdown:
 
 QUESTION: {question}
@@ -84,7 +83,7 @@ FORMATTING REQUIREMENTS:
 - Use bullet points (-) for examples or sub-points
 - Break content into short, scannable paragraphs
 
-Provide a structured solution in JSON format:
+Provide a structured solution in JSON format. IMPORTANT: Ensure the output is a single, valid JSON object with no extra text or markdown formatting. All keys and string values must be enclosed in double quotes.
 {{
   "steps": [
     {{
@@ -107,8 +106,8 @@ Provide a structured solution in JSON format:
   "key_concepts": ["List of key mathematical concepts used"]
 }}
 """
-            elif question_type == "science":
-                prompt = f"""
+        elif question_type == "science":
+            prompt = f"""
 You are an expert science tutor. Explain this scientific concept or solve this problem and format your response in Markdown:
 
 QUESTION: {question}
@@ -122,7 +121,7 @@ FORMATTING REQUIREMENTS:
 - Use bullet points (-) for examples or sub-points
 - Break content into short, scannable paragraphs
 
-Provide a structured explanation in JSON format:
+Provide a structured explanation in JSON format. IMPORTANT: Ensure the output is a single, valid JSON object with no extra text or markdown formatting. All keys and string values must be enclosed in double quotes.
 {{
   "steps": [
     {{
@@ -143,8 +142,8 @@ Provide a structured explanation in JSON format:
   "real_world_applications": ["How this applies in real life"]
 }}
 """
-            elif question_type == "programming":
-                prompt = f"""
+        elif question_type == "programming":
+            prompt = f"""
 You are an expert programming tutor. Help solve this coding problem and format your response in Markdown:
 
 QUESTION: {question}
@@ -158,7 +157,7 @@ FORMATTING REQUIREMENTS:
 - Use bullet points (-) for examples or sub-points
 - Break content into short, scannable paragraphs
 
-Provide a structured solution in JSON format:
+Provide a structured solution in JSON format. IMPORTANT: Ensure the output is a single, valid JSON object with no extra text or markdown formatting. All keys and string values must be enclosed in double quotes.
 {{
   "steps": [
     {{
@@ -182,8 +181,8 @@ Provide a structured solution in JSON format:
   "time_complexity": "Big O analysis if applicable, formatted as $O(n)$ notation"
 }}
 """
-            else:
-                prompt = f"""
+        else:
+            prompt = f"""
 You are an expert tutor. Provide a comprehensive explanation for this question and format your response in Markdown:
 
 QUESTION: {question}
@@ -197,7 +196,7 @@ FORMATTING REQUIREMENTS:
 - Use bullet points (-) for examples or sub-points
 - Break content into short, scannable paragraphs
 
-Provide a structured explanation in JSON format:
+Provide a structured explanation in JSON format. IMPORTANT: Ensure the output is a single, valid JSON object with no extra text or markdown formatting. All keys and string values must be enclosed in double quotes.
 {{
   "steps": [
     {{
@@ -217,33 +216,36 @@ Provide a structured explanation in JSON format:
   "key_concepts": ["Important concepts covered"]
 }}
 """
-            
-            logger.info(f"Generating {question_type} solution using AI...")
-            
+
+        logger.info(f"Generating {question_type} solution using AI...")
+
+        try:
             response = get_ai_response(prompt)
             
-            # Clean and parse the response
+            # Clean and parse the response more robustly
             clean_response = response.strip()
-            if clean_response.startswith('```json'):
-                clean_response = clean_response[7:]
-            if clean_response.endswith('```'):
-                clean_response = clean_response[:-3]
             
+            # Use regex to find the JSON object
+            match = re.search(r'\{.*\}', clean_response, re.DOTALL)
+            if match:
+                json_text = match.group(0)
+            else:
+                # Handle cases where no JSON object is found
+                raise ApiError("TUTOR_AI_INVALID_RESPONSE", "No JSON object found in AI response.", status=500)
+
             import json
-            parsed = json.loads(clean_response.strip())
+            parsed = json.loads(json_text)
             
             if isinstance(parsed, dict) and 'steps' in parsed:
                 logger.info(f"✅ Generated {len(parsed['steps'])} solution steps")
                 return parsed['steps']
             else:
                 logger.warning("AI response didn't contain expected 'steps' format")
-                
+                raise ApiError("TUTOR_AI_INVALID_RESPONSE", "AI response was not in the expected format.", status=500)
+
         except Exception as e:
             logger.error(f"Advanced solution generation failed: {e}")
-        
-        # Fallback to basic remediation steps
-        return []
-
+            raise ApiError("TUTOR_AI_FAILED", f"The AI provider failed to generate a response: {e}", status=502)
 
 def solve_question(
     question: Optional[str], image_bytes: Optional[bytes], user_id: str, include_history: bool = True
@@ -267,53 +269,12 @@ def solve_question(
         logger.info(f"Question analysis: {question_analysis}")
         
         # Try advanced AI-powered solution first
-        advanced_steps = EnhancedTutor.generate_advanced_solution(question, question_analysis)
+        steps = EnhancedTutor.generate_advanced_solution(question, question_analysis)
         
-        if advanced_steps:
-            steps = advanced_steps
-            logger.info(f"Using advanced AI solution with {len(steps)} steps")
-        else:
-            # Fallback to basic remediation steps
-            logger.info("Falling back to basic remediation steps")
-            steps = get_remediation_steps(user_id=user_id, question_text=question)
-            
-        # Try basic AI enrichment as additional fallback
-        try:
-          from .ai_providers import get_ai_response
-          markdown_prompt = f"""
-Provide a step-by-step solution for this question in JSON format with Markdown formatting:
-
-QUESTION: {question}
-
-FORMATTING REQUIREMENTS:
-- Use **bold** for key terms and important concepts
-- Use *italics* for emphasis and definitions  
-- Use `inline code` for formulas or variables
-- Use LaTeX math notation wrapped in $...$ for equations
-- Break content into short, scannable paragraphs
-
-Return only JSON in this format:
-{{
-  "steps": [
-    {{
-      "title": "**Step 1: [Title]**",
-      "detail": "Explanation with proper **Markdown** formatting and $LaTeX$ if needed"
-    }}
-  ]
-}}
-"""
-          enriched_raw = get_ai_response(markdown_prompt)
-          if enriched_raw:
-            import json
-            try:
-              parsed = json.loads(enriched_raw)
-              if isinstance(parsed, dict) and isinstance(parsed.get('steps'), list) and parsed['steps']:
-                steps = parsed['steps']
-                logger.info("Enhanced with basic AI steps")
-            except Exception as e:
-              logger.warning(f"Basic AI enhancement failed: {e}")
-        except Exception as e:
-          logger.warning(f"AI enrichment failed: {e}")
+        if not steps:
+            # This should ideally not be reached if generate_advanced_solution raises exceptions
+            logger.warning("generate_advanced_solution returned no steps. This indicates a problem.")
+            raise ApiError("TUTOR_NO_SOLUTION", "The AI tutor could not find a solution.", status=500)
 
         # Build comprehensive response with metadata
         # Per UI contract: if `steps` are present, keep `answer` as a short intro/summary only
@@ -348,21 +309,8 @@ Return only JSON in this format:
             logger.warning(f"Failed to renumber steps: {e}")
           answer = "Here are the steps to solve the problem."
         else:
-          answer_lines = []
-          for idx, step in enumerate(steps):
-            step_title = step.get('title', f'Step {idx+1}')
-            step_detail = step.get('detail', '')
-            step_calc = step.get('calculation', '')
-            step_code = step.get('code_snippet', '')
-
-            line = f"{idx+1}. {step_title}: {step_detail}"
-            if step_calc:
-              line += f"\n   Calculation: {step_calc}"
-            if step_code:
-              line += f"\n   Code: {step_code}"
-            answer_lines.append(line)
-
-          answer = "\n\n".join(answer_lines) if answer_lines else "I'm sorry, I couldn't generate an answer."
+          # This else block should not be reachable anymore
+          answer = "I'm sorry, I couldn't generate an answer."
 
         # Save conversation to history if valid user
         if is_valid_uuid(user_id):
@@ -386,10 +334,10 @@ Return only JSON in this format:
     except Exception as e:
         logger.error(f"Unexpected error in solve_question: {e}")
         logger.error(f"Traceback: {traceback.format_exc()}")
-        # Return a fallback response instead of crashing
+        # Return a more specific fallback response
         return {
             "question": question or "Unknown question",
             "steps": [],
-            "answer": "I'm experiencing technical difficulties right now. Please try again in a moment, or rephrase your question.",
+            "answer": f"An unexpected error occurred: {e}. Please try again.",
             "history": []
         }

@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { LoadingButton, SkeletonCard } from "@/components/ui/loading";
+import { NoDataPlaceholder } from "@/components/ui/no-data-placeholder";
 import { StudyTimer } from "@/components/ui/study-timer";
 import Link from "next/link";
 import { 
@@ -350,29 +351,35 @@ export default function DashboardPage(){
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
-                {todaysTasks.map((task: any) => (
-                  <div key={task.id} className="bg-muted/50 p-4 rounded-lg">
-                    <div className="flex items-center justify-between mb-3">
-                      <div>
-                        <h4 className="font-semibold">{task.subject}</h4>
-                        <p className="text-sm text-muted-foreground">{task.topic}</p>
+                {todaysTasks.length > 0 ? (
+                  todaysTasks.map((task: any) => (
+                    <div key={task.id} className="bg-muted/50 p-4 rounded-lg">
+                      <div className="flex items-center justify-between mb-3">
+                        <div>
+                          <h4 className="font-semibold">{task.subject}</h4>
+                          <p className="text-sm text-muted-foreground">{task.topic}</p>
+                        </div>
+                        <StudyTimer
+                          duration={task.duration}
+                          status={task.status}
+                          onStatusChange={(newStatus) => updateSessionStatus(task.date, task.topic, newStatus)}
+                          onComplete={(actualTime) => markSessionComplete(task.date, task.topic, actualTime)}
+                        />
                       </div>
-                      <StudyTimer
-                        duration={task.duration}
-                        status={task.status}
-                        onStatusChange={(newStatus) => updateSessionStatus(task.date, task.topic, newStatus)}
-                        onComplete={(actualTime) => markSessionComplete(task.date, task.topic, actualTime)}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-sm">
-                        <span>Progress</span>
-                        <span>{task.progress}%</span>
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-sm">
+                          <span>Progress</span>
+                          <span>{task.progress}%</span>
+                        </div>
+                        <Progress value={task.progress} className="h-2" />
                       </div>
-                      <Progress value={task.progress} className="h-2" />
                     </div>
+                  ))
+                ) : (
+                  <div className="text-center py-8">
+                    <p className="text-muted-foreground">No tasks scheduled for today.</p>
                   </div>
-                ))}
+                )}
                 <Link href="/planner">
                   <Button variant="outline" className="w-full">
                     View Full Plan
@@ -394,7 +401,7 @@ export default function DashboardPage(){
                     <div className="flex items-center justify-center h-full">
                       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
                     </div>
-                  ) : (
+                  ) : studyChartData.length > 0 ? (
                     <ResponsiveContainer width="100%" height="100%">
                       <AreaChart data={studyChartData}>
                         <XAxis dataKey='date' />
@@ -409,6 +416,8 @@ export default function DashboardPage(){
                         />
                       </AreaChart>
                     </ResponsiveContainer>
+                  ) : (
+                    <NoDataPlaceholder />
                   )}
                 </div>
               </CardContent>
@@ -429,7 +438,7 @@ export default function DashboardPage(){
                     <div className="flex items-center justify-center h-full">
                       <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
                     </div>
-                  ) : (
+                  ) : weeklyChartData.length > 0 ? (
                     <ResponsiveContainer width="100%" height="100%">
                       <AreaChart data={weeklyChartData}>
                         <XAxis dataKey="week" />
@@ -438,6 +447,8 @@ export default function DashboardPage(){
                         <Area type="monotone" dataKey="study_time" stroke="#8884d8" fill="#8884d8" />
                       </AreaChart>
                     </ResponsiveContainer>
+                  ) : (
+                    <NoDataPlaceholder />
                   )}
                 </div>
               </CardContent>
@@ -455,7 +466,7 @@ export default function DashboardPage(){
                     <div className="flex items-center justify-center h-full">
                       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
                     </div>
-                  ) : (
+                  ) : data?.subject_performance?.length > 0 ? (
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
                         <Pie
@@ -475,6 +486,8 @@ export default function DashboardPage(){
                         <Tooltip />
                       </PieChart>
                     </ResponsiveContainer>
+                  ) : (
+                    <NoDataPlaceholder />
                   )}
                 </div>
               </CardContent>
@@ -535,21 +548,29 @@ export default function DashboardPage(){
               </CardHeader>
               <CardContent>
                 <div className="h-48">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={Object.values((data?.sessions||[]).reduce((acc:any, s:any)=> { const k = s.topic||'General'; acc[k] = acc[k]||{ name:k, value:0, color: chartColors[Object.keys(acc).length % chartColors.length] }; acc[k].value += s.duration_min||0; return acc; }, {})) as any}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={30}
-                        outerRadius={70}
-                        dataKey="value"
-                      >
-                        {(Object.values((data?.sessions||[]).reduce((acc:any, s:any)=> { const k = s.topic||'General'; acc[k] = acc[k]||{ name:k, value:0, color: chartColors[Object.keys(acc).length % chartColors.length] }; acc[k].value += s.duration_min||0; return acc; }, {})) as any).map((entry:any, index:number) => (<Cell key={`cell-${index}`} fill={entry.color} />))}
-                      </Pie>
-                      <Tooltip />
-                    </PieChart>
-                  </ResponsiveContainer>
+                  {loading ? (
+                    <div className="flex items-center justify-center h-full">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                    </div>
+                  ) : (data?.sessions || []).length > 0 ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={Object.values((data?.sessions||[]).reduce((acc:any, s:any)=> { const k = s.topic||'General'; acc[k] = acc[k]||{ name:k, value:0, color: chartColors[Object.keys(acc).length % chartColors.length] }; acc[k].value += s.duration_min||0; return acc; }, {})) as any}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={30}
+                          outerRadius={70}
+                          dataKey="value"
+                        >
+                          {(Object.values((data?.sessions||[]).reduce((acc:any, s:any)=> { const k = s.topic||'General'; acc[k] = acc[k]||{ name:k, value:0, color: chartColors[Object.keys(acc).length % chartColors.length] }; acc[k].value += s.duration_min||0; return acc; }, {})) as any).map((entry:any, index:number) => (<Cell key={`cell-${index}`} fill={entry.color} />))}
+                        </Pie>
+                        <Tooltip />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <NoDataPlaceholder />
+                  )}
                 </div>
                 <div className="grid grid-cols-2 gap-2 mt-4">
                   {(Object.values((data?.sessions||[]).reduce((acc:any, s:any)=> { const k = s.topic||'General'; acc[k] = acc[k]||{ name:k, value:0, color: chartColors[Object.keys(acc).length % chartColors.length] }; acc[k].value += s.duration_min||0; return acc; }, {})) as any).map((item:any) => (
