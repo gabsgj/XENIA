@@ -9,6 +9,8 @@ from ..utils import is_valid_uuid
 from ..errors import ApiError
 import re
 import traceback
+from ..supabase_client import get_supabase_client
+import asyncio
 
 logger = logging.getLogger('xenia')
 
@@ -60,17 +62,84 @@ class EnhancedTutor:
         return {"type": "general", "strategy": "comprehensive_explanation"}
     
     @staticmethod
-    def generate_advanced_solution(question: str, question_analysis: Dict) -> List[Dict]:
+    def _load_user_syllabus_context(user_id: str) -> Dict[str, str]:
+        """Load user's syllabus context from database for personalized responses."""
+        try:
+            if not is_valid_uuid(user_id):
+                return {"context": "basic", "subject_area": "General", "topics": ""}
+            
+            supabase = get_supabase_client()
+            
+            # Load syllabus topics from database
+            topics_response = supabase.table('syllabus_topics').select('*').eq('user_id', user_id).limit(20).execute()
+            
+            # Load recent syllabus artifacts for additional context
+            artifacts_response = supabase.table('syllabus_artifacts').select('*').eq('user_id', user_id).order('created_at', desc=True).limit(3).execute()
+            
+            topics = []
+            subject_areas = set()
+            
+            if topics_response.data:
+                for topic_row in topics_response.data:
+                    topic_name = topic_row.get('topic', '')
+                    if topic_name:
+                        topics.append(topic_name)
+                        # Extract subject area from topic (first word/phrase before colon or dash)
+                        if ':' in topic_name:
+                            subject_areas.add(topic_name.split(':')[0].strip())
+                        elif '-' in topic_name:
+                            subject_areas.add(topic_name.split('-')[0].strip())
+            
+            # Auto-detect subject area based on topics
+            subject_area = "General"
+            topic_text = ' '.join(topics).lower()
+            
+            if any(word in topic_text for word in ['math', 'calculus', 'algebra', 'geometry', 'statistics']):
+                subject_area = "Mathematics"
+            elif any(word in topic_text for word in ['physics', 'chemistry', 'biology', 'science']):
+                subject_area = "Science"
+            elif any(word in topic_text for word in ['programming', 'computer', 'algorithm', 'coding', 'software']):
+                subject_area = "Computer Science"
+            elif any(word in topic_text for word in ['english', 'literature', 'writing', 'essay']):
+                subject_area = "English"
+            elif subject_areas:
+                subject_area = list(subject_areas)[0]
+            
+            context_info = {
+                "context": "personalized" if topics else "basic",
+                "subject_area": subject_area,
+                "topics": ", ".join(topics[:10]) if topics else "",  # Limit to first 10 topics
+                "curriculum_level": "undergraduate" if len(topics) > 5 else "high_school"
+            }
+            
+            logger.info(f"Loaded syllabus context for user {user_id}: {len(topics)} topics, subject: {subject_area}")
+            return context_info
+            
+        except Exception as e:
+            logger.warning(f"Failed to load syllabus context for user {user_id}: {e}")
+            return {"context": "basic", "subject_area": "General", "topics": ""}
+    
+    @staticmethod
+    def generate_advanced_solution(question: str, question_analysis: Dict, syllabus_context: Optional[Dict] = None) -> List[Dict]:
         """Generate advanced solution using AI with question-type awareness."""
         from .ai_providers import get_ai_response
 
         question_type = question_analysis.get("type", "general")
         strategy = question_analysis.get("strategy", "comprehensive_explanation")
 
+        # Build context-aware prompt prefix
+        context_prefix = ""
+        if syllabus_context and syllabus_context.get("context") == "personalized":
+            context_prefix = f"""
+CONTEXT: You are tutoring a {syllabus_context.get('curriculum_level', 'student')} student in {syllabus_context.get('subject_area', 'General')}.
+Current syllabus topics include: {syllabus_context.get('topics', 'various topics')}.
+Please tailor your explanation to be relevant to their current curriculum and reference these topics when applicable.
+"""
+        
         # Craft specialized prompts based on question type
         if question_type == "mathematics":
             prompt = f"""
-You are an expert mathematics tutor. Solve this step-by-step and format your response in Markdown:
+You are an expert mathematics tutor. Solve this step-by-step and format your response in Markdown:{context_prefix}
 
 QUESTION: {question}
 
@@ -108,7 +177,7 @@ Provide a structured solution in JSON format. IMPORTANT: Ensure the output is a 
 """
         elif question_type == "science":
             prompt = f"""
-You are an expert science tutor. Explain this scientific concept or solve this problem and format your response in Markdown:
+You are an expert science tutor. Explain this scientific concept or solve this problem and format your response in Markdown:{context_prefix}
 
 QUESTION: {question}
 
@@ -144,7 +213,7 @@ Provide a structured explanation in JSON format. IMPORTANT: Ensure the output is
 """
         elif question_type == "programming":
             prompt = f"""
-You are an expert programming tutor. Help solve this coding problem and format your response in Markdown:
+You are an expert programming tutor. Help solve this coding problem and format your response in Markdown:{context_prefix}
 
 QUESTION: {question}
 
@@ -183,7 +252,7 @@ Provide a structured solution in JSON format. IMPORTANT: Ensure the output is a 
 """
         else:
             prompt = f"""
-You are an expert tutor. Provide a comprehensive explanation for this question and format your response in Markdown:
+You are an expert tutor. Provide a comprehensive explanation for this question and format your response in Markdown:{context_prefix}
 
 QUESTION: {question}
 
@@ -264,12 +333,16 @@ def solve_question(
         if not question or len(question.strip()) < 3:
             raise ApiError("TUTOR_INVALID_INPUT", "Question is too short or unclear", status=400)
         
+        # Load user's syllabus context for personalized responses
+        syllabus_context = EnhancedTutor._load_user_syllabus_context(user_id)
+        logger.info(f"Syllabus context: {syllabus_context.get('subject_area', 'General')} - {syllabus_context.get('context', 'basic')}")
+        
         # Analyze question type for targeted tutoring
         question_analysis = EnhancedTutor.analyze_question_type(question)
         logger.info(f"Question analysis: {question_analysis}")
         
-        # Try advanced AI-powered solution first
-        steps = EnhancedTutor.generate_advanced_solution(question, question_analysis)
+        # Try advanced AI-powered solution first with syllabus context
+        steps = EnhancedTutor.generate_advanced_solution(question, question_analysis, syllabus_context)
         
         if not steps:
             # This should ideally not be reached if generate_advanced_solution raises exceptions
