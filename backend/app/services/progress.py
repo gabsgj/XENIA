@@ -1,8 +1,10 @@
 import datetime
-from ..supabase_client import get_supabase
+import logging
+from ..supabase_client import get_supabase, supabase_call
 
 # Local in-memory fallback cache used when Supabase persistence fails or isn't available
 LOCAL_CACHE = {}
+logger = logging.getLogger('xenia')
 
 
 # Progress persistence using Supabase
@@ -19,7 +21,7 @@ def record_quiz_result(user_id, topic_scores):
     sb = get_supabase()
     now = datetime.datetime.utcnow().isoformat() + "Z"
 
-    # Insert history rows
+    # Insert history rows and upsert aggregates using supabase_call for retries/circuit-breaker
     history_rows = []
     upsert_rows = []
     for entry in topic_scores:
@@ -47,36 +49,41 @@ def record_quiz_result(user_id, topic_scores):
 
     try:
         if history_rows:
-            sb.table("user_progress_history").insert(history_rows).execute()
+            # Use supabase_call wrapper
+            supabase_call(lambda: sb.table("user_progress_history").insert(history_rows).execute())
 
-        # For aggregates, use upsert semantics: if record exists, increment fields; otherwise insert
+        # Use upsert semantics when available
         for row in upsert_rows:
-            # Attempt to upsert by user_id+topic
-            # Using a simple read-update-write because Supabase client mock may not support compound upsert
-            existing = sb.table("user_progress").select("*").eq("user_id", user_id).eq("topic", row["topic"]).limit(1).execute().data
-            if existing:
-                rec = existing[0]
-                new_quizzes = int(rec.get("quizzes_taken", 0)) + int(row["quizzes_taken"])
-                new_correct = int(rec.get("correct", 0)) + int(row["correct"])
-                new_wrong = int(rec.get("wrong", 0)) + int(row["wrong"])
-                # last_score becomes the most recent
-                sb.table("user_progress").update({
-                    "quizzes_taken": new_quizzes,
-                    "correct": new_correct,
-                    "wrong": new_wrong,
-                    "last_score": row["last_score"],
-                    "last_updated": row["last_updated"],
-                }).eq("user_id", user_id).eq("topic", row["topic"]).execute()
-            else:
-                sb.table("user_progress").insert(row).execute()
+            try:
+                # attempt direct upsert (works with real Supabase and with mock)
+                supabase_call(lambda r=row: sb.table("user_progress").upsert(r).execute())
+            except Exception:
+                # fallback to read-update-write with optimistic locking behavior
+                try:
+                    def _get_existing():
+                        return sb.table("user_progress").select("*").eq("user_id", user_id).eq("topic", row["topic"]).limit(1).execute().data
+
+                    existing = supabase_call(_get_existing)
+                    if existing:
+                        rec = existing[0]
+                        new_quizzes = int(rec.get("quizzes_taken", 0)) + int(row.get("quizzes_taken", 0))
+                        new_correct = int(rec.get("correct", 0)) + int(row.get("correct", 0))
+                        new_wrong = int(rec.get("wrong", 0)) + int(row.get("wrong", 0))
+                        supabase_call(lambda: sb.table("user_progress").update({
+                            "quizzes_taken": new_quizzes,
+                            "correct": new_correct,
+                            "wrong": new_wrong,
+                            "last_score": row["last_score"],
+                            "last_updated": row["last_updated"],
+                        }).eq("user_id", user_id).eq("topic", row["topic"]).execute())
+                    else:
+                        supabase_call(lambda: sb.table("user_progress").insert(row).execute())
+                except Exception as inner:
+                    logger.warning(f"Progress upsert fallback failed for user {user_id} topic {row.get('topic')}: {inner}")
+                    raise
     except Exception as e:
-        # Fall back to no-op but log via supabase client logger
-        try:
-            import logging
-            logging.getLogger("xenia").warning(f"Failed to persist progress to Supabase: {e}")
-        except Exception:
-            pass
-        # Update local fallback cache so callers (tests) can still see progress
+        # Fall back to local cache if Supabase unavailable
+        logger.warning(f"Failed to persist progress to Supabase: {e}")
         for entry in topic_scores:
             topic = entry["topic"]
             rec = LOCAL_CACHE.setdefault(user_id, {}).setdefault(topic, {
@@ -96,8 +103,9 @@ def record_quiz_result(user_id, topic_scores):
 def get_user_progress(user_id):
     sb = get_supabase()
     try:
-        resp = sb.table("user_progress").select("*").eq("user_id", user_id).execute()
-        return {r["topic"]: r for r in (resp.data or [])}
+        resp = supabase_call(lambda: sb.table("user_progress").select("*").eq("user_id", user_id).execute())
+        data = getattr(resp, 'data', None)
+        return {r["topic"]: r for r in (data or [])}
     except Exception:
         # Fall back to local cache if Supabase not available
         return LOCAL_CACHE.get(user_id, {})

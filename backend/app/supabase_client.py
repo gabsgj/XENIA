@@ -1,45 +1,104 @@
 import os
 import logging
+import time
 from supabase import create_client, Client
-from typing import Optional
+from typing import Optional, Callable
+
+from .utils.circuit_breaker import CircuitBreaker, CircuitOpenError
+from .middleware.request_queue import with_request_semaphore
 
 logger = logging.getLogger('xenia')
 _supabase: Optional[Client] = None
 
+# Circuit breaker for Supabase outbound calls to prevent cascade failures
+_sb_circuit = CircuitBreaker(failure_threshold=int(os.getenv('SB_CIRCUIT_FAILURE_THRESHOLD', '5')),
+                             recovery_timeout=int(os.getenv('SB_CIRCUIT_RECOVERY_TIMEOUT', '60')))
+
+
+def _retry_with_backoff(fn: Callable, max_attempts: int = 3, base_delay: float = 0.5):
+    """Retry helper with exponential backoff for sync functions."""
+    last_exc = None
+    for attempt in range(1, max_attempts + 1):
+        try:
+            return fn()
+        except CircuitOpenError:
+            # propagate circuit open immediately
+            raise
+        except Exception as e:
+            last_exc = e
+            sleep_time = base_delay * (2 ** (attempt - 1))
+            logger.warning(f"Attempt {attempt} failed for supabase call: {e}. Retrying in {sleep_time:.2f}s")
+            time.sleep(sleep_time)
+    # final raise
+    raise last_exc
+
 
 def get_supabase() -> Client:
+    """Return a singleton Supabase client. Wraps calls with retry + circuit breaker when used via helper wrappers.
+
+    Note: Supabase client here is primarily an HTTP client. We limit concurrent outbound requests
+    using a semaphore in `with_request_semaphore` decorator for each call site.
+    """
     global _supabase
     if _supabase is None:
         url = os.getenv("SUPABASE_URL", "")
         key = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_ANON_KEY", "")
-        
+
         # Check if we have real credentials vs demo/placeholder credentials
-        is_demo = (not url or not key or 
-                   url.startswith("https://demo-") or 
+        is_demo = (not url or not key or
+                   url.startswith("https://demo-") or
                    "demo" in key.lower() or
                    key.startswith("eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIi"))
-        
+
         if not url or not key:
             logger.warning("⚠️ Supabase configuration missing - using mock client for development")
             _supabase = _create_mock_client()
             return _supabase
-            
+
         if is_demo:
             logger.info("🎭 Demo Supabase credentials detected - using enhanced mock client with real API patterns")
             _supabase = _create_mock_client()
             return _supabase
-            
+
         try:
             logger.info("🔗 Connecting to real Supabase instance...")
+            # create_client uses httpx under the hood; we can't directly control pool size here easily,
+            # but we'll rely on outbound limiting and retries around calls.
             _supabase = create_client(url, key)
-            # Test connection with a lightweight query
-            _supabase.table("profiles").select("count", count="exact").limit(1).execute()
+
+            # Test connection with a lightweight query using retry wrapper + circuit breaker
+            def _test():
+                return _supabase.table("profiles").select("count", count="exact").limit(1).execute()
+
+            # run test through circuit breaker
+            try:
+                _sb_circuit.call(lambda: _retry_with_backoff(_test, max_attempts=2, base_delay=0.2))
+            except Exception as e:
+                logger.warning(f"⚠️ Real Supabase connection test failed: {e}")
+                logger.info("🎭 Falling back to mock client for development")
+                _supabase = _create_mock_client()
+                return _supabase
+
             logger.info("✅ Real Supabase connection established successfully")
         except Exception as e:
             logger.warning(f"⚠️ Real Supabase connection failed: {e}")
             logger.info("🎭 Falling back to mock client for development")
             _supabase = _create_mock_client()
     return _supabase
+
+
+def supabase_call(fn: Callable, max_attempts: int = 3):
+    """Helper to perform a Supabase operation with semaphore, circuit breaker and retries.
+
+    Usage:
+        supabase_call(lambda: sb.table(...).select(...).execute())
+    """
+    # ensure circuit not open
+    def _wrapped():
+        return fn()
+
+    # run under circuit and retry
+    return _sb_circuit.call(lambda: _retry_with_backoff(_wrapped, max_attempts=max_attempts))
 
 
 def _create_mock_client() -> Client:

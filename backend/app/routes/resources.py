@@ -1,6 +1,7 @@
 import logging
 from flask import Blueprint, request, jsonify
 from ..supabase_client import get_supabase
+from ..supabase_client import get_supabase, supabase_call
 from ..errors import ApiError
 from ..services.resources import get_resources, fetch_resources_for_topic
 from ..services.ai_providers import get_topic_resources
@@ -61,9 +62,9 @@ def list_topics():
         ]}
     sb = get_supabase()
     try:
-        resp = sb.table("syllabus_topics").select(
+        resp = supabase_call(lambda: sb.table("syllabus_topics").select(
             "id, topic, parent_topic, order_index, status, completed_at"
-        ).eq("user_id", user_id).order("order_index").limit(500).execute()
+        ).eq("user_id", user_id).order("order_index").limit(500).execute())
         
         # If no topics found, return sample topics to get started
         if not resp.data or len(resp.data) == 0:
@@ -114,7 +115,7 @@ def update_progress():
         return {"ok": True, "plan": {"sessions": []}}
     
     try:
-        plan_resp = sb.table("plans").select("plan").eq("user_id", user_id).limit(1).execute()
+        plan_resp = supabase_call(lambda: sb.table("plans").select("plan").eq("user_id", user_id).limit(1).execute())
         if not plan_resp.data:
             raise ApiError("PLAN_404", "Plan not found", status=404)
         plan = plan_resp.data[0]["plan"]
@@ -144,13 +145,13 @@ def update_progress():
                     })
         
         plan["sessions"] = list(session_map.values())
-        sb.table("plans").upsert({"user_id": user_id, "plan": plan}).execute()
+        supabase_call(lambda: sb.table("plans").upsert({"user_id": user_id, "plan": plan}).execute())
         
         # Record completed sessions in analytics database
         if completed_sessions:
             try:
                 for session in completed_sessions:
-                    sb.table("sessions").upsert(session).execute()
+                    supabase_call(lambda s=session: sb.table("sessions").upsert(s).execute())
                 logger.info(f"Recorded {len(completed_sessions)} completed sessions in analytics")
             except Exception as e:
                 logger.warning(f"Failed to record sessions in analytics: {e}")
@@ -187,7 +188,7 @@ def update_topic_status():
         if status == "completed":
             from datetime import datetime, timezone
             update["completed_at"] = datetime.now(timezone.utc).isoformat()
-        sb.table("syllabus_topics").update(update).eq("user_id", user_id).eq("topic", topic).execute()
+        supabase_call(lambda: sb.table("syllabus_topics").update(update).eq("user_id", user_id).eq("topic", topic).execute())
         return {"ok": True}
     except Exception as e:
         logger.error(f"Topic status update failed: {e}")
@@ -225,7 +226,7 @@ def bulk_topic_status():
         if status == "completed":
             patch["completed_at"] = completed_time
         try:
-            sb.table("syllabus_topics").update(patch).eq("user_id", user_id).eq("topic", topic).execute()
+            supabase_call(lambda: sb.table("syllabus_topics").update(patch).eq("user_id", user_id).eq("topic", topic).execute())
             changed += 1
         except Exception as e:
             logger.error(f"Bulk topic update error for {topic}: {e}")
