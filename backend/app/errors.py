@@ -4,6 +4,7 @@ import uuid
 from typing import Any, Dict, Optional, Tuple
 from flask import jsonify, request, g
 from werkzeug.exceptions import HTTPException
+from .middleware.error_handler import handle_database_error
 
 
 logger = logging.getLogger("xenia.errors")
@@ -121,11 +122,19 @@ def register_error_handlers(app):
 
     @app.errorhandler(Exception)
     def _handle_unexpected(err: Exception):
+        # Try to provide DB-aware friendly responses for connection-type errors
+        try:
+            db_response = handle_database_error(err)
+            if db_response is not None:
+                return db_response
+        except Exception:
+            # if db handler fails, fall back to generic handling
+            pass
+
         status = 500
         code = _derive_error_code_from_path(request.path, status)
         message = "Internal server error"
         details = {"type": err.__class__.__name__}
-        # Minimal stack in logs, not in response
         cid = getattr(g, "correlation_id", "-")
         logger.exception(
             "Unhandled [%s] %s: %s\n%s", cid, code, str(err), traceback.format_exc()

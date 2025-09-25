@@ -6,6 +6,12 @@ from ..errors import ApiError
 from ..services.resources import get_resources, fetch_resources_for_topic
 from ..services.ai_providers import get_topic_resources
 from ..utils import normalize_user_id, is_valid_uuid
+from ..services.progress import progress_batcher
+import hashlib, json, time
+
+# Simple in-memory request cache for deduplication. In prod replace with Redis.
+_request_cache = {}
+_CACHE_TTL = int(__import__('os').getenv('PROGRESS_REQUEST_CACHE_TTL', '5'))
 from ..services.topic_store import get_topics as store_get_topics
 
 logger = logging.getLogger('xenia')
@@ -114,54 +120,78 @@ def update_progress():
         logger.info(f"Sample topics detected in progress update for user {user_id}, returning optimistic success")
         return {"ok": True, "plan": {"sessions": []}}
     
+    # Deduplication: compute a request hash and return cached response for short TTL
     try:
-        plan_resp = supabase_call(lambda: sb.table("plans").select("plan").eq("user_id", user_id).limit(1).execute())
-        if not plan_resp.data:
-            raise ApiError("PLAN_404", "Plan not found", status=404)
-        plan = plan_resp.data[0]["plan"]
-        session_map = {(s.get("date"), s.get("topic")): s for s in plan.get("sessions", [])}
-        completed_sessions = []
-        
-        for upd in session_updates:
-            key = (upd.get("date"), upd.get("topic"))
-            if key in session_map:
-                old_status = session_map[key].get("status", "pending")
-                new_status = upd.get("status", "completed")
-                session_map[key]["status"] = new_status
-                
-                # Update duration if provided
-                if "duration_min" in upd:
-                    session_map[key]["duration_min"] = upd["duration_min"]
-                
-                # If session was just completed, record it in analytics
-                if old_status != "completed" and new_status == "completed":
-                    session_data = session_map[key]
-                    completed_sessions.append({
-                        "user_id": user_id,
-                        "topic": session_data.get("topic"),
-                        "duration_min": session_data.get("duration_min", 45),  # Now uses updated duration
-                        "status": "completed",
-                        "created_at": f"{upd.get('date')}T12:00:00Z"  # Use session date
-                    })
-        
-        plan["sessions"] = list(session_map.values())
-        supabase_call(lambda: sb.table("plans").upsert({"user_id": user_id, "plan": plan}).execute())
-        
-        # Record completed sessions in analytics database
-        if completed_sessions:
-            try:
-                for session in completed_sessions:
-                    supabase_call(lambda s=session: sb.table("sessions").upsert(s).execute())
-                logger.info(f"Recorded {len(completed_sessions)} completed sessions in analytics")
-            except Exception as e:
-                logger.warning(f"Failed to record sessions in analytics: {e}")
-        
-        return {"ok": True, "plan": plan}
+        request_hash = hashlib.md5(json.dumps(session_updates, sort_keys=True).encode()).hexdigest()
+        now = time.time()
+        if request_hash in _request_cache:
+            last_time, response = _request_cache[request_hash]
+            if now - last_time < _CACHE_TTL:
+                return response
+
+        # Add sessions to batcher instead of immediate DB writes
+        for session in session_updates:
+            progress_batcher.add_update(user_id, session)
+
+        response = ({"ok": True, "queued": len(session_updates)})
+        _request_cache[request_hash] = (now, response)
+        # cleanup old entries in-place
+        for k, v in list(_request_cache.items()):
+            if now - v[0] >= _CACHE_TTL:
+                _request_cache.pop(k, None)
+        return response
+
     except ApiError:
         raise
+
     except Exception as e:
-        logger.error(f"Progress update failed: {e}")
-        return {"ok": False, "error": str(e)}, 500
+        # fallback to previous synchronous DB update flow if batcher fails
+        logger.warning(f"Batcher path failed, falling back to direct DB update: {e}")
+        try:
+            plan_resp = supabase_call(lambda: sb.table("plans").select("plan").eq("user_id", user_id).limit(1).execute())
+            if not plan_resp.data:
+                raise ApiError("PLAN_404", "Plan not found", status=404)
+            plan = plan_resp.data[0]["plan"]
+            session_map = {(s.get("date"), s.get("topic")): s for s in plan.get("sessions", [])}
+            completed_sessions = []
+
+            for upd in session_updates:
+                key = (upd.get("date"), upd.get("topic"))
+                if key in session_map:
+                    old_status = session_map[key].get("status", "pending")
+                    new_status = upd.get("status", "completed")
+                    session_map[key]["status"] = new_status
+
+                    if "duration_min" in upd:
+                        session_map[key]["duration_min"] = upd["duration_min"]
+
+                    if old_status != "completed" and new_status == "completed":
+                        session_data = session_map[key]
+                        completed_sessions.append({
+                            "user_id": user_id,
+                            "topic": session_data.get("topic"),
+                            "duration_min": session_data.get("duration_min", 45),
+                            "status": "completed",
+                            "created_at": f"{upd.get('date')}T12:00:00Z"
+                        })
+
+            plan["sessions"] = list(session_map.values())
+            supabase_call(lambda: sb.table("plans").upsert({"user_id": user_id, "plan": plan}).execute())
+
+            if completed_sessions:
+                try:
+                    for session in completed_sessions:
+                        supabase_call(lambda s=session: sb.table("sessions").upsert(s).execute())
+                    logger.info(f"Recorded {len(completed_sessions)} completed sessions in analytics")
+                except Exception as ie:
+                    logger.warning(f"Failed to record sessions in analytics during fallback: {ie}")
+
+            return {"ok": True, "plan": plan}
+        except ApiError:
+            raise
+        except Exception as ee:
+            logger.error(f"Progress update failed in fallback: {ee}")
+            return {"ok": False, "error": str(ee)}, 500
 
 
 @resources_bp.post("/topics/status")

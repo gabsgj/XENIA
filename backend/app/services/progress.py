@@ -1,6 +1,9 @@
 import datetime
 import logging
 from ..supabase_client import get_supabase, supabase_call
+import time
+from collections import defaultdict
+from threading import Lock, Thread
 
 # Local in-memory fallback cache used when Supabase persistence fails or isn't available
 LOCAL_CACHE = {}
@@ -109,3 +112,79 @@ def get_user_progress(user_id):
     except Exception:
         # Fall back to local cache if Supabase not available
         return LOCAL_CACHE.get(user_id, {})
+
+
+class ProgressBatcher:
+    """Batch and deduplicate progress updates within a short time window.
+
+    - pending_updates: {user_id: [session_dict,...]}
+    - batch_window: seconds window to aggregate updates before flushing
+    """
+    def __init__(self, batch_window: float = 0.5):
+        self.pending_updates = defaultdict(list)
+        self.last_flush = time.time()
+        self.lock = Lock()
+        self.batch_window = float(batch_window)
+        self._running = True
+        # background flusher thread
+        self._flusher = Thread(target=self._periodic_flush, daemon=True)
+        self._flusher.start()
+
+    def add_update(self, user_id, update_data):
+        key = f"{update_data.get('topic','')}_{update_data.get('date','')}_{update_data.get('status','')}"
+        with self.lock:
+            # remove existing for same topic+date, keep latest
+            self.pending_updates[user_id] = [
+                u for u in self.pending_updates[user_id]
+                if f"{u.get('topic','')}_{u.get('date','')}_{u.get('status','')}" != key
+            ]
+            self.pending_updates[user_id].append(update_data)
+
+            # immediate flush if window already passed
+            if time.time() - self.last_flush > self.batch_window:
+                self.flush_all()
+
+    def flush_all(self):
+        with self.lock:
+            items = dict(self.pending_updates)
+            self.pending_updates.clear()
+            self.last_flush = time.time()
+
+        for user_id, updates in items.items():
+            if not updates:
+                continue
+            try:
+                # Transform session updates into topic_scores suitable for record_quiz_result
+                topic_scores = []
+                for s in updates:
+                    # Map session fields to a minimal score record; this can be extended
+                    topic_scores.append({
+                        "topic": s.get("topic"),
+                        "correct": int(s.get("correct", 0)),
+                        "wrong": int(s.get("wrong", 0)),
+                        "score": float(s.get("score", 0.0)),
+                    })
+                # Persist in a single call
+                record_quiz_result(user_id, topic_scores)
+            except Exception as e:
+                logger.warning(f"Failed to flush progress for user {user_id}: {e}")
+
+    def _periodic_flush(self):
+        # flush periodically while running
+        while self._running:
+            try:
+                time.sleep(self.batch_window)
+                self.flush_all()
+            except Exception:
+                pass
+
+    def stop(self):
+        self._running = False
+        try:
+            self._flusher.join(timeout=1.0)
+        except Exception:
+            pass
+
+
+# Module-level batcher used by endpoints
+progress_batcher = ProgressBatcher()
