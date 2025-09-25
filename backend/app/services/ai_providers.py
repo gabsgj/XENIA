@@ -188,7 +188,7 @@ def filter_and_prioritize_topics(extracted_topics: list, syllabus_content: str, 
     difficulty_level = user_prefs.get("difficulty_level", "intermediate")
     time_available = user_prefs.get("time_available", "moderate")
     
-    topics_text = "\n".join([f"- {topic}" for topic in extracted_topics[:50]])  # Increased from 30
+    topics_text = "\n".join([f"- {topic}" for topic in extracted_topics])  # include all extracted topics
     focus_areas_text = ", ".join(focus_areas) if focus_areas else "No specific focus areas"
     
     prompt = f"""
@@ -311,34 +311,36 @@ Return ONLY valid JSON:
         
         # Fallback: More permissive filtering logic
         logger.info("🔄 Using enhanced fallback topic filtering...")
-        
+
         # Remove only clearly administrative topics (more permissive)
         admin_keywords = ['syllabus overview', 'course policies', 'grading system', 'attendance policy', 'office hours schedule']
-        filtered = [topic for topic in extracted_topics 
-                   if not any(keyword in topic.lower() for keyword in admin_keywords)]
-        
+        filtered = [
+            topic for topic in extracted_topics
+            if not any(keyword in topic.lower() for keyword in admin_keywords)
+        ]
+
         # Enhanced prioritization - include more topics
         priority_topics = []
-        for i, topic in enumerate(filtered[:40]):  # Increased from 20 to 40
+        for i, topic in enumerate(filtered):
             priority_topics.append({
                 "topic": topic,
-                "category": "foundational" if i < 8 else "intermediate" if i < 25 else "advanced",  # More generous categorization
+                "category": "foundational" if i < 8 else "intermediate" if i < 25 else "advanced",
                 "priority": "critical" if i < 5 else "high" if i < 15 else "medium" if i < 30 else "low",
-                "estimated_hours": 2.5 + (i % 4),  # Varied time estimates
-                "difficulty_score": min(i // 3 + 3, 9),  # More gradual difficulty progression
+                "estimated_hours": 2.5 + (i % 4),
+                "difficulty_score": min(i // 3 + 3, 9),
                 "prerequisites": [],
                 "learning_objectives": [f"Understand {topic}", f"Apply {topic} concepts"],
                 "why_important": "Essential curriculum topic" if i < 15 else "Important supporting topic",
                 "suggested_resources": []
             })
-        
+
         return {
             "filtered_topics": priority_topics,
             "learning_path": {
-                "phase_1_foundation": [t["topic"] for t in priority_topics[:8]],  # Increased from 5
-                "phase_2_core": [t["topic"] for t in priority_topics[8:20]],      # Increased coverage
-                "phase_3_advanced": [t["topic"] for t in priority_topics[20:32]], # More advanced topics
-                "phase_4_application": [t["topic"] for t in priority_topics[32:]] + ["Final project", "Review and integration"]
+                "phase_1_foundation": [t["topic"] for t in priority_topics[:8]],
+                "phase_2_core": [t["topic"] for t in priority_topics[8:]],
+                "phase_3_advanced": [],
+                "phase_4_application": [t["topic"] for t in priority_topics[8:]] + ["Final project", "Review and integration"]
             },
             "filtering_insights": {
                 "topics_removed": len(extracted_topics) - len(priority_topics),
@@ -363,8 +365,11 @@ def generate_intelligent_study_plan(topics: list, horizon_days: int, deadline: s
     preferred_hours = user_prefs.get("daily_hours", 1.5)
     difficulty_preference = user_prefs.get("difficulty_progression", "gradual")  # gradual, mixed, intensive
     
-    topics_str = "\n".join([f"- {t.get('topic', t)} (difficulty: {t.get('score', 5)}, hours: {t.get('estimated_hours', 3)})" 
-                           for t in (topics[:15] if isinstance(topics[0], dict) else [{"topic": t, "score": 5, "estimated_hours": 3} for t in topics[:15]])])
+    # Include all topics when constructing plan prompt
+    topics_str = "\n".join([
+        f"- {t.get('topic', t)} (difficulty: {t.get('score', 5)}, hours: {t.get('estimated_hours', 3)})"
+        for t in (topics if isinstance(topics[0], dict) else [{"topic": t, "score": 5, "estimated_hours": 3} for t in topics])
+    ])
     
     prompt = f"""
 Create an intelligent study schedule optimized for learning effectiveness.
@@ -551,7 +556,7 @@ Return ONLY valid JSON in this exact format:
                     }
                     valid_topics.append(enhanced_topic)
             
-            parsed["topics"] = valid_topics[:30]  # Increased limit from 20 to 30 topics
+            parsed["topics"] = valid_topics  # preserve all validated topics (no artificial cap)
             return parsed
             
     except Exception as e:
@@ -562,8 +567,8 @@ Return ONLY valid JSON in this exact format:
     # Enhanced fallback analysis with topic extraction
     try:
         from .weaktopics import extract_topics_from_text
-        extracted_topics = extract_topics_from_text(text)[:20]  # Increased from 10
-        
+        extracted_topics = extract_topics_from_text(text)  # preserve all extracted topics (no cap)
+
         fallback_topics = []
         for i, topic in enumerate(extracted_topics):
             fallback_topics.append({
@@ -717,9 +722,9 @@ def generate_enhanced_study_plan_with_resources(topics: list, horizon_days: int 
     learning_style = preferences.get("learning_style", "balanced")
     difficulty_preference = preferences.get("difficulty_preference", "gradual")
     
-    # Format topics for AI
+    # Format topics for AI (include all provided topics)
     topics_str = ""
-    for i, topic in enumerate(topics[:20], 1):
+    for i, topic in enumerate(topics, 1):
         if isinstance(topic, dict):
             topics_str += f"{i}. {topic.get('topic', 'Unknown Topic')} (Priority: {topic.get('priority', 'medium')}, Hours: {topic.get('estimated_hours', 3)})\n"
         else:

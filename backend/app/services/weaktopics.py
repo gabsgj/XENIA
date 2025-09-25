@@ -192,7 +192,7 @@ def extract_topics_from_text(text: str) -> List[str]:
         if term and len(term) >= 3 and term.lower() not in {c.lower() for c in collected}:
             add(term.title())
 
-    return collected[:300]  # Increased limit from 200 to 300
+    return collected  # no artificial cap on extracted topics
 
 
 def get_weak_topics(user_id: str) -> List[Dict]:
@@ -222,8 +222,8 @@ def get_weak_topics(user_id: str) -> List[Dict]:
         for t in topics:
             weak_scores[t] = weak_scores.get(t, 0) + score
 
-    ranked = sorted(weak_scores.items(), key=lambda kv: kv[1], reverse=True)
-    return [{"topic": t, "score": s} for t, s in ranked[:20]]
+        ranked = sorted(weak_scores.items(), key=lambda kv: kv[1], reverse=True)
+        return [{"topic": t, "score": s} for t, s in ranked]  # return full ranking
 
 
 def analyze_weak_topics(user_progress: Dict[str, Dict]) -> List[Dict]:
@@ -245,7 +245,7 @@ def analyze_weak_topics(user_progress: Dict[str, Dict]) -> List[Dict]:
         scores.append((topic, int(weak_score)))
 
     ranked = sorted(scores, key=lambda kv: kv[1], reverse=True)
-    return [{"topic": t, "score": s} for t, s in ranked[:20]]
+    return [{"topic": t, "score": s} for t, s in ranked]
 
 
 def get_remediation_steps(user_id: str, question_text: str) -> List[Dict]:

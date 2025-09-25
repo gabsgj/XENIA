@@ -260,7 +260,7 @@ class EnhancedTextExtractor:
                         'confidence': 0.4  # Lower confidence for fallback parsing
                     })
             
-            return topics[:10]  # Limit to top 10 topics per chunk
+            return topics  # return all topics found in this chunk (no artificial cap)
             
         except Exception as e:
             logger.error(f"Chunk extraction error: {e}")

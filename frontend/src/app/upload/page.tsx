@@ -11,7 +11,7 @@ import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
-import { LoadingButton, LoadingOverlay, TopicsSkeleton, ProgressIndicator } from '@/components/ui/loading'
+import { LoadingButton, TopicsSkeleton, ProgressIndicator } from '@/components/ui/loading'
 import { useErrorContext } from '@/lib/error-context'
 
 import { 
@@ -372,8 +372,8 @@ export default function UploadPage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Main Upload Area */}
           <div className="lg:col-span-2 space-y-6 relative">
-            {/* Overlay while processing/uploading */}
-            <LoadingOverlay show={uploading || processingTopics} />
+      {/* Note: removed fullscreen loading overlay to keep upload page interactive.
+        Progress indicators and banners below remain active while uploading. */}
             {/* Upload Section */}
             <Card>
               <CardHeader>
