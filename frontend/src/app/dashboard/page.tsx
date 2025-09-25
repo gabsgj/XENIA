@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { LoadingButton, SkeletonCard } from "@/components/ui/loading";
 import { NoDataPlaceholder } from "@/components/ui/no-data-placeholder";
-import { StudyTimer } from "@/components/ui/study-timer";
+import StudyTimer from "@/components/ui/study-timer-simple";
 import Link from "next/link";
 import { 
   Calendar, 
