@@ -105,33 +105,75 @@ export default function PlannerPage() {
           }
         }
         
-        // Also fetch topic-specific resources for current plan topics using AI recommendations
+        // Also fetch topic-specific resources for current plan topics
         if (p?.sessions?.length > 0) {
           const uniqueTopics = [...new Set(p.sessions.map((s:any) => s.topic))] as string[]
           try {
-            // Use the AI resources endpoint for better recommendations
-            const aiRes = await api(`/api/ai/get-resources?topics=${encodeURIComponent(uniqueTopics.slice(0, 5).join(','))}&max=12`)
-            const aiResources = aiRes.resources || []
-            
-            // Format AI resources to match expected structure
-            const formattedResources = aiResources.map((resource: any) => ({
-              ...resource,
-              source: resource.type === 'video' ? 'youtube' : 
-                     resource.type === 'article' ? 'article' : 
-                     resource.type === 'documentation' ? 'docs' : 'general',
-              url: resource.url || '#',
-              title: resource.title || 'Resource'
-            }))
-            
+            // Prefer per-topic plan resources endpoint (older working flow)
+            const topicResourcePromises = uniqueTopics.slice(0, 5).map(async (topic: string) => {
+              try {
+                const topicRes = await api(`/api/plan/resources/${encodeURIComponent(topic)}?learning_style=balanced`)
+                return { topic, resources: topicRes.resources || {} }
+              } catch (e) {
+                console.warn(`Failed to fetch resources for topic: ${topic}`, e)
+                return { topic, resources: {} }
+              }
+            })
+
+            const topicResourcesResults = await Promise.allSettled(topicResourcePromises)
+            const additionalResources: any[] = []
+
+            topicResourcesResults.forEach((result) => {
+              if (result.status === 'fulfilled' && result.value?.resources) {
+                const { topic, resources: topicRes } = result.value
+
+                // Extract different types of resources
+                Object.entries(topicRes).forEach(([category, resourceList]: [string, any]) => {
+                  if (Array.isArray(resourceList)) {
+                    resourceList.forEach((resource: any) => {
+                      additionalResources.push({
+                        ...resource,
+                        topic: topic,
+                        source: category.includes('youtube') || category.includes('videos') ? 'youtube' : 
+                               category.includes('articles') ? 'article' : 
+                               category.includes('documentation') ? 'docs' : 'general',
+                        url: resource.url || resource.url || '#',
+                        title: resource.title || resource.name || resource.title || 'Resource'
+                      })
+                    })
+                  }
+                })
+              }
+            })
+
+            // If we didn't get per-topic resources, fall back to the batched AI endpoint
+            if (additionalResources.length === 0) {
+              try {
+                const aiRes = await api(`/api/ai/get-resources?topics=${encodeURIComponent(uniqueTopics.slice(0, 5).join(','))}&max=12`)
+                const aiResources = aiRes.resources || []
+                const formattedResources = aiResources.map((resource: any) => ({
+                  ...resource,
+                  source: resource.type === 'video' ? 'youtube' : 
+                         resource.type === 'article' ? 'article' : 
+                         resource.type === 'documentation' ? 'docs' : 'general',
+                  url: resource.url || '#',
+                  title: resource.title || 'Resource',
+                  topic: resource.topic || ''
+                }))
+                additionalResources.push(...formattedResources)
+              } catch (e) {
+                console.warn('Failed to fetch AI resources (batched):', e)
+              }
+            }
+
             // Merge with existing resources, avoiding duplicates
             setResources(prev => {
               const existingUrls = new Set(prev.map(r => r.url).filter(Boolean))
-              const newResources = formattedResources.filter((r: any) => r.url && !existingUrls.has(r.url))
+              const newResources = additionalResources.filter((r: any) => r.url && !existingUrls.has(r.url))
               return [...prev, ...newResources]
             })
           } catch (e) {
             console.warn('Failed to fetch AI resources:', e)
-            // Fallback: create basic resources from topics
             const fallbackResources = uniqueTopics.slice(0, 3).map((topic, idx) => ({
               title: `Learn ${topic}`,
               url: `https://www.google.com/search?q=${encodeURIComponent(topic + ' tutorial')}`,
