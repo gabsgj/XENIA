@@ -181,9 +181,27 @@ def get_topic_resources(topic: str):
         
         from ..services.ai_providers import get_topic_resources
         resources = get_topic_resources(topic, learning_style)
-        
-        logger.info(f"   Found resources for {topic}: {len(resources.get('youtube_videos', []))} videos")
-        
+
+        # If the provider returned an explanatory message (connectivity / API key issues)
+        # it may be embedded inside the returned resources object (e.g. resources['final_answer']).
+        # Normalize that into a top-level `final_answer` field and return an empty resources map
+        # so the frontend can detect and surface the message instead of treating it as resource data.
+        try:
+            if isinstance(resources, dict) and (resources.get('final_answer') or resources.get('error') or resources.get('message')):
+                msg = resources.get('final_answer') or resources.get('error') or resources.get('message')
+                logger.warning(f"   AI provider returned explanatory message for topic {topic}: {msg}")
+                return {
+                    "success": False,
+                    "topic": topic,
+                    "final_answer": msg,
+                    "resources": {}
+                }, 200
+        except Exception:
+            # If any unexpected shape, fall back to returning the raw resources
+            logger.debug(f"   Unable to normalize resources for topic {topic}, returning as-is")
+
+        logger.info(f"   Found resources for {topic}: {len(resources.get('youtube_videos', [])) if isinstance(resources, dict) else (len(resources) if hasattr(resources, '__len__') else 0)} items")
+
         return {
             "success": True,
             "topic": topic,
