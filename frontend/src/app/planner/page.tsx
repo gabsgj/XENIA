@@ -10,6 +10,8 @@ import { LoadingButton, LoadingOverlay, SkeletonCard } from '@/components/ui/loa
 import { StudyTimer } from '@/components/ui/study-timer'
 
 import { MainLayout } from '@/components/navigation'
+import RegeneratePlanModal from '@/components/RegeneratePlanModal'
+import { usePlanRegeneration } from '@/hooks/usePlanRegeneration'
 import { 
   Calendar, 
   Clock, 
@@ -36,6 +38,47 @@ export default function PlannerPage() {
   const [showAllResources, setShowAllResources] = useState(false)
   
   const { pushError } = useErrorContext()
+  const [showRegenerateModal, setShowRegenerateModal] = useState(false)
+  const { isRegenerating, regenerate } = usePlanRegeneration()
+
+  async function regen(){
+    setLoading(true)
+    try {
+      const userId = getUserId()
+      let horizonDays = 14
+      if (deadline) {
+        const deadlineDate = new Date(deadline)
+        const today = new Date()
+        const daysUntilDeadline = Math.ceil((deadlineDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+        if (daysUntilDeadline > 0) {
+          horizonDays = Math.min(daysUntilDeadline, 90)
+        }
+      } else if (plan?.horizon_days) {
+        horizonDays = plan.horizon_days
+      }
+
+      const extractedTopics = plan?.weak_topics?.map((t: any) => t.topic) || []
+      const topicDetails = plan?.weak_topics || []
+
+      const generated = await api('/api/plan/generate', {
+        method: 'POST',
+        body: JSON.stringify({
+          user_id: userId,
+          horizon_days: horizonDays,
+          preferred_hours_per_day: hoursPerDay,
+          deadline: deadline || undefined,
+          extracted_topics: extractedTopics,
+          topic_details: topicDetails
+        })
+      })
+
+      setPlan(generated)
+    } catch (e:any) {
+      pushError({ errorCode: e?.errorCode||'PLAN_500', errorMessage: e?.errorMessage, details: e })
+    } finally {
+      setLoading(false)
+    }
+  }
   
   useEffect(()=>{ 
     (async ()=>{ 
@@ -116,48 +159,32 @@ export default function PlannerPage() {
     })() 
   },[pushError])
 
-  async function regen(){
-    setLoading(true)
+  // open regenerate modal
+  const openRegenerate = () => setShowRegenerateModal(true)
+
+  const handleRegeneratePlan = async (config: any) => {
     try {
-      // Get user ID from Supabase authentication
-      const userId = getUserId()
-      
-      // Calculate horizon based on deadline or use current plan's horizon
-      let horizonDays = 14 // default
-      if (deadline) {
-        const deadlineDate = new Date(deadline)
-        const today = new Date()
-        const daysUntilDeadline = Math.ceil((deadlineDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
-        if (daysUntilDeadline > 0) {
-          horizonDays = Math.min(daysUntilDeadline, 90) // Cap at 90 days max
-        }
-      } else if (plan?.horizon_days) {
-        horizonDays = plan.horizon_days
+      const payload = {
+        plan_id: plan?.id,
+        new_deadline: config.newDeadline.toISOString().split('T')[0],
+        preserve_progress: config.preserveProgress,
+        priority_adjustment: config.priorityAdjustment,
+        learning_pace: config.learningPace,
+        excluded_topics: config.excludedTopics
       }
-      
-      // Extract topics from current plan for context
-      const extractedTopics = plan?.weak_topics?.map((t: any) => t.topic) || []
-      const topicDetails = plan?.weak_topics || []
-      
-      setPlan(await api('/api/plan/generate', { 
-        method:'POST', 
-        body: JSON.stringify({ 
-          user_id: userId,
-          horizon_days: horizonDays, 
-          preferred_hours_per_day: hoursPerDay, 
-          deadline: deadline || undefined,
-          extracted_topics: extractedTopics,
-          topic_details: topicDetails
-        }) 
-      }))
-    } catch(e:any){ 
-      pushError({ 
-        errorCode: e?.errorCode||'PLAN_500', 
-        errorMessage: e?.errorMessage, 
-        details: e
-      }) 
-    } finally {
-      setLoading(false)
+
+      const result = await regenerate(payload)
+      if (result && result.success && result.data?.regenerated_plan) {
+        setPlan(result.data.regenerated_plan)
+        setShowRegenerateModal(false)
+        // Show success UI
+        // eslint-disable-next-line no-console
+        console.info('Regenerated plan', result.data.changes_summary)
+      } else {
+        pushError({ errorCode: 'PLAN_REGEN_FAIL', errorMessage: 'Regeneration failed', details: result })
+      }
+    } catch (e:any) {
+      pushError({ errorCode: e?.errorCode || 'PLAN_500', errorMessage: e?.message || 'Unexpected error', details: e })
     }
   }
 
@@ -263,7 +290,7 @@ export default function PlannerPage() {
             <h1 className='text-3xl md:text-4xl font-bold tracking-tight'>Study Planner</h1>
             <p className='text-muted-foreground'>Your personalized AI-generated study schedule</p>
           </div>
-          <div className='flex flex-wrap items-center gap-3'>
+            <div className='flex flex-wrap items-center gap-3'>
             <div className='flex items-center gap-2'>
               <label className='text-xs text-muted-foreground'>Hours/day</label>
               <input type='number' step='0.5' min='0.5' max='12' className='w-20 px-2 py-1 border rounded bg-background text-sm'
@@ -284,15 +311,32 @@ export default function PlannerPage() {
               Filter
             </Button>
             <LoadingButton
-              loading={loading}
-              loadingText="Generating..."
-              onClick={regen}
+              loading={isRegenerating}
+              loadingText="Regenerating..."
+              onClick={openRegenerate}
               icon={RefreshCw}
             >
               Regenerate Plan
             </LoadingButton>
           </div>
         </div>
+
+        {showRegenerateModal && (
+          <RegeneratePlanModal
+            currentPlan={plan}
+            currentProgress={{
+              completedTasks: plan?.progress?.sessions_completed || 0,
+              totalTasks: plan?.sessions?.length || 0,
+              totalHours: plan?.progress?.total_hours_completed || totalTimeSpent || 0,
+              estimatedDaysLeft: plan?.horizon_days || 0,
+              completedTopics: plan?.progress?.completed_topics || [],
+              weakTopics: plan?.progress?.weak_topics || []
+            }}
+            isOpen={showRegenerateModal}
+            onClose={() => setShowRegenerateModal(false)}
+            onRegenerate={handleRegeneratePlan}
+          />
+        )}
 
         {plan ? (
           <Tabs defaultValue='kanban' className="space-y-6">

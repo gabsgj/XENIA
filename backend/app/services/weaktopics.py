@@ -226,6 +226,28 @@ def get_weak_topics(user_id: str) -> List[Dict]:
     return [{"topic": t, "score": s} for t, s in ranked[:20]]
 
 
+def analyze_weak_topics(user_progress: Dict[str, Dict]) -> List[Dict]:
+    """Analyze a user_progress mapping and return ranked weak topics.
+
+    user_progress is expected to be a mapping topic -> {last_score, quizzes_taken, ...}
+    This function converts that structure into a simple ranking of weak topics.
+    """
+    if not user_progress:
+        return []
+
+    scores = []
+    for topic, data in user_progress.items():
+        # lower last_score => weaker topic
+        last_score = float(data.get('last_score', 0)) if isinstance(data.get('last_score', 0), (int, float, str)) else 0.0
+        quizzes = int(data.get('quizzes_taken', 0)) if data.get('quizzes_taken') is not None else 0
+        # heuristic weak score: (100 - last_score) * (1 + 0.1*quizzes)
+        weak_score = max(0.0, 100.0 - last_score) * (1 + (quizzes * 0.1))
+        scores.append((topic, int(weak_score)))
+
+    ranked = sorted(scores, key=lambda kv: kv[1], reverse=True)
+    return [{"topic": t, "score": s} for t, s in ranked[:20]]
+
+
 def get_remediation_steps(user_id: str, question_text: str) -> List[Dict]:
     """Get step-by-step solution using AI"""
     import logging

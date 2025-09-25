@@ -3,6 +3,9 @@ from flask import Blueprint, request
 from ..utils import get_user_id_from_request
 from ..errors import ApiError
 from ..services.planning import generate_plan, get_current_plan
+from ..services.plan_regeneration import PlanRegenerationService
+from ..services.progress import get_user_progress
+from ..services.weaktopics import analyze_weak_topics
 
 logger = logging.getLogger('xenia')
 plan_bp = Blueprint("plan", __name__)
@@ -78,10 +81,21 @@ def current():
         completed = sum(1 for s in sessions if s.get("status") == "completed")
         in_progress = sum(1 for s in sessions if s.get("status") == "in-progress")
         total = len(sessions) or 1
+        # enrich with persisted user progress if available
+        user_progress = get_user_progress(uid)
+        # Estimate total hours completed
+        total_minutes_completed = sum(s.get('duration_min', 0) for s in sessions if s.get('status') == 'completed')
+        total_hours_completed = round(total_minutes_completed / 60.0, 2)
+
+        weak_topics = analyze_weak_topics(user_progress)
+
         plan["progress"] = {
             "sessions_completed": completed,
             "sessions_in_progress": in_progress,
-            "percent_complete": round(completed / total * 100, 2)
+            "percent_complete": round(completed / total * 100, 2),
+            "total_hours_completed": total_hours_completed,
+            "completed_topics": list(user_progress.keys()),
+            "weak_topics": weak_topics
         }
         logger.info(f"   Current plan retrieved successfully for user {uid}")
         return plan, 200
@@ -246,3 +260,127 @@ def adjust_plan():
     except Exception as e:
         logger.error(f"   Plan adjustment failed: {e}")
         raise ApiError("PLAN_500", f"Failed to adjust plan: {str(e)}")
+
+
+@plan_bp.post('/regenerate')
+def regenerate():
+    """Regenerate a study plan given a new deadline and options. Preserves completed progress when requested."""
+    logger.info("🔁 Regenerate plan endpoint called")
+    uid = get_user_id_from_request(request) or ""
+    if not uid:
+        logger.error("   Missing user_id in request")
+        raise ApiError("PLAN_400", "Missing user_id")
+
+    try:
+        data = request.get_json() or {}
+        plan_id = data.get('plan_id')
+        new_deadline = data.get('new_deadline')
+        preserve_progress = bool(data.get('preserve_progress', True))
+        priority_adjustment = data.get('priority_adjustment')
+        learning_pace = data.get('learning_pace')
+        excluded_topics = data.get('excluded_topics', []) or []
+
+        if not new_deadline:
+            raise ApiError('PLAN_400', 'new_deadline is required')
+
+        # Basic validation: deadline must be a future date
+        from datetime import datetime, date
+        try:
+            nd = datetime.strptime(new_deadline, '%Y-%m-%d').date()
+        except Exception:
+            raise ApiError('PLAN_400', 'new_deadline must be YYYY-MM-DD')
+
+        if nd <= date.today():
+            raise ApiError('PLAN_400', 'Deadline must be in the future')
+
+        # Fetch current plan (by id or current user plan)
+        if plan_id:
+            current_plan = get_current_plan(uid, plan_id=plan_id)
+        else:
+            current_plan = get_current_plan(uid)
+
+        if not current_plan:
+            raise ApiError('PLAN_404', 'No current plan found')
+
+        # Build service and run regeneration
+        service = PlanRegenerationService(gemini_client=None, supabase_client=None)
+        regenerated = service.regenerate_with_deadline(
+            current_plan=current_plan,
+            new_deadline=nd,
+            preserve_progress=preserve_progress,
+            priority_adjustment=priority_adjustment,
+            learning_pace=learning_pace,
+            excluded_topics=excluded_topics
+        )
+
+        return { 'success': True, 'data': { 'regenerated_plan': regenerated, 'changes_summary': regenerated.get('changes_summary') } }, 200
+
+    except ApiError:
+        raise
+    except Exception as e:
+        logger.error(f'   Regeneration failed: {e}')
+        raise ApiError('PLAN_500', f'Failed to regenerate plan: {str(e)}')
+
+
+@plan_bp.post('/check-deadline-feasibility')
+def check_deadline_feasibility():
+    """Check whether a proposed deadline is feasible given current progress."""
+    logger.info('🧭 Check deadline feasibility called')
+    uid = get_user_id_from_request(request) or ""
+    if not uid:
+        raise ApiError('PLAN_400', 'Missing user_id')
+
+    try:
+        data = request.get_json() or {}
+        new_deadline = data.get('new_deadline')
+        plan_id = data.get('plan_id')
+
+        if not new_deadline:
+            raise ApiError('PLAN_400', 'new_deadline is required')
+
+        from datetime import datetime, date
+        try:
+            nd = datetime.strptime(new_deadline, '%Y-%m-%d').date()
+        except Exception:
+            raise ApiError('PLAN_400', 'new_deadline must be YYYY-MM-DD')
+
+        # Load plan
+        if plan_id:
+            plan = get_current_plan(uid, plan_id=plan_id)
+        else:
+            plan = get_current_plan(uid)
+
+        if not plan:
+            raise ApiError('PLAN_404', 'No current plan found')
+
+        # Estimate remaining workload (hours)
+        sessions = plan.get('sessions', [])
+        remaining_minutes = sum([s.get('duration_min', 0) for s in sessions if s.get('status') != 'completed'])
+        remaining_hours = remaining_minutes / 60.0
+
+        # Available time
+        today = date.today()
+        days_available = max(1, (nd - today).days)
+        # Assume user can study at least 0.5 hours/day by default
+        estimated_hours_per_day = remaining_hours / days_available
+
+        # Simple confidence estimation
+        feasible = estimated_hours_per_day <= 6  # arbitrary cap
+        # Suggest alternate deadline if not feasible (extend to fit 2 hours/day)
+        suggested_days = int((remaining_hours / 2.0) + 0.9999)
+        suggested_deadline = today + timedelta(days=suggested_days)
+
+        result = {
+            'feasible': feasible,
+            'estimated_hours_per_day': round(estimated_hours_per_day, 2),
+            'suggested_deadline': suggested_deadline.isoformat(),
+            'confidence_level': 0.8 if feasible else 0.35
+        }
+
+        return result, 200
+
+    except ApiError:
+        raise
+    except Exception as e:
+        logger.error(f'   Deadline check failed: {e}')
+        raise ApiError('PLAN_500', f'Failed to check deadline: {str(e)}')
