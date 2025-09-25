@@ -274,6 +274,16 @@ export default function PlannerPage() {
     }
   }
 
+  // Safely compare resource and session topics. Many resources may miss a `topic` field,
+  // calling toLowerCase() on undefined would throw and break the UI. Use this helper
+  // to centralize the logic and avoid runtime errors.
+  const topicMatches = (resource: any, sessionTopic: string) => {
+    const rTopic = String(resource?.topic || '').toLowerCase()
+    const sTopic = String(sessionTopic || '').toLowerCase()
+    if (!rTopic && !sTopic) return false
+    return rTopic === sTopic || sTopic.includes(rTopic) || rTopic.includes(sTopic)
+  }
+
   return (
     <MainLayout>
       <div className='p-6 space-y-8'>
@@ -387,7 +397,7 @@ export default function PlannerPage() {
                           <p className='text-xs text-muted-foreground mb-2'>{s.focus}</p>
                           
                           {/* Resource suggestions for this topic */}
-                          {resources.filter((r:any) => r.topic === s.topic || s.topic.toLowerCase().includes(r.topic.toLowerCase()) || r.topic.toLowerCase().includes(s.topic.toLowerCase())).slice(0, 2).map((resource:any, rIdx:number) => (
+                          {resources.filter((r:any) => topicMatches(r, s.topic)).slice(0, 2).map((resource:any, rIdx:number) => (
                             <div key={rIdx} className="mb-2 p-2 bg-blue-50 dark:bg-blue-950 rounded border-l-2 border-blue-500">
                               <div className="flex items-center gap-2">
                                 <span className="text-xs font-medium text-blue-700 dark:text-blue-300">
@@ -404,9 +414,9 @@ export default function PlannerPage() {
                           <div className="flex items-center justify-between">
                             <span className='text-xs text-muted-foreground'>{s.duration_min} min</span>
                             <div className="flex gap-1">
-                              {resources.filter((r:any) => r.topic === s.topic || s.topic.toLowerCase().includes(r.topic.toLowerCase()) || r.topic.toLowerCase().includes(s.topic.toLowerCase())).length > 0 && (
+                              {resources.filter((r:any) => topicMatches(r, s.topic)).length > 0 && (
                                 <Button size="sm" variant="ghost" className="h-6 px-2 text-xs" onClick={() => {
-                                  const topicResources = resources.filter((r:any) => r.topic === s.topic || s.topic.toLowerCase().includes(r.topic.toLowerCase()) || r.topic.toLowerCase().includes(s.topic.toLowerCase()))
+                                  const topicResources = resources.filter((r:any) => topicMatches(r, s.topic))
                                   alert(`Resources for ${s.topic}:\n\n${topicResources.map(r => `${r.source.toUpperCase()}: ${r.title}\n${r.url}`).join('\n\n')}`)
                                 }}>
                                   📚
@@ -466,13 +476,13 @@ export default function PlannerPage() {
                               />
                             </td>
                             <td className='p-3'>
-                              {resources.filter((r:any) => r.topic === s.topic || s.topic.toLowerCase().includes(r.topic.toLowerCase()) || r.topic.toLowerCase().includes(s.topic.toLowerCase())).slice(0, 1).map((resource:any, rIdx:number) => (
+                              {resources.filter((r:any) => topicMatches(r, s.topic)).slice(0, 1).map((resource:any, rIdx:number) => (
                                 <a key={rIdx} href={resource.url} target="_blank" rel="noopener noreferrer" 
                                    className="text-blue-600 dark:text-blue-400 hover:underline text-xs flex items-center gap-1">
                                   {resource.source === 'youtube' ? '📺' : '📖'} {resource.title.substring(0, 30)}...
                                 </a>
                               ))}
-                              {resources.filter((r:any) => r.topic === s.topic || s.topic.toLowerCase().includes(r.topic.toLowerCase()) || r.topic.toLowerCase().includes(s.topic.toLowerCase())).length === 0 && (
+                              {resources.filter((r:any) => topicMatches(r, s.topic)).length === 0 && (
                                 <span className="text-xs text-muted-foreground">No resources</span>
                               )}
                             </td>
@@ -513,11 +523,11 @@ export default function PlannerPage() {
                           <p className="text-muted-foreground text-sm mb-2">{s.focus}</p>
                           
                           {/* Resource suggestions */}
-                          {resources.filter((r:any) => r.topic === s.topic || s.topic.toLowerCase().includes(r.topic.toLowerCase()) || r.topic.toLowerCase().includes(s.topic.toLowerCase())).slice(0, 3).length > 0 && (
+                          {resources.filter((r:any) => topicMatches(r, s.topic)).slice(0, 3).length > 0 && (
                             <div className="mb-3">
                               <h4 className="text-xs font-semibold text-muted-foreground mb-2">📚 Recommended Resources:</h4>
                               <div className="grid gap-2">
-                                {resources.filter((r:any) => r.topic === s.topic || s.topic.toLowerCase().includes(r.topic.toLowerCase()) || r.topic.toLowerCase().includes(s.topic.toLowerCase())).slice(0, 3).map((resource:any, rIdx:number) => (
+                                {resources.filter((r:any) => topicMatches(r, s.topic)).slice(0, 3).map((resource:any, rIdx:number) => (
                                   <div key={rIdx} className="flex items-center gap-2 p-2 bg-blue-50 dark:bg-blue-950 rounded">
                                     <span className="text-xs">
                                       {resource.source === 'youtube' ? '📺' : resource.source === 'ocw' ? '🎓' : '📖'}
