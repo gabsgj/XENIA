@@ -227,3 +227,73 @@ def reorder_tasks():
     except Exception as e:
         logger.warning(f'   Failed to reorder tasks: {e}')
         raise ApiError('DB_WRITE_FAIL', 'Unable to reorder tasks')
+
+
+@tasks_bp.post("/")
+def create_task():
+    logger.info("➕ Create task endpoint called")
+    sb = get_supabase()
+    data = request.get_json(silent=True) or {}
+    
+    user_id = data.get("user_id") or request.headers.get("X-User-Id")
+    title = data.get("title")
+    due_date = data.get("due_date")
+    duration_minutes = data.get("duration_minutes", 30)
+    subject = data.get("subject", "General")
+    
+    if not user_id:
+        raise ApiError("AUTH_401", "Missing user_id")
+    if not title:
+        raise ApiError("PLAN_400", "Missing title")
+    
+    from ..utils import normalize_user_id
+    norm_user_id = normalize_user_id(user_id)
+    
+    try:
+        from datetime import datetime, timezone
+        task_data = {
+            "user_id": norm_user_id,
+            "title": title,
+            "subject": subject,
+            "due_date": due_date,
+            "duration_minutes": duration_minutes,
+            "status": "pending",
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        
+        resp = sb.table("tasks").insert(task_data).execute()
+        task = resp.data[0] if resp.data else task_data
+        
+        logger.info(f"   Created task: {title}")
+        return {"task": task}
+    except Exception as e:
+        logger.warning(f"   Failed to create task: {e}")
+        raise ApiError("DB_WRITE_FAIL", "Unable to create task")
+
+
+@tasks_bp.delete("/<task_id>")
+def delete_task(task_id):
+    logger.info(f"🗑️ Delete task {task_id}")
+    sb = get_supabase()
+    user_id = request.headers.get("X-User-Id") or request.args.get("user_id")
+    
+    if not user_id:
+        raise ApiError("AUTH_401", "Missing user_id")
+    
+    from ..utils import normalize_user_id
+    norm_user_id = normalize_user_id(user_id)
+    
+    try:
+        # Verify task belongs to user before deleting
+        resp = sb.table("tasks").select("id").eq("id", task_id).eq("user_id", norm_user_id).execute()
+        if not resp.data:
+            raise ApiError("TASK_404", "Task not found", status=404)
+        
+        sb.table("tasks").delete().eq("id", task_id).execute()
+        logger.info(f"   Deleted task {task_id}")
+        return {"ok": True}
+    except ApiError:
+        raise
+    except Exception as e:
+        logger.warning(f"   Failed to delete task: {e}")
+        raise ApiError("DB_WRITE_FAIL", "Unable to delete task")

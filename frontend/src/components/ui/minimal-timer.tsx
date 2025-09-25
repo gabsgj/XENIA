@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { Play, Pause, CheckCircle } from 'lucide-react'
 
-interface StudyTimerSimpleProps {
+interface MinimalTimerProps {
   duration: number // minutes
   status: 'pending' | 'in-progress' | 'completed'
   onStatusChange: (newStatus: 'pending' | 'in-progress' | 'completed') => void
@@ -13,18 +13,18 @@ interface StudyTimerSimpleProps {
   className?: string
 }
 
-export function StudyTimerSimple({
+export function MinimalTimer({
   duration,
   status,
   onStatusChange,
   onComplete,
   externalProgress,
   className = ''
-}: StudyTimerSimpleProps) {
+}: MinimalTimerProps) {
   const totalSeconds = Math.max(1, duration) * 60
   const [remaining, setRemaining] = useState(() => Math.max(0, totalSeconds * (1 - (externalProgress ?? 0) / 100)))
   const [isRunning, setIsRunning] = useState(status === 'in-progress')
-  const intervalRef = useRef<number | null>(null)
+  const intervalRef = useRef<NodeJS.Timeout | null>(null)
 
   useEffect(() => {
     setIsRunning(status === 'in-progress')
@@ -40,7 +40,7 @@ export function StudyTimerSimple({
 
   useEffect(() => {
     if (isRunning && intervalRef.current === null) {
-      intervalRef.current = window.setInterval(() => {
+      intervalRef.current = setInterval(() => {
         setRemaining(r => {
           const n = r - 1
           if (n <= 0) {
@@ -95,29 +95,36 @@ export function StudyTimerSimple({
 
   const progressPercent = Math.min(100, Math.max(0, ((totalSeconds - remaining) / totalSeconds) * 100))
 
+  if (status === 'completed') {
+    return (
+      <div className={`${className} flex items-center gap-2 text-green-600`}>
+        <CheckCircle className="w-4 h-4" />
+        <span className="text-sm font-medium">Completed</span>
+      </div>
+    )
+  }
+
   return (
-    <div className={`${className} flex items-center gap-3 p-2 bg-muted/30 rounded-lg`}>
-      <div className="flex items-center gap-2 min-w-0">
-        <div className="text-sm font-mono">{formatTime(remaining)}</div>
-        <div className="w-16 bg-gray-200 rounded-full h-1.5 overflow-hidden">
-          <div
-            className="h-1.5 bg-primary rounded-full transition-all duration-300"
-            style={{ width: `${progressPercent}%` }}
-          />
-        </div>
+    <div className={`${className} flex items-center gap-2 p-2 bg-muted/20 rounded-md`}>
+      <div className="text-sm font-mono min-w-[3rem]">{formatTime(remaining)}</div>
+      <div className="flex-1 bg-gray-200 rounded-full h-1 overflow-hidden min-w-[2rem]">
+        <div
+          className="h-1 bg-primary rounded-full transition-all duration-300"
+          style={{ width: `${progressPercent}%` }}
+        />
       </div>
       <div className="flex items-center gap-1">
         {status === 'pending' && (
-          <Button size="sm" variant="ghost" onClick={start} className="h-7 px-2">
+          <Button size="sm" variant="ghost" onClick={start} className="h-6 w-6 p-0">
             <Play className="w-3 h-3" />
           </Button>
         )}
         {status === 'in-progress' && (
-          <Button size="sm" variant="ghost" onClick={pause} className="h-7 px-2">
+          <Button size="sm" variant="ghost" onClick={pause} className="h-6 w-6 p-0">
             <Pause className="w-3 h-3" />
           </Button>
         )}
-        <Button size="sm" variant="ghost" onClick={complete} className="h-7 px-2">
+        <Button size="sm" variant="ghost" onClick={complete} className="h-6 w-6 p-0">
           <CheckCircle className="w-3 h-3" />
         </Button>
       </div>
@@ -125,4 +132,4 @@ export function StudyTimerSimple({
   )
 }
 
-export default StudyTimerSimple
+export default MinimalTimer

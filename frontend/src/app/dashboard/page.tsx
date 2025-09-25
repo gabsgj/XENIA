@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { LoadingButton, SkeletonCard } from "@/components/ui/loading";
 import { NoDataPlaceholder } from "@/components/ui/no-data-placeholder";
-import StudyTimer from "@/components/ui/study-timer-simple";
+import MinimalTimer from "@/components/ui/minimal-timer";
 import Link from "next/link";
 import { 
   Calendar, 
@@ -82,7 +82,7 @@ export default function DashboardPage(){
     }
   }, [])
 
-  const updateSessionStatus = async (date: string, topic: string, newStatus: string) => {
+  const updateSessionStatus = async (date: string, topic: string, newStatus: 'pending' | 'in-progress' | 'completed') => {
     try {
       const resp = await api('/api/resources/progress', {
         method: 'POST',
@@ -359,7 +359,7 @@ export default function DashboardPage(){
                           <h4 className="font-semibold">{task.subject}</h4>
                           <p className="text-sm text-muted-foreground">{task.topic}</p>
                         </div>
-                        <StudyTimer
+                        <MinimalTimer
                           className="flex-1 max-w-sm"
                           duration={task.duration}
                           status={task.status}

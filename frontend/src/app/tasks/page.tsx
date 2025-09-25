@@ -20,7 +20,7 @@ import {
 } from 'lucide-react'
 import React from 'react'
 import { StudyTimer } from '@/components/ui/study-timer'
-import TaskList from '@/components/TaskList'
+// TaskList component is now inline
 import RecommendationsPanel from '@/components/RecommendationsPanel'
 import { useTasks } from '@/hooks/useTasks'
 import { useStudySession } from '@/hooks/useStudySession'
@@ -98,7 +98,10 @@ export default function TasksPage(){
       const resp = await startSession({ taskId, durationMin: 25 })
       setActiveTaskId(taskId)
       setTimerStatus('in-progress')
-    }catch(e:any){ pushError({ errorCode: 'SESSION_START_FAIL', errorMessage: String(e), details: e }) }
+    }catch(e:any){ 
+      console.error('Failed to start task:', e)
+      pushError({ errorCode: 'SESSION_START_FAIL', errorMessage: 'Failed to start session', details: e }) 
+    }
   }
 
   const toggleTaskComplete = async (task: any) => {
@@ -206,7 +209,31 @@ export default function TasksPage(){
                 <CardDescription>Your study tasks for today</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <TaskList tasks={today as any[]} onStart={(t:any)=>startTask(t.id)} onComplete={()=>{}} onToggle={(t:any)=>toggleTaskComplete(t)} onReorder={async (order)=>{ await fetch('/api/tasks/reorder', { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ order })}); await fetchToday(); await fetchUpcoming(); }} />
+{today.length > 0 ? (
+                  <div className="space-y-3">
+                    {today.map((task: any) => (
+                      <div key={task.id} className="p-3 border rounded-lg hover:bg-muted/50 flex items-center justify-between">
+                        <div>
+                          <div className="font-medium">{task.title || task.topic}</div>
+                          <div className="text-sm text-muted-foreground">{task.subject || 'General'} • {task.duration_minutes || task.estimatedMinutes || 30} min</div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge variant={task.status === 'done' || task.completed ? 'success' : 'secondary'}>
+                            {task.status || 'pending'}
+                          </Badge>
+                          <Button size="sm" variant="ghost" onClick={() => startTask(task.id)} disabled={!!activeTaskId}>
+                            Start
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={() => toggleTaskComplete(task)}>
+                            {task.status === 'done' || task.completed ? 'Undo' : 'Complete'}
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="p-4 text-center text-muted-foreground">No tasks for today.</div>
+                )}
               </CardContent>
             </Card>
 

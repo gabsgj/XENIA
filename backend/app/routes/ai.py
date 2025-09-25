@@ -1,6 +1,7 @@
 import logging
 import threading
 import time
+import re
 from flask import Blueprint, request
 from ..errors import ApiError
 from ..services.ai_providers import get_topic_resources

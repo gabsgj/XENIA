@@ -32,6 +32,17 @@ export default function RecommendationsPanel({ topics }: { topics: string[] }){
         setItems(r)
       }catch(e){
         console.warn('Recommendations failed', e)
+        // Provide fallback recommendations
+        const fallbackItems = topics.slice(0, 3).map((topic, idx) => ({
+          type: 'article',
+          title: `Learn ${topic}`,
+          url: `https://www.google.com/search?q=${encodeURIComponent(topic + ' tutorial')}`,
+          duration: 30,
+          difficulty: 'intermediate',
+          relevanceScore: 7,
+          topic: topic
+        }))
+        setItems(fallbackItems)
       }finally{setLoading(false)}
     }
     load()
