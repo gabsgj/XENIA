@@ -25,6 +25,7 @@ export default function PlannerPage() {
   const [plan, setPlan] = useState<any>(null)
   const [topics, setTopics] = useState<any[]>([])
   const [resources, setResources] = useState<any[]>([])
+  const [aiServiceError, setAiServiceError] = useState<string | null>(null)
   const [hoursPerDay, setHoursPerDay] = useState(1.5)
   const [deadline, setDeadline] = useState('')
   const [loading, setLoading] = useState(false)
@@ -113,10 +114,11 @@ export default function PlannerPage() {
             const topicResourcePromises = uniqueTopics.slice(0, 5).map(async (topic: string) => {
               try {
                 const topicRes = await api(`/api/plan/resources/${encodeURIComponent(topic)}?learning_style=balanced`)
-                return { topic, resources: topicRes.resources || {} }
+                // return the full response so we can inspect for error messages like `final_answer`
+                return { topic, response: topicRes }
               } catch (e) {
                 console.warn(`Failed to fetch resources for topic: ${topic}`, e)
-                return { topic, resources: {} }
+                return { topic, response: null }
               }
             })
 
@@ -124,8 +126,19 @@ export default function PlannerPage() {
             const additionalResources: any[] = []
 
             topicResourcesResults.forEach((result) => {
-              if (result.status === 'fulfilled' && result.value?.resources) {
-                const { topic, resources: topicRes } = result.value
+              if (result.status === 'fulfilled' && result.value?.response) {
+                const { topic, response } = result.value
+
+                // response may either be the resources object directly or an object with a `resources` key
+                const topicRes = response.resources || response
+
+                // If there are no resources and the backend included a final_answer / error, surface it
+                const hasResources = Array.isArray(response?.resources) ? response.resources.length > 0 : Object.keys(topicRes || {}).length > 0
+                if (!hasResources && (response?.final_answer || response?.error || response?.success === false || response?.message)) {
+                  const msg = response.final_answer || response.error || response.message || 'AI service unavailable'
+                  setAiServiceError(String(msg))
+                  return
+                }
 
                 // Extract different types of resources
                 Object.entries(topicRes).forEach(([category, resourceList]: [string, any]) => {
@@ -150,20 +163,33 @@ export default function PlannerPage() {
             if (additionalResources.length === 0) {
               try {
                 const aiRes = await api(`/api/ai/get-resources?topics=${encodeURIComponent(uniqueTopics.slice(0, 5).join(','))}&max=12`)
-                const aiResources = aiRes.resources || []
-                const formattedResources = aiResources.map((resource: any) => ({
-                  ...resource,
-                  source: resource.type === 'video' ? 'youtube' : 
-                         resource.type === 'article' ? 'article' : 
-                         resource.type === 'documentation' ? 'docs' : 'general',
-                  url: resource.url || '#',
-                  title: resource.title || 'Resource',
-                  topic: resource.topic || ''
-                }))
-                additionalResources.push(...formattedResources)
+
+                // If the AI returned an explanatory message (connectivity, API key issues, etc.)
+                const aiHasResources = Array.isArray(aiRes?.resources) && aiRes.resources.length > 0
+                if (!aiHasResources && (aiRes?.final_answer || aiRes?.error || aiRes?.success === false || aiRes?.message)) {
+                  const msg = aiRes.final_answer || aiRes.error || aiRes.message || 'AI service unavailable'
+                  setAiServiceError(String(msg))
+                } else {
+                  setAiServiceError(null)
+                  const aiResources = aiRes.resources || []
+                  const formattedResources = aiResources.map((resource: any) => ({
+                    ...resource,
+                    source: resource.type === 'video' ? 'youtube' : 
+                           resource.type === 'article' ? 'article' : 
+                           resource.type === 'documentation' ? 'docs' : 'general',
+                    url: resource.url || '#',
+                    title: resource.title || 'Resource',
+                    topic: resource.topic || ''
+                  }))
+                  additionalResources.push(...formattedResources)
+                }
               } catch (e) {
                 console.warn('Failed to fetch AI resources (batched):', e)
+                setAiServiceError('Failed to reach AI service')
               }
+            } else {
+              // we successfully gathered per-topic resources, clear any previous AI error
+              setAiServiceError(null)
             }
 
             // Merge with existing resources, avoiding duplicates
@@ -383,7 +409,7 @@ export default function PlannerPage() {
           />
         )}
 
-        {plan ? (
+  {plan ? (
           <Tabs defaultValue='kanban' className="space-y-6">
             <TabsList className="grid w-full grid-cols-3 max-w-md">
               <TabsTrigger value='kanban' className="flex items-center gap-2">
@@ -633,7 +659,14 @@ export default function PlannerPage() {
         )}
 
         {/* Dedicated Resources Section */}
-        {resources.length > 0 && (
+        <div>
+          {aiServiceError && (
+            <div className="mb-4 p-3 rounded bg-yellow-50 border-l-4 border-yellow-400 text-sm text-yellow-800">
+              {aiServiceError}
+            </div>
+          )}
+
+          {resources.length > 0 && (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -779,8 +812,9 @@ export default function PlannerPage() {
                 </div>
               )}
             </CardContent>
-          </Card>
-        )}
+            </Card>
+            )}
+          </div>
       </div>
     </MainLayout>
   )
