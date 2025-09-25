@@ -11,6 +11,7 @@ interface MinimalTimerProps {
   onComplete: (actualTime: number) => void
   externalProgress?: number
   className?: string
+  noAutoStart?: boolean
 }
 
 export function MinimalTimer({
@@ -23,14 +24,26 @@ export function MinimalTimer({
 }: MinimalTimerProps) {
   const totalSeconds = Math.max(1, duration) * 60
   const [remaining, setRemaining] = useState(() => Math.max(0, totalSeconds * (1 - (externalProgress ?? 0) / 100)))
-  const [isRunning, setIsRunning] = useState(status === 'in-progress')
+  const [isRunning, setIsRunning] = useState(() => !!( ! (typeof (arguments) !== 'undefined') && false) )
+  // will be initialized properly in effect below; default false to avoid accidental autostart
+  // NOTE: we will consider noAutoStart prop in the sync effect
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
 
   useEffect(() => {
-    setIsRunning(status === 'in-progress')
-    if (status === 'completed') setRemaining(0)
-    if (status === 'pending') setRemaining(totalSeconds)
-  }, [status, totalSeconds])
+    // Sync visible remaining time and completed state, but optionally avoid auto-starting
+    if (status === 'completed') {
+      setRemaining(0)
+    }
+    if (status === 'pending') {
+      setRemaining(totalSeconds)
+    }
+
+    // Only set running state from external status when auto-start is allowed
+    // Default behavior: do not auto-start (noAutoStart=true) to keep timers manual.
+    if (!noAutoStart) {
+      setIsRunning(status === 'in-progress')
+    }
+  }, [status, totalSeconds, noAutoStart])
 
   useEffect(() => {
     if (externalProgress !== undefined && !isRunning) {
@@ -75,10 +88,11 @@ export function MinimalTimer({
     setIsRunning(true)
   }, [onStatusChange])
 
-  const pause = useCallback(() => {
+  const reset = useCallback(() => {
     setIsRunning(false)
+    setRemaining(totalSeconds)
     onStatusChange('pending')
-  }, [onStatusChange])
+  }, [onStatusChange, totalSeconds])
 
   const complete = useCallback(() => {
     setIsRunning(false)
@@ -114,17 +128,20 @@ export function MinimalTimer({
         />
       </div>
       <div className="flex items-center gap-1">
-        {status === 'pending' && (
-          <Button size="sm" variant="ghost" onClick={start} className="h-6 w-6 p-0">
+        {/* Start button - always visible when not completed and not running */}
+        {!isRunning && status !== 'completed' && (
+          <Button size="sm" variant="ghost" onClick={start} className="h-6 w-6 p-0" aria-label="Start">
             <Play className="w-3 h-3" />
           </Button>
         )}
-        {status === 'in-progress' && (
-          <Button size="sm" variant="ghost" onClick={pause} className="h-6 w-6 p-0">
-            <Pause className="w-3 h-3" />
-          </Button>
-        )}
-        <Button size="sm" variant="ghost" onClick={complete} className="h-6 w-6 p-0">
+
+        {/* Reset button - small and minimal */}
+        <Button size="sm" variant="ghost" onClick={reset} className="h-6 w-6 p-0" aria-label="Reset">
+          <RotateCcw className="w-3 h-3" />
+        </Button>
+
+        {/* Complete button */}
+        <Button size="sm" variant="ghost" onClick={complete} className="h-6 w-6 p-0" aria-label="Complete">
           <CheckCircle className="w-3 h-3" />
         </Button>
       </div>

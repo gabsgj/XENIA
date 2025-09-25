@@ -7,7 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { LoadingButton, LoadingOverlay, SkeletonCard } from '@/components/ui/loading'
-import { StudyTimer } from '@/components/ui/study-timer'
+import MinimalTimer from '@/components/ui/minimal-timer'
 
 import { MainLayout } from '@/components/navigation'
 import RegeneratePlanModal from '@/components/RegeneratePlanModal'
@@ -454,9 +454,10 @@ export default function PlannerPage() {
                           
                           {/* Study Timer */}
                           <div className="mb-3">
-                            <StudyTimer
+                            <MinimalTimer
                               duration={s.duration_min}
                               status={s.status || 'pending'}
+                              noAutoStart={true}
                               onStatusChange={(newStatus) => updateSessionStatus(s.date, s.topic, newStatus)}
                               onComplete={(actualTime) => markSessionCompleteAPI(s.date, s.topic, actualTime)}
                             />
@@ -536,9 +537,10 @@ export default function PlannerPage() {
                               <Badge variant="outline">{s.duration_min} min</Badge>
                             </td>
                             <td className='p-3'>
-                              <StudyTimer
+                              <MinimalTimer
                                 duration={s.duration_min}
                                 status={s.status || 'pending'}
+                                noAutoStart={true}
                                 onStatusChange={(newStatus) => updateSessionStatus(s.date, s.topic, newStatus)}
                                 onComplete={(actualTime) => markSessionCompleteAPI(s.date, s.topic, actualTime)}
                               />
