@@ -178,7 +178,18 @@ const RegeneratePlanModal: React.FC<Props> = ({ currentPlan, currentProgress, is
 
         <ModalFooter>
           <button onClick={onClose} className="px-4 py-2 text-gray-600 hover:text-gray-800">Cancel</button>
-          <button onClick={handleSubmit} disabled={isSubmitting || (!feasibilityCheck?.feasible && config.learningPace !== 'intensive')} className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50">
+          {/*
+            Only disable the regenerate button when we have an explicit feasibility result
+            that marks the timeline as infeasible and the selected pace isn't 'intensive'.
+            Previously the button was disabled while the feasibility check was still null,
+            which made the button unclickable immediately after opening the modal.
+          */}
+          <button
+            onClick={handleSubmit}
+            disabled={isSubmitting || (feasibilityCheck && !feasibilityCheck.feasible && config.learningPace !== 'intensive')}
+            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            title={isSubmitting ? 'Regenerating...' : (feasibilityCheck && !feasibilityCheck.feasible && config.learningPace !== 'intensive') ? 'Timeline infeasible — adjust deadline or choose intensive pace' : undefined}
+          >
             {isSubmitting ? 'Regenerating...' : 'Regenerate Plan'}
           </button>
         </ModalFooter>
