@@ -36,16 +36,17 @@ export function MinimalTimer({
     // Narrow the status value to the expected union for safe comparisons
     const s: 'pending' | 'in-progress' | 'completed' = status
 
-    // Sync visible remaining time and completed state, but optionally avoid auto-starting
+    // Always reflect completed state
     if (s === 'completed') {
       setRemaining(0)
       setManuallyPaused(false)
       setIsRunning(false)
       startedRef.current = false
+      return
     }
-    // When status is pending, reset state properly
-    if (s === 'pending') {
-      // Reset to full duration if no external progress, or use external progress
+
+    // Only reset to pending if the local timer hasn't started and isn't running
+    if (s === 'pending' && !startedRef.current && !isRunning) {
       const initialRemaining = externalProgress !== undefined && externalProgress !== null
         ? Math.max(0, totalSeconds * (1 - externalProgress / 100))
         : totalSeconds
@@ -55,12 +56,11 @@ export function MinimalTimer({
       startedRef.current = false
     }
 
-    // Only set running state from external status when auto-start is allowed and not manually paused
-    // Default behavior: do not auto-start (noAutoStart=true) to keep timers manual.
-    if (!noAutoStart && !manuallyPaused) {
+    // Only set running state from external when auto-start is allowed and we haven't manually started yet
+    if (!noAutoStart && !manuallyPaused && !startedRef.current) {
       setIsRunning(s === 'in-progress')
     }
-  }, [status, totalSeconds, noAutoStart, manuallyPaused, externalProgress])
+  }, [status, totalSeconds, noAutoStart, manuallyPaused, externalProgress, isRunning])
 
   useEffect(() => {
     // Only sync from externalProgress before the local timer has started,
@@ -155,7 +155,7 @@ export function MinimalTimer({
   }
 
   return (
-    <div className={`${className} flex items-center gap-2 px-2 py-1 bg-background rounded border w-full`}>
+    <div className={`${className} flex flex-wrap sm:flex-nowrap items-center gap-2 px-2 py-1 bg-background rounded border w-full`}>
       <div className="text-xs font-mono min-w-[2.75rem] text-muted-foreground">{formatTime(remaining)}</div>
       <div className="flex-1 bg-muted/30 rounded-full h-1 overflow-hidden min-w-[2rem]">
         <div

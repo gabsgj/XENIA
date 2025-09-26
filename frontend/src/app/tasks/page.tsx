@@ -39,6 +39,7 @@ import { TimerErrorBoundary } from '@/components/ui/timer-error-boundary'
 import { useTasks } from '@/hooks/useTasks'
 import { useStudySession } from '@/hooks/useStudySession'
 import { cn } from '@/lib/utils'
+import { api } from '@/lib/api'
 
 interface TaskFormData {
   title: string
@@ -103,6 +104,41 @@ export default function TasksPage(){
     description: ''
   })
 
+  // Plan sessions merging
+  const [planToday, setPlanToday] = useState<any[]>([])
+  const [planLoading, setPlanLoading] = useState(false)
+
+  useEffect(() => {
+    const fetchPlanToday = async () => {
+      setPlanLoading(true)
+      try {
+        const resp = await api('/api/plan/current')
+        const todayStr = new Date().toISOString().split('T')[0]
+        const sessions = (resp?.sessions || []).filter((s: any) => s.date === todayStr)
+        const mapped = sessions.map((s: any, idx: number) => ({
+          id: `plan-${s.date}-${idx}`,
+          title: s.topic || 'Study Session',
+          subject: (s.topic || '').split(':')[0] || 'General',
+          estimatedMinutes: s.duration_min || 45,
+          duration_minutes: s.duration_min || 45,
+          priority: 'Medium',
+          status: s.status || 'pending',
+          completed: s.status === 'completed',
+          progress: s.status === 'completed' ? 100 : s.status === 'in-progress' ? 50 : 0,
+          dueDate: s.date,
+          fromPlan: true,
+          __plan: { date: s.date, topic: s.topic }
+        }))
+        setPlanToday(mapped)
+      } catch {
+        setPlanToday([])
+      } finally {
+        setPlanLoading(false)
+      }
+    }
+    fetchPlanToday()
+  }, [])
+
   // Computed values
   const sessionStats = useMemo(() => {
     return getSessionStats()
@@ -110,10 +146,12 @@ export default function TasksPage(){
 
   const todaysTasks = useMemo(() => {
     const todayStr = new Date().toISOString().split('T')[0]
-    return all.filter(task => 
+    const base = all.filter(task => 
       task.dueDate === todayStr || task.due_date === todayStr
     )
-  }, [all])
+    // Merge plan sessions (non-destructive)
+    return [...base, ...planToday]
+  }, [all, planToday])
 
   const filteredTasks = useMemo(() => {
     let filtered = todaysTasks
@@ -187,7 +225,7 @@ export default function TasksPage(){
       
       // Start new session
       await startSession({ 
-        taskId: task.id, 
+        taskId: task.fromPlan ? undefined : task.id, 
         durationMin: task.estimatedMinutes || task.duration_minutes || 25,
         topic: task.title,
         subject: task.subject
@@ -196,8 +234,20 @@ export default function TasksPage(){
       setActiveTaskId(task.id)
       setTimerStatus('in-progress')
       
-      // Update task status
-      await updateTask(task.id, { status: 'in-progress' })
+      // Update task status (only for real tasks)
+      if (!task.fromPlan) {
+        await updateTask(task.id, { status: 'in-progress' })
+      } else if (task.__plan) {
+        // Optimistically update local plan item
+        setPlanToday(prev => prev.map(p => p.id === task.id ? { ...p, status: 'in-progress' } : p))
+        // Best-effort: update backend plan status to in-progress
+        try {
+          await api('/api/resources/progress', {
+            method: 'POST',
+            body: JSON.stringify({ sessions: [{ date: task.__plan.date, topic: task.__plan.topic, status: 'in-progress' }] })
+          })
+        } catch {}
+      }
       
     } catch (e: any) {
       pushError({ 
@@ -221,14 +271,27 @@ export default function TasksPage(){
       if (activeTaskId === task.id && activeSession?.id) {
         await endSession({ 
           sessionId: activeSession.id, 
-          taskId: task.id, 
+          taskId: task.fromPlan ? undefined : task.id, 
           completed: true 
         })
         setActiveTaskId(null)
         setTimerStatus('pending')
       }
       
-      await toggleTaskStatus(task.id)
+      if (!task.fromPlan) {
+        await toggleTaskStatus(task.id)
+      } else if (task.__plan) {
+        // Update plan session to completed
+        try {
+          await api('/api/resources/progress', {
+            method: 'POST',
+            body: JSON.stringify({ sessions: [{ date: task.__plan.date, topic: task.__plan.topic, status: 'completed', duration_min: task.estimatedMinutes || task.duration_minutes || 25 }] })
+          })
+          setPlanToday(prev => prev.map(p => p.id === task.id ? { ...p, status: 'completed', completed: true, progress: 100 } : p))
+        } catch (e) {
+          pushError({ errorCode: 'PLAN_PROGRESS_FAIL', errorMessage: 'Failed to complete plan session', details: e })
+        }
+      }
       
     } catch (e: any) {
       pushError({ 
@@ -246,6 +309,11 @@ export default function TasksPage(){
   }
 
   const handleDeleteTask = async (task: any) => {
+    if (task.fromPlan) {
+      alert('Plan sessions cannot be deleted here. You can adjust your plan in the Planner page.')
+      return
+    }
+
     if (!confirm(`Are you sure you want to delete "${task.title}"?`)) {
       return
     }
@@ -316,21 +384,37 @@ export default function TasksPage(){
     if (!activeTaskId) return
     
     try {
-      // Complete the session and task
+      // Complete the session and task/plan
       if (activeSession?.id) {
         await endSession({ 
           sessionId: activeSession.id, 
-          taskId: activeTaskId, 
+          taskId: planToday.some(p => p.id === activeTaskId) ? undefined : activeTaskId, 
           actualMinutes: actualTime, 
           completed: true 
         })
       }
-      
-      await updateTask(activeTaskId, { 
-        status: 'completed', 
-        completed: true, 
-        progress: 100 
-      })
+
+      const isPlan = planToday.some(p => p.id === activeTaskId)
+      if (isPlan) {
+        const planItem = planToday.find(p => p.id === activeTaskId)
+        if (planItem?.__plan) {
+          try {
+            await api('/api/resources/progress', {
+              method: 'POST',
+              body: JSON.stringify({ sessions: [{ date: planItem.__plan.date, topic: planItem.__plan.topic, status: 'completed', duration_min: actualTime }] })
+            })
+            setPlanToday(prev => prev.map(p => p.id === activeTaskId ? { ...p, status: 'completed', completed: true, progress: 100 } : p))
+          } catch (e) {
+            pushError({ errorCode: 'PLAN_PROGRESS_FAIL', errorMessage: 'Failed to update plan after timer', details: e })
+          }
+        }
+      } else {
+        await updateTask(activeTaskId, { 
+          status: 'completed', 
+          completed: true, 
+          progress: 100 
+        })
+      }
       
       setActiveTaskId(null)
       setTimerStatus('pending')
@@ -806,7 +890,7 @@ export default function TasksPage(){
                                       <Button
                                         size="sm"
                                         onClick={() => handleStartTask(task)}
-                                        disabled={processingIds.has(task.id) || !!activeTaskId}
+                                        disabled={processingIds.has(task.id) || (!!activeTaskId && activeTaskId !== task.id)}
                                         className="bg-blue-600 hover:bg-blue-700"
                                       >
                                         {processingIds.has(task.id) ? (
@@ -831,15 +915,17 @@ export default function TasksPage(){
                                       )}
                                     </Button>
                                     
-                                    <Button
-                                      size="sm"
-                                      variant="ghost"
-                                      onClick={() => handleDeleteTask(task)}
-                                      disabled={processingIds.has(task.id)}
-                                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                                    >
-                                      <Trash2 className="w-3 h-3" />
-                                    </Button>
+                                    {!task.fromPlan && (
+                                      <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        onClick={() => handleDeleteTask(task)}
+                                        disabled={processingIds.has(task.id)}
+                                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                      >
+                                        <Trash2 className="w-3 h-3" />
+                                      </Button>
+                                    )}
                                   </>
                                 )}
                               </div>

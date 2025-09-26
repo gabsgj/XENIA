@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { LoadingButton, LoadingOverlay, SkeletonCard } from '@/components/ui/loading'
 import MinimalTimer from '@/components/ui/minimal-timer'
+import EnhancedRecommendationsPanel from '@/components/EnhancedRecommendationsPanel'
 
 import { MainLayout } from '@/components/navigation'
 import { PlannerErrorBoundary } from '@/components/planner/PlannerErrorBoundary'
@@ -428,7 +429,7 @@ export default function PlannerPage() {
                           
                           <div className="mb-3">
                             <MinimalTimer
-                              className="w-full max-w-[240px]"
+                              className="w-full"
                               duration={s.duration_min}
                               status={sessionStatus[`${s.date}-${s.topic}`] || s.status || 'pending'}
                               noAutoStart={true}
@@ -521,7 +522,7 @@ export default function PlannerPage() {
                             </td>
                             <td className='p-3'>
                               <MinimalTimer
-                                className="w-full max-w-[240px]"
+                                className="w-full"
                                 duration={s.duration_min}
                                 status={sessionStatus[`${s.date}-${s.topic}`] || s.status || 'pending'}
                                 noAutoStart={true}
@@ -659,7 +660,7 @@ export default function PlannerPage() {
         )}
 
         {/* Dedicated Resources Section */}
-        {resources.length > 0 && (
+        {(resources.length > 0 || (plan?.sessions?.length || 0) > 0) && (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -671,6 +672,21 @@ export default function PlannerPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
+              {/* Smart Recommendations (reuses the tasks panel) */}
+              {(() => {
+                try {
+                  const planTopicsForRecs = Array.from(new Set((plan?.sessions || []).map((s:any) => s.topic).filter(Boolean)))
+                  return (
+                    <div className="mb-6">
+                      <h4 className="text-sm font-semibold mb-2">AI-powered Recommendations</h4>
+                      <EnhancedRecommendationsPanel topics={planTopicsForRecs} maxItems={12} compact={true} />
+                    </div>
+                  )
+                } catch {
+                  return null
+                }
+              })()}
+
               {/* Sort resources to prioritize videos */}
               {(() => {
                 const sortedResources = [...resources].sort((a, b) => {

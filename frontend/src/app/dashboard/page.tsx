@@ -341,23 +341,24 @@ export default function DashboardPage(){
               <CardContent className="space-y-4">
                 {todaysTasks.length > 0 ? (
                   todaysTasks.map((task: any) => (
-                    <div key={task.id} className="bg-muted/50 p-4 rounded-lg">
-                      <div className="flex items-center justify-between mb-3">
-                        <div>
-                          <h4 className="font-semibold">{task.subject}</h4>
-                          <p className="text-sm text-muted-foreground">{task.topic}</p>
+                    <div key={task.id} className="bg-muted/50 p-4 sm:p-5 rounded-lg">
+                      <div className="flex items-center justify-between gap-4 flex-wrap md:flex-nowrap mb-3">
+                        <div className="min-w-0 flex-1">
+                          <h4 className="font-semibold truncate" title={task.subject}>{task.subject}</h4>
+                          <p className="text-sm text-muted-foreground truncate" title={task.topic}>{task.topic}</p>
                         </div>
-                        <MinimalTimer
-                          className="w-full max-w-[240px]"
-                          duration={task.duration}
-                          status={task.status}
-                          noAutoStart={true}
-                          onStatusChange={(newStatus) => updateSessionStatus(task.date, task.topic, newStatus)}
-                          onComplete={(actualTime) => markSessionComplete(task.date, task.topic, actualTime)}
-                          externalProgress={task.progress}
-                        />
+                        <div className="w-full md:w-auto md:flex-shrink-0">
+                          <MinimalTimer
+                            className="w-full max-w-[280px]"
+                            duration={task.duration}
+                            status={task.status}
+                            noAutoStart={true}
+                            onStatusChange={(newStatus) => updateSessionStatus(task.date, task.topic, newStatus)}
+                            onComplete={(actualTime) => markSessionComplete(task.date, task.topic, actualTime)}
+                            externalProgress={task.progress}
+                          />
+                        </div>
                       </div>
-                      {/* Progress is shown by the StudyTimer timeline above */}
                     </div>
                   ))
                 ) : (
