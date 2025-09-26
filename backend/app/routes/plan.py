@@ -320,6 +320,36 @@ def regenerate():
         if not current_plan:
             raise ApiError('PLAN_404', 'No current plan found')
 
+        # Fetch syllabus topics to ensure regeneration only includes syllabus topics
+        from ..utils import is_valid_uuid
+        from ..services.topic_store import get_topics as store_get_topics
+        
+        syllabus_topic_names = set()
+        if not is_valid_uuid(uid):
+            # Development mode: get from in-memory store
+            syllabus_topics = store_get_topics(uid)
+            syllabus_topic_names = set(syllabus_topics)
+        else:
+            # Production mode: get from Supabase
+            sb = get_supabase()
+            try:
+                from ..supabase_client import supabase_call
+                resp = supabase_call(lambda: sb.table("syllabus_topics").select("topic").eq("user_id", uid).execute())
+                if resp.data:
+                    syllabus_topic_names = set([t["topic"] for t in resp.data])
+            except Exception as e:
+                logger.warning(f"Failed to fetch syllabus topics from Supabase: {e}")
+                # Fallback to current plan topics
+                syllabus_topic_names = set([s.get('topic') for s in current_plan.get('sessions', []) if s.get('topic')])
+
+        # If we have syllabus topics, filter the current plan to only include syllabus topics
+        if syllabus_topic_names:
+            filtered_sessions = []
+            for session in current_plan.get('sessions', []):
+                if session.get('topic') in syllabus_topic_names:
+                    filtered_sessions.append(session)
+            current_plan['sessions'] = filtered_sessions
+
         # Build service and run regeneration
         service = PlanRegenerationService(gemini_client=None, supabase_client=None)
         regenerated = service.regenerate_with_deadline(

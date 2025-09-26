@@ -109,18 +109,13 @@ export default function PlannerPage() {
       // Get user ID from Supabase authentication
       const userId = getUserId()
       
-      // Get current syllabus topics to filter the regeneration
-      const syllabusTopics = topics.map((t: any) => t.topic)
-      
-      setPlan(await api('/api/plan/regenerate', { 
+      setPlan(await api('/api/plan/generate', { 
         method:'POST', 
         body: JSON.stringify({ 
-          user_id: userId,
-          new_deadline: deadline || undefined,
-          preserve_progress: true,
-          excluded_topics: [], // Could be populated from UI filters
-          priority_adjustment: 'balanced',
-          learning_pace: 'moderate'
+          user_id: userId, // Use actual user ID from authentication
+          horizon_days: 14, 
+          preferred_hours_per_day: hoursPerDay, 
+          deadline: deadline||undefined 
         }) 
       }))
     } catch(e:any){ 
