@@ -26,6 +26,8 @@ export default function PlannerPage() {
   const [hoursPerDay, setHoursPerDay] = useState(1.5)
   const [deadline, setDeadline] = useState('')
   const [loading, setLoading] = useState(false)
+  const [initialTopics, setInitialTopics] = useState<any[]>([])
+  const [sessionStatus, setSessionStatus] = useState<Record<string, 'pending' | 'in-progress' | 'completed'>>({})
   
   // Progress tracking state
   const [completedSessions, setCompletedSessions] = useState<Set<string>>(new Set())
@@ -48,6 +50,9 @@ export default function PlannerPage() {
         setPlan(p)
         setTopics(t.topics||[])
         setResources(r.resources||[])
+        if (t.topics?.length > 0) {
+          setInitialTopics(t.topics)
+        }
         
         // Also fetch topic-specific resources for current plan topics
         if (p?.sessions?.length > 0) {
@@ -113,7 +118,7 @@ export default function PlannerPage() {
       const userId = getUserId()
       
       // Get current syllabus topics to filter the regeneration
-      const syllabusTopics = topics.map((t: any) => t.topic)
+      const syllabusTopics = (initialTopics.length > 0 ? initialTopics : topics).map((t: any) => t.topic)
       
       setPlan(await api('/api/plan/regenerate', { 
         method:'POST', 
@@ -121,6 +126,7 @@ export default function PlannerPage() {
           user_id: userId,
           new_deadline: deadline || undefined,
           preserve_progress: true,
+          topics: syllabusTopics, // Pass the topics to the backend
           excluded_topics: [], // Could be populated from UI filters
           priority_adjustment: 'balanced',
           learning_pace: 'moderate'
@@ -187,6 +193,7 @@ export default function PlannerPage() {
         body: JSON.stringify({ sessions: [{ date, topic, status }] })
       })
       setPlan(resp.plan)
+      setSessionStatus(prev => ({ ...prev, [`${date}-${topic}`]: status as 'pending' | 'in-progress' | 'completed' }))
     } catch(e:any){
       pushError({ errorCode: e?.errorCode||'PLAN_PROGRESS_FAIL', errorMessage: e?.errorMessage, details: e })
     }
@@ -277,11 +284,11 @@ export default function PlannerPage() {
                             </Badge>
                           </div>
                           
-                          {/* Study Timer */}
                           <div className="mb-3">
                             <MinimalTimer
+                              className="w-48"
                               duration={s.duration_min}
-                              status={s.status || 'pending'}
+                              status={sessionStatus[`${s.date}-${s.topic}`] || s.status || 'pending'}
                               noAutoStart={true}
                               onStatusChange={(newStatus) => markSession(s.date, s.topic, newStatus)}
                               onComplete={(actualTime) => markSessionComplete(`${s.date}-${s.topic}`, actualTime)}
@@ -291,7 +298,7 @@ export default function PlannerPage() {
                           <p className='text-xs text-muted-foreground mb-2'>{s.focus}</p>
                           
                           {/* Resource suggestions for this topic */}
-                          {resources.filter((r:any) => r.topic === s.topic || s.topic.toLowerCase().includes(r.topic.toLowerCase()) || r.topic.toLowerCase().includes(r.topic.toLowerCase())).slice(0, 2).map((resource:any, rIdx:number) => (
+                          {resources.filter((r:any) => r.topic === s.topic || s.topic.toLowerCase().includes(r.topic.toLowerCase()) || r.topic.toLowerCase().includes(r.topic.toLowerCase())).slice(0, 5).map((resource:any, rIdx:number) => (
                             <div key={rIdx} className="mb-2 p-2 bg-slate-50 dark:bg-slate-800/50 rounded border border-slate-200 dark:border-slate-700">
                               <div className="flex items-center gap-2 mb-1">
                                 <span className="text-xs font-medium text-slate-600 dark:text-slate-400">
@@ -364,8 +371,9 @@ export default function PlannerPage() {
                             </td>
                             <td className='p-3'>
                               <MinimalTimer
+                                className="w-48"
                                 duration={s.duration_min}
-                                status={s.status || 'pending'}
+                                status={sessionStatus[`${s.date}-${s.topic}`] || s.status || 'pending'}
                                 noAutoStart={true}
                                 onStatusChange={(newStatus) => markSession(s.date, s.topic, newStatus)}
                                 onComplete={(actualTime) => markSessionComplete(`${s.date}-${s.topic}`, actualTime)}
@@ -529,7 +537,7 @@ export default function PlannerPage() {
                           Featured Videos
                         </h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                          {videoResources.slice(0, showAllResources ? videoResources.length : 8).map((resource:any, idx:number) => (
+                          {videoResources.slice(0, showAllResources ? videoResources.length : 12).map((resource:any, idx:number) => (
                             <Card key={`video-${idx}`} className="hover:shadow-lg transition-all border-l-4 border-l-red-500 bg-white dark:bg-slate-800">
                               <CardContent className="p-4">
                                 <div className="flex items-start gap-3">
@@ -571,7 +579,7 @@ export default function PlannerPage() {
                           Additional Resources
                         </h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                          {otherResources.slice(0, showAllResources ? otherResources.length : 8).map((resource:any, idx:number) => (
+                          {otherResources.slice(0, showAllResources ? otherResources.length : 12).map((resource:any, idx:number) => (
                             <div key={`other-${idx}`} className="border rounded-lg p-4 hover:shadow-md transition-all">
                               <div className="flex items-start gap-3">
                                 <span className="text-2xl">
@@ -606,7 +614,7 @@ export default function PlannerPage() {
                     )}
 
                     {/* Show More/Less Button */}
-                    {(videoResources.length > 8 || otherResources.length > 8) && (
+                    {(videoResources.length > 12 || otherResources.length > 12) && (
                       <div className="text-center mt-6">
                         <Button
                           variant="outline"
@@ -635,7 +643,7 @@ export default function PlannerPage() {
               {resources.length > 16 && !showAllResources && (
                 <div className="text-center mt-6">
                   <p className="text-sm text-muted-foreground">
-                    Showing {Math.min(16, resources.length)} of {resources.length} resources
+                    Showing {Math.min(24, resources.length)} of {resources.length} resources
                   </p>
                 </div>
               )}

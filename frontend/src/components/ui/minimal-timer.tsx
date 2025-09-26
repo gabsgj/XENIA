@@ -25,7 +25,8 @@ export function MinimalTimer({
 }: MinimalTimerProps) {
   const totalSeconds = Math.max(1, duration) * 60
   const [remaining, setRemaining] = useState(() => Math.max(0, totalSeconds * (1 - (externalProgress ?? 0) / 100)))
-  const [isRunning, setIsRunning] = useState(() => !!( ! (typeof (arguments) !== 'undefined') && false) )
+  const [isRunning, setIsRunning] = useState(false)
+  const [manuallyPaused, setManuallyPaused] = useState(false)
   // will be initialized properly in effect below; default false to avoid accidental autostart
   // NOTE: we will consider noAutoStart prop in the sync effect
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
@@ -34,17 +35,19 @@ export function MinimalTimer({
     // Sync visible remaining time and completed state, but optionally avoid auto-starting
     if (status === 'completed') {
       setRemaining(0)
+      setManuallyPaused(false)
     }
     if (status === 'pending') {
       setRemaining(totalSeconds)
+      setManuallyPaused(false)
     }
 
-    // Only set running state from external status when auto-start is allowed
+    // Only set running state from external status when auto-start is allowed and not manually paused
     // Default behavior: do not auto-start (noAutoStart=true) to keep timers manual.
-    if (!noAutoStart) {
+    if (!noAutoStart && !manuallyPaused) {
       setIsRunning(status === 'in-progress')
     }
-  }, [status, totalSeconds, noAutoStart])
+  }, [status, totalSeconds, noAutoStart, manuallyPaused])
 
   useEffect(() => {
     if (externalProgress !== undefined && !isRunning) {
@@ -87,20 +90,29 @@ export function MinimalTimer({
   const start = useCallback(() => {
     onStatusChange('in-progress')
     setIsRunning(true)
+    setManuallyPaused(false)
   }, [onStatusChange])
+
+  const pause = useCallback(() => {
+    setIsRunning(false)
+    setManuallyPaused(true)
+    // Don't change status to pending, keep as in-progress so it can be resumed
+  }, [])
 
   const reset = useCallback(() => {
     setIsRunning(false)
     setRemaining(totalSeconds)
+    setManuallyPaused(false)
     onStatusChange('pending')
   }, [onStatusChange, totalSeconds])
 
   const complete = useCallback(() => {
     setIsRunning(false)
     setRemaining(0)
-    onStatusChange('completed')
+    setManuallyPaused(false)
+    // Only call onComplete - it handles both status change and duration update
     onComplete(Math.max(1, Math.round((totalSeconds - remaining) / 60)))
-  }, [onComplete, onStatusChange, totalSeconds, remaining])
+  }, [onComplete, totalSeconds, remaining])
 
   const formatTime = (s: number) => {
     const m = Math.floor(s / 60)
@@ -120,7 +132,7 @@ export function MinimalTimer({
   }
 
   return (
-    <div className={`${className} flex items-center gap-1.5 px-2 py-1 bg-muted/10 rounded border`}>
+    <div className={`${className} flex items-center gap-1.5 px-2 py-1 bg-muted/10 rounded border min-w-[200px]`}>
       <div className="text-xs font-mono min-w-[2.5rem] text-muted-foreground">{formatTime(remaining)}</div>
       <div className="flex-1 bg-muted/30 rounded-full h-0.5 overflow-hidden min-w-[1.5rem]">
         <div
@@ -129,22 +141,31 @@ export function MinimalTimer({
         />
       </div>
       <div className="flex items-center gap-0.5">
-        {/* Start button - always visible when not completed and not running */}
+        {/* Start button - visible when not running and not completed */}
         {!isRunning && status !== 'completed' && (
           <Button size="sm" variant="ghost" onClick={start} className="h-5 w-5 p-0 hover:bg-muted/50" aria-label="Start">
             <Play className="w-2.5 h-2.5" />
           </Button>
         )}
 
-        {/* Reset button - small and minimal */}
+        {/* Pause button - visible when running */}
+        {isRunning && (
+          <Button size="sm" variant="ghost" onClick={pause} className="h-5 w-5 p-0 hover:bg-muted/50" aria-label="Pause">
+            <Pause className="w-2.5 h-2.5" />
+          </Button>
+        )}
+
+        {/* Reset button - always visible */}
         <Button size="sm" variant="ghost" onClick={reset} className="h-5 w-5 p-0 hover:bg-muted/50" aria-label="Reset">
           <RotateCcw className="w-2.5 h-2.5" />
         </Button>
 
-        {/* Complete button */}
-        <Button size="sm" variant="ghost" onClick={complete} className="h-5 w-5 p-0 hover:bg-muted/50" aria-label="Complete">
-          <CheckCircle className="w-2.5 h-2.5" />
-        </Button>
+        {/* Complete button - visible when not completed */}
+        {status !== 'completed' && (
+          <Button size="sm" variant="ghost" onClick={complete} className="h-5 w-5 p-0 hover:bg-muted/50" aria-label="Complete">
+            <CheckCircle className="w-2.5 h-2.5" />
+          </Button>
+        )}
       </div>
     </div>
   )
