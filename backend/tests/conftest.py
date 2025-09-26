@@ -9,6 +9,14 @@ BACKEND_ROOT = Path(__file__).resolve().parents[1]
 if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
+# Ensure 'scripts' folder doesn't shadow test modules with identical names
+SCRIPTS_DIR = BACKEND_ROOT / 'scripts'
+try:
+    if str(SCRIPTS_DIR) in sys.path:
+        sys.path = [p for p in sys.path if p != str(SCRIPTS_DIR)]
+except Exception:
+    pass
+
 try:
     from dotenv import load_dotenv  # type: ignore
     load_dotenv(BACKEND_ROOT.parent / '.env')  # load project .env if exists

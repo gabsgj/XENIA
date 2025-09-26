@@ -79,11 +79,13 @@ export function useTasks(){
         responses[type] = await api(endpoints[type])
       }
       
+      const normalize = (resp: any) => Array.isArray(resp) ? resp : (resp?.tasks ?? [])
+
       setState(prev => ({
         ...prev,
-        today: responses.today?.tasks || prev.today,
-        upcoming: responses.upcoming?.tasks || prev.upcoming, 
-        all: responses.all?.tasks || prev.all,
+        today: Object.prototype.hasOwnProperty.call(responses, 'today') ? normalize(responses.today) : prev.today,
+        upcoming: Object.prototype.hasOwnProperty.call(responses, 'upcoming') ? normalize(responses.upcoming) : prev.upcoming,
+        all: Object.prototype.hasOwnProperty.call(responses, 'all') ? normalize(responses.all) : prev.all,
         loading: false,
         lastFetch: new Date()
       }))

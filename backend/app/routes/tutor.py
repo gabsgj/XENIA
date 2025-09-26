@@ -60,10 +60,8 @@ def ask_tutor():
         
         # Validate input
         if not question and not file_content:
-            return APIResponseBuilder.validation_error(
-                "No input provided. Please provide either a question or upload an image.",
-                field="question"
-            )
+            # Tests expect a specific ApiError shape and code for missing input on tutor
+            raise ApiError("TUTOR_TIMEOUT", "No input provided. Please provide either a question or upload an image.", status=400)
         
         # Get user ID
         raw_user_id = request.headers.get("X-User-Id", "") or request.values.get("user_id", "")

@@ -428,7 +428,7 @@ export default function PlannerPage() {
                           
                           <div className="mb-3">
                             <MinimalTimer
-                              className="w-48"
+                              className="w-full max-w-[240px]"
                               duration={s.duration_min}
                               status={sessionStatus[`${s.date}-${s.topic}`] || s.status || 'pending'}
                               noAutoStart={true}
@@ -521,7 +521,7 @@ export default function PlannerPage() {
                             </td>
                             <td className='p-3'>
                               <MinimalTimer
-                                className="w-48"
+                                className="w-full max-w-[240px]"
                                 duration={s.duration_min}
                                 status={sessionStatus[`${s.date}-${s.topic}`] || s.status || 'pending'}
                                 noAutoStart={true}

@@ -348,7 +348,7 @@ export default function DashboardPage(){
                           <p className="text-sm text-muted-foreground">{task.topic}</p>
                         </div>
                         <MinimalTimer
-                          className="w-48"
+                          className="w-full max-w-[240px]"
                           duration={task.duration}
                           status={task.status}
                           noAutoStart={true}

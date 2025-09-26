@@ -129,7 +129,7 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-background">
       <Navigation />
-      <div className="lg:pl-64">
+      <div className="lg:ml-64">
         <main className="min-h-screen">
           {children}
         </main>

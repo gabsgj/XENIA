@@ -155,7 +155,7 @@ export function MinimalTimer({
   }
 
   return (
-    <div className={`${className} flex items-center gap-2 px-2 py-1 bg-background rounded border min-w-[220px]`}>
+    <div className={`${className} flex items-center gap-2 px-2 py-1 bg-background rounded border w-full`}>
       <div className="text-xs font-mono min-w-[2.75rem] text-muted-foreground">{formatTime(remaining)}</div>
       <div className="flex-1 bg-muted/30 rounded-full h-1 overflow-hidden min-w-[2rem]">
         <div

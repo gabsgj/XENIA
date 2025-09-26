@@ -220,28 +220,34 @@ def _create_mock_client() -> Client:
         def upsert(self, data):
             logger.debug(f"🎭 Mock upsert: {data}")
             rows = self.store[self.table_name]
-            key = None
-            if isinstance(data, dict):
-                if "user_id" in data:
-                    key = ("user_id", data["user_id"])
-                elif "id" in data:
-                    key = ("id", data["id"])
-                else:
-                    rows.append(dict(data))
-                    return MockExecute()
-                # find existing
-                found = False
-                for r in rows:
-                    if r.get(key[0]) == key[1]:
-                        r.update(data)
-                        found = True
-                        break
-                if not found:
-                    rows.append(dict(data))
-            else:
-                # list of rows
+            def _upsert_row(row):
+                # Prefer composite key of (user_id, topic) when present (mimic real upsert unique constraint)
+                if isinstance(row, dict):
+                    if 'user_id' in row and 'topic' in row:
+                        # find by both user_id and topic
+                        for r in rows:
+                            if r.get('user_id') == row.get('user_id') and r.get('topic') == row.get('topic'):
+                                r.update(row)
+                                return
+                        # not found -> append
+                        rows.append(dict(row))
+                        return
+                    # fallback to id-based upsert
+                    if 'id' in row:
+                        for r in rows:
+                            if r.get('id') == row.get('id'):
+                                r.update(row)
+                                return
+                        rows.append(dict(row))
+                        return
+                    # generic append
+                    rows.append(dict(row))
+
+            if isinstance(data, list):
                 for row in data:
-                    self.upsert(row)
+                    _upsert_row(row)
+            else:
+                _upsert_row(data)
             return MockExecute()
         
         def update(self, changes):
