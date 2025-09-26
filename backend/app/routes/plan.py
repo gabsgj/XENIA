@@ -6,6 +6,7 @@ from ..services.planning import generate_plan, get_current_plan
 from ..services.plan_regeneration import PlanRegenerationService
 from ..services.progress import get_user_progress
 from ..services.weaktopics import analyze_weak_topics
+from ..supabase_client import get_supabase
 
 logger = logging.getLogger('xenia')
 plan_bp = Blueprint("plan", __name__)
@@ -386,7 +387,7 @@ def check_deadline_feasibility():
         if not new_deadline:
             raise ApiError('PLAN_400', 'new_deadline is required')
 
-        from datetime import datetime, date
+        from datetime import datetime, date, timedelta
         try:
             nd = datetime.strptime(new_deadline, '%Y-%m-%d').date()
         except Exception:
