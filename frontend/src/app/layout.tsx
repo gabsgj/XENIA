@@ -4,6 +4,7 @@ import { ThemeProvider } from "next-themes";
 import Providers from "@/components/providers";
 import { Toaster } from "@/components/ui/sonner";
 import WakeBackend from "@/components/WakeBackend";
+import EnhancedErrorBoundary from "@/components/ui/enhanced-error-boundary";
 
 export const metadata: Metadata = {
   title: "XENIA - AI Study Planner",
@@ -29,7 +30,9 @@ export default function RootLayout({
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
           <Providers>
             <WakeBackend />
-            {children}
+            <EnhancedErrorBoundary>
+              {children}
+            </EnhancedErrorBoundary>
             <Toaster richColors position="top-right" closeButton />
           </Providers>
         </ThemeProvider>

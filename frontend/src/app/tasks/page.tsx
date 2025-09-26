@@ -1,7 +1,6 @@
 "use client"
 
-import { useEffect, useState, useRef } from 'react'
-import { api, getUserId } from '@/lib/api'
+import { useEffect, useState, useMemo } from 'react'
 import { MainLayout } from '@/components/navigation'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -9,148 +8,200 @@ import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Skeleton } from '@/components/ui/skeleton'
+import { Textarea } from '@/components/ui/textarea'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog'
 import { useErrorContext } from '@/lib/error-context'
 import { 
-  Play, 
-  Pause, 
   Plus, 
   BookOpen,
   Timer,
-  Square
+  Target,
+  Clock,
+  Calendar,
+  MoreVertical,
+  Edit,
+  Trash2,
+  CheckCircle2,
+  PlayCircle,
+  PauseCircle,
+  RotateCcw,
+  Lightbulb,
+  Filter,
+  TrendingUp,
+  Flame
 } from 'lucide-react'
-import React from 'react'
-import { StudyTimer } from '@/components/ui/study-timer'
-// TaskList component is now inline
-import RecommendationsPanel from '@/components/RecommendationsPanel'
+import { EnhancedStudyTimer } from '@/components/ui/enhanced-study-timer'
+import EnhancedRecommendationsPanel from '@/components/EnhancedRecommendationsPanel'
+import { TaskErrorBoundary } from '@/components/tasks/TaskErrorBoundary'
+import { TimerErrorBoundary } from '@/components/ui/timer-error-boundary'
 import { useTasks } from '@/hooks/useTasks'
 import { useStudySession } from '@/hooks/useStudySession'
+import { cn } from '@/lib/utils'
+
+interface TaskFormData {
+  title: string
+  subject: string
+  dueDate: string
+  duration: number
+  difficulty: 'Easy' | 'Medium' | 'Hard'
+  priority: 'High' | 'Medium' | 'Low'
+  description?: string
+}
 
 export default function TasksPage(){
-  const [topic, setTopic] = useState('Algebra')
-  const [minutes, setMinutes] = useState(30)
-  const [status, setStatus] = useState('')
   const { pushError } = useErrorContext()
-  const { today, upcoming, loading: tasksLoading, fetchToday, fetchUpcoming, completeTask } = useTasks()
-  const { activeSession, startSession, endSession } = useStudySession()
-  const [planResources, setPlanResources] = useState<any[]>([])
-  const [sessions, setSessions] = useState<any[]>([])
-  const [userId, setUserId] = useState<string>('')
+  const { 
+    today, 
+    upcoming, 
+    all, 
+    loading: tasksLoading, 
+    error: tasksError,
+    createTask, 
+    updateTask,
+    completeTask,
+    deleteTask,
+    toggleTaskStatus,
+    refresh: refreshTasks
+  } = useTasks()
+  
+  const { 
+    activeSession,
+    isTimerRunning,
+    elapsedTime,
+    elapsedMinutes,
+    startSession,
+    endSession,
+    pauseSession,
+    resumeSession,
+    getSessionStats
+  } = useStudySession()
+
+  // Component state
+  const [showCreateTaskDialog, setShowCreateTaskDialog] = useState(false)
+  const [editingTask, setEditingTask] = useState<any | null>(null)
+  const [selectedFilter, setSelectedFilter] = useState<'all' | 'pending' | 'in-progress' | 'completed'>('all')
+  const [selectedSubject, setSelectedSubject] = useState<string>('all')
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null)
   const [timerStatus, setTimerStatus] = useState<'pending' | 'in-progress' | 'completed'>('pending')
-  const [startingTaskId, setStartingTaskId] = useState<string | null>(null)
-  const [completingIds, setCompletingIds] = useState<Set<string>>(new Set())
-  const intervalRef = useRef<NodeJS.Timeout | null>(null)
+  const [processingIds, setProcessingIds] = useState<Set<string>>(new Set())
+  
+  // Quick log session form
+  const [quickLogTopic, setQuickLogTopic] = useState('')
+  const [quickLogMinutes, setQuickLogMinutes] = useState(25)
+  const [quickLogStatus, setQuickLogStatus] = useState('')
 
-  const formatTaskStatus = (s?: string | boolean) => {
-    if (!s) return 'pending'
-    const st = String(s)
-    if (st === 'done' || st === 'completed') return 'Completed'
-    if (st === 'in-progress' || st === 'in_progress') return 'In progress'
-    if (st === 'pending') return 'Pending'
-    return st.charAt(0).toUpperCase() + st.slice(1)
-  }
-  // Add sample tasks for testing
-  const addSampleTasks = async () => {
-    try {
-      const sampleTasks = [
-        { title: 'Study Algebra - Chapter 5', due_date: new Date().toISOString().split('T')[0], duration_minutes: 45, subject: 'Mathematics' },
-        { title: 'Read Physics Chapter 3', due_date: new Date().toISOString().split('T')[0], duration_minutes: 30, subject: 'Physics' },
-        { title: 'Complete Chemistry Lab Report', due_date: new Date(Date.now() + 24*60*60*1000).toISOString().split('T')[0], duration_minutes: 60, subject: 'Chemistry' },
-        { title: 'Review History Notes', due_date: new Date(Date.now() + 2*24*60*60*1000).toISOString().split('T')[0], duration_minutes: 25, subject: 'History' }
-      ]
-      
-      for (const task of sampleTasks) {
-        await api('/api/tasks', { 
-          method: 'POST', 
-          body: JSON.stringify({ ...task, user_id: userId }) 
-        })
-      }
-      
-      await fetchToday()
-      await fetchUpcoming()
-    } catch (e) {
-      console.error('Failed to add sample tasks:', e)
-    }
-  }
+  // Task form data
+  const [taskFormData, setTaskFormData] = useState<TaskFormData>({
+    title: '',
+    subject: '',
+    dueDate: new Date().toISOString().split('T')[0],
+    duration: 30,
+    difficulty: 'Medium',
+    priority: 'Medium',
+    description: ''
+  })
 
-  // Load user ID
-  useEffect(() => {
-    const userId = getUserId()
-    setUserId(userId)
-  }, [])
+  // Computed values
+  const sessionStats = useMemo(() => {
+    return getSessionStats()
+  }, [getSessionStats])
 
-  // Fetch plan resources and initial tasks
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const plan = await api('/api/plan/current')
-        const resourcesResp = await api('/api/resources/list')
-        const topicResources: any[] = resourcesResp.resources || []
-        if (plan?.sessions?.length) {
-          const uniqueTopics: string[] = (Array.from(new Set(plan.sessions.map((s:any)=> String(s.topic)))) as string[]).slice(0,5)
-          for (const t of uniqueTopics) {
-            try {
-              const tr = await api(`/api/plan/resources/${encodeURIComponent(t)}?learning_style=balanced`)
-              if (tr?.resources) {
-                Object.entries(tr.resources).forEach(([k,v]: any) => {
-                  if (Array.isArray(v)) {
-                    v.forEach((r:any)=> topicResources.push({...r, topic: t}))
-                  }
-                })
-              }
-            } catch(e){ /* ignore topic-specific failure */ }
-          }
+  const todaysTasks = useMemo(() => {
+    const todayStr = new Date().toISOString().split('T')[0]
+    return all.filter(task => 
+      task.dueDate === todayStr || task.due_date === todayStr
+    )
+  }, [all])
+
+  const filteredTasks = useMemo(() => {
+    let filtered = todaysTasks
+    
+    if (selectedFilter !== 'all') {
+      filtered = filtered.filter(task => {
+        if (selectedFilter === 'completed') {
+          return task.status === 'completed' || task.completed
         }
-        setPlanResources(topicResources)
-      } catch(e){ 
-        console.warn('Failed to load plan resources:', e)
+        return task.status === selectedFilter
+      })
+    }
+    
+    if (selectedSubject !== 'all') {
+      filtered = filtered.filter(task => task.subject === selectedSubject)
+    }
+    
+    return filtered.sort((a, b) => {
+      // Sort by priority first, then by due date
+      const priorityOrder = { 'High': 3, 'Medium': 2, 'Low': 1 }
+      const aPriority = priorityOrder[a.priority as keyof typeof priorityOrder] || 2
+      const bPriority = priorityOrder[b.priority as keyof typeof priorityOrder] || 2
+      
+      if (aPriority !== bPriority) {
+        return bPriority - aPriority
       }
-    }
-    load()
-  }, [])
+      
+      return new Date(a.dueDate || a.due_date).getTime() - new Date(b.dueDate || b.due_date).getTime()
+    })
+  }, [todaysTasks, selectedFilter, selectedSubject])
 
-  // Fetch recent sessions for progress
-  useEffect(() => {
-    if (!userId) return
-    ;(async () => {
-      try {
-        const data = await api('/api/analytics/student')
-        setSessions(data.sessions || [])
-      } catch (e: any) {
-        // Sessions fetch is optional, don't show error
-        console.warn('Failed to load sessions:', e)
-      }
-    })()
-  }, [userId])
+  const availableSubjects = useMemo(() => {
+    const subjects = [...new Set(all.map(task => task.subject).filter(Boolean))]
+    return subjects.sort()
+  }, [all])
 
-  const startTask = async (taskId: string) => {
-    if (activeTaskId && activeTaskId !== taskId) {
-      // Stop current task
-      setActiveTaskId(null)
-      setTimerStatus('pending')
-    }
-    // Start backend session
-    try{
-      setStartingTaskId(taskId)
-      const resp = await startSession({ taskId, durationMin: 25 })
-      setActiveTaskId(taskId)
-      setTimerStatus('in-progress')
-    }catch(e:any){ 
-      console.error('Failed to start task:', e)
-      pushError({ errorCode: 'SESSION_START_FAIL', errorMessage: 'Failed to start session', details: e }) 
-    } finally {
-      setStartingTaskId(null)
-    }
-  }
+  const todaysTopics = useMemo(() => {
+    return [...new Set(filteredTasks.map(task => task.subject || task.topic).filter(Boolean))]
+  }, [filteredTasks])
 
-  const toggleTaskComplete = async (task: any) => {
+  const taskStats = useMemo(() => {
+    const totalTasks = todaysTasks.length
+    const completedTasks = todaysTasks.filter(task => task.status === 'completed' || task.completed).length
+    const inProgressTasks = todaysTasks.filter(task => task.status === 'in-progress').length
+    const completionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0
+    
+    return {
+      totalTasks,
+      completedTasks,
+      inProgressTasks,
+      completionRate
+    }
+  }, [todaysTasks])
+
+  // Action handlers
+  const handleStartTask = async (task: any) => {
     try {
-      setCompletingIds(prev => new Set(prev).add(task.id))
-      await completeTask(task.id)
-    } catch (e:any) {
-      pushError({ errorCode: e?.errorCode||'TASK_UPDATE_FAIL', errorMessage: e?.errorMessage, details: e })
+      setProcessingIds(prev => new Set(prev).add(task.id))
+      
+      // Stop current task if different
+      if (activeTaskId && activeTaskId !== task.id) {
+        if (activeSession?.id) {
+          await endSession({ sessionId: activeSession.id })
+        }
+      }
+      
+      // Start new session
+      await startSession({ 
+        taskId: task.id, 
+        durationMin: task.estimatedMinutes || task.duration_minutes || 25,
+        topic: task.title,
+        subject: task.subject
+      })
+      
+      setActiveTaskId(task.id)
+      setTimerStatus('in-progress')
+      
+      // Update task status
+      await updateTask(task.id, { status: 'in-progress' })
+      
+    } catch (e: any) {
+      pushError({ 
+        errorCode: e?.errorCode || 'SESSION_START_FAIL', 
+        errorMessage: e?.errorMessage || 'Failed to start task', 
+        details: e 
+      })
     } finally {
-      setCompletingIds(prev => {
+      setProcessingIds(prev => {
         const copy = new Set(prev)
         copy.delete(task.id)
         return copy
@@ -158,23 +209,98 @@ export default function TasksPage(){
     }
   }
 
-  const deleteTask = async (taskId: string) => {
+  const handleCompleteTask = async (task: any) => {
     try {
-      await api(`/api/tasks/${taskId}`, { method: 'DELETE' })
-      await fetchToday()
-      await fetchUpcoming()
-    } catch(e:any){ pushError({ errorCode: e?.errorCode||'TASK_DELETE_FAIL', errorMessage: e?.errorMessage, details: e }) }
+      setProcessingIds(prev => new Set(prev).add(task.id))
+      
+      if (activeTaskId === task.id && activeSession?.id) {
+        await endSession({ 
+          sessionId: activeSession.id, 
+          taskId: task.id, 
+          completed: true 
+        })
+        setActiveTaskId(null)
+        setTimerStatus('pending')
+      }
+      
+      await toggleTaskStatus(task.id)
+      
+    } catch (e: any) {
+      pushError({ 
+        errorCode: e?.errorCode || 'TASK_COMPLETE_FAIL', 
+        errorMessage: e?.errorMessage || 'Failed to complete task', 
+        details: e 
+      })
+    } finally {
+      setProcessingIds(prev => {
+        const copy = new Set(prev)
+        copy.delete(task.id)
+        return copy
+      })
+    }
   }
 
-  const stopTask = async () => {
-    // end active session if present
-    if (activeSession && activeSession.id) {
-      try{
-        await endSession({ sessionId: activeSession.id })
-      }catch(e:any){ console.warn('Failed to end session', e) }
+  const handleDeleteTask = async (task: any) => {
+    if (!confirm(`Are you sure you want to delete "${task.title}"?`)) {
+      return
     }
-    setActiveTaskId(null)
-    setTimerStatus('pending')
+    
+    try {
+      setProcessingIds(prev => new Set(prev).add(task.id))
+      
+      // Stop session if this task is active
+      if (activeTaskId === task.id && activeSession?.id) {
+        await endSession({ sessionId: activeSession.id })
+        setActiveTaskId(null)
+        setTimerStatus('pending')
+      }
+      
+      await deleteTask(task.id)
+      
+    } catch (e: any) {
+      pushError({ 
+        errorCode: e?.errorCode || 'TASK_DELETE_FAIL', 
+        errorMessage: e?.errorMessage || 'Failed to delete task', 
+        details: e 
+      })
+    } finally {
+      setProcessingIds(prev => {
+        const copy = new Set(prev)
+        copy.delete(task.id)
+        return copy
+      })
+    }
+  }
+
+  const handleCreateTask = async () => {
+    try {
+      await createTask({
+        ...taskFormData,
+        dueDate: taskFormData.dueDate,
+        estimatedMinutes: taskFormData.duration,
+        status: 'pending',
+        completed: false,
+        phase: 'active'
+      })
+      
+      setShowCreateTaskDialog(false)
+      setTaskFormData({
+        title: '',
+        subject: '',
+        dueDate: new Date().toISOString().split('T')[0],
+        duration: 30,
+        difficulty: 'Medium',
+        priority: 'Medium',
+        description: ''
+      })
+      
+    } catch (e: any) {
+      pushError({ 
+        errorCode: e?.errorCode || 'TASK_CREATE_FAIL', 
+        errorMessage: e?.errorMessage || 'Failed to create task', 
+        details: e 
+      })
+    }
   }
 
   const handleTimerStatusChange = (newStatus: 'pending' | 'in-progress' | 'completed') => {
@@ -183,291 +309,724 @@ export default function TasksPage(){
 
   const handleTimerComplete = async (actualTime: number) => {
     if (!activeTaskId) return
-    try{
-      // find active session id
-      const session = activeSession
-      // end session and mark task complete
-      if (session && session.id) {
-        await endSession({ sessionId: session.id, taskId: activeTaskId, actualMinutes: actualTime, completed: true })
-        // Ensure task is marked complete in tasks API as well (some backends don't auto-toggle task status on session end)
-        try {
-          await completeTask(activeTaskId)
-        } catch (e) {
-          // swallow - we'll refresh below anyway
-          console.warn('completeTask fallback failed', e)
-        }
-      } else {
-        // fallback: track manually
-        await api('/api/tasks/track', { method: 'POST', body: JSON.stringify({ topic: topic, duration_min: actualTime }) })
+    
+    try {
+      // Complete the session and task
+      if (activeSession?.id) {
+        await endSession({ 
+          sessionId: activeSession.id, 
+          taskId: activeTaskId, 
+          actualMinutes: actualTime, 
+          completed: true 
+        })
       }
-      setStatus('Session logged successfully!')
+      
+      await updateTask(activeTaskId, { 
+        status: 'completed', 
+        completed: true, 
+        progress: 100 
+      })
+      
       setActiveTaskId(null)
       setTimerStatus('pending')
-      await fetchToday()
-    }catch(e:any){
-      pushError({ errorCode: e?.errorCode||'TRACK_FAILED', errorMessage: e?.errorMessage || String(e), details: e })
+      
+    } catch (e: any) {
+      pushError({ 
+        errorCode: e?.errorCode || 'TIMER_COMPLETE_FAIL', 
+        errorMessage: e?.errorMessage || 'Failed to complete timer', 
+        details: e 
+      })
     }
   }
 
-  async function track(){
+  const handleQuickLogSession = async () => {
     try {
-      await api('/api/tasks/track', { 
-        method:'POST', 
-        body: JSON.stringify({ topic, duration_min: minutes }) 
+      await startSession({
+        topic: quickLogTopic || 'General Study',
+        subject: 'General',
+        durationMin: quickLogMinutes
       })
-      setStatus('Session logged successfully!')
-    } catch(e:any){ 
+      
+      // Immediately complete the session
+      if (activeSession?.id) {
+        await endSession({
+          sessionId: activeSession.id,
+          actualMinutes: quickLogMinutes,
+          completed: true
+        })
+      }
+      
+      setQuickLogStatus('Session logged successfully!')
+      setQuickLogTopic('')
+      setQuickLogMinutes(25)
+      
+      setTimeout(() => setQuickLogStatus(''), 3000)
+      
+    } catch (e: any) {
       pushError({ 
-        errorCode: e?.errorCode||'HTTP_500', 
-        errorMessage: e?.errorMessage, 
-        details: e
-      }) 
+        errorCode: e?.errorCode || 'QUICK_LOG_FAIL', 
+        errorMessage: e?.errorMessage || 'Failed to log session', 
+        details: e 
+      })
+    }
+  }
+
+  // Add sample tasks for demo
+  const addSampleTasks = async () => {
+    const sampleTasks = [
+      {
+        title: 'Study Algebra - Linear Equations',
+        subject: 'Mathematics',
+        dueDate: new Date().toISOString().split('T')[0],
+        duration: 45,
+        difficulty: 'Medium' as const,
+        priority: 'High' as const,
+        description: 'Review chapter 3 on solving linear equations'
+      },
+      {
+        title: 'Read Physics - Motion Laws',
+        subject: 'Physics',
+        dueDate: new Date().toISOString().split('T')[0],
+        duration: 30,
+        difficulty: 'Medium' as const,
+        priority: 'Medium' as const,
+        description: "Study Newton's laws of motion"
+      },
+      {
+        title: 'Chemistry Lab Report',
+        subject: 'Chemistry',
+        dueDate: new Date(Date.now() + 24*60*60*1000).toISOString().split('T')[0],
+        duration: 60,
+        difficulty: 'Hard' as const,
+        priority: 'High' as const,
+        description: 'Complete the organic chemistry lab report'
+      }
+    ]
+    
+    for (const task of sampleTasks) {
+      await createTask({
+        ...task,
+        estimatedMinutes: task.duration,
+        status: 'pending',
+        completed: false,
+        phase: 'active'
+      })
     }
   }
 
   return (
-    <MainLayout>
-      <div className='p-6 space-y-8'>
+    <TaskErrorBoundary>
+      <MainLayout>
+        <div className="container mx-auto py-8 space-y-8">
         {/* Header */}
-          <div className='flex flex-col md:flex-row md:items-center md:justify-between gap-4'>
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
-            <h1 className='text-3xl md:text-4xl font-bold tracking-tight'>Tasks & Sessions</h1>
-            <p className='text-muted-foreground'>Manage your study tasks and track your learning sessions</p>
+            <h1 className="text-3xl md:text-4xl font-bold tracking-tight">Tasks & Sessions</h1>
+            <p className="text-muted-foreground">Manage your study tasks and track your learning progress</p>
           </div>
-          <Button title="Create a new task" onClick={async ()=> {
-            const title = window.prompt('Task title')
-            if (!title) return
-            const due = window.prompt('Due date/time (ISO or YYYY-MM-DD HH:MM)')
-            const durationStr = window.prompt('Duration in minutes', '30')
-            const duration = durationStr ? parseInt(durationStr || '30') : 30
-            try {
-              const created = await api('/api/tasks', { method: 'POST', body: JSON.stringify({ title, due_date: due, duration_minutes: duration, user_id: userId }) })
-              // refresh tasks
-              await fetchToday()
-              await fetchUpcoming()
-            } catch(e:any){ 
-              pushError({ errorCode: e?.errorCode||'TASK_CREATE_FAIL', errorMessage: e?.errorMessage, details: e }) 
-            }
-          }}>
-            <Plus className="w-4 h-4 mr-2" />
-            New Task
-          </Button>
+          
+          <div className="flex items-center gap-3">
+            <Dialog open={showCreateTaskDialog} onOpenChange={setShowCreateTaskDialog}>
+              <DialogTrigger asChild>
+                <Button>
+                  <Plus className="w-4 h-4 mr-2" />
+                  New Task
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[500px]">
+                <DialogHeader>
+                  <DialogTitle>Create New Task</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="title">Task Title *</Label>
+                    <Input
+                      id="title"
+                      placeholder="e.g., Study Calculus Chapter 5"
+                      value={taskFormData.title}
+                      onChange={(e) => setTaskFormData(prev => ({ ...prev, title: e.target.value }))}
+                    />
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="subject">Subject *</Label>
+                      <Input
+                        id="subject"
+                        placeholder="e.g., Mathematics"
+                        value={taskFormData.subject}
+                        onChange={(e) => setTaskFormData(prev => ({ ...prev, subject: e.target.value }))}
+                      />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="dueDate">Due Date *</Label>
+                      <Input
+                        id="dueDate"
+                        type="date"
+                        value={taskFormData.dueDate}
+                        onChange={(e) => setTaskFormData(prev => ({ ...prev, dueDate: e.target.value }))}
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="duration">Duration (min)</Label>
+                      <Input
+                        id="duration"
+                        type="number"
+                        min="5"
+                        max="240"
+                        value={taskFormData.duration}
+                        onChange={(e) => setTaskFormData(prev => ({ ...prev, duration: parseInt(e.target.value) || 30 }))}
+                      />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="difficulty">Difficulty</Label>
+                      <Select
+                        value={taskFormData.difficulty}
+                        onValueChange={(value: 'Easy' | 'Medium' | 'Hard') => 
+                          setTaskFormData(prev => ({ ...prev, difficulty: value }))
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Easy">Easy</SelectItem>
+                          <SelectItem value="Medium">Medium</SelectItem>
+                          <SelectItem value="Hard">Hard</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="priority">Priority</Label>
+                      <Select
+                        value={taskFormData.priority}
+                        onValueChange={(value: 'High' | 'Medium' | 'Low') => 
+                          setTaskFormData(prev => ({ ...prev, priority: value }))
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="High">High</SelectItem>
+                          <SelectItem value="Medium">Medium</SelectItem>
+                          <SelectItem value="Low">Low</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="description">Description (Optional)</Label>
+                    <Textarea
+                      id="description"
+                      placeholder="Add any additional details..."
+                      rows={3}
+                      value={taskFormData.description}
+                      onChange={(e) => setTaskFormData(prev => ({ ...prev, description: e.target.value }))}
+                    />
+                  </div>
+                </div>
+                
+                <DialogFooter>
+                  <Button 
+                    variant="outline" 
+                    onClick={() => setShowCreateTaskDialog(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button 
+                    onClick={handleCreateTask}
+                    disabled={!taskFormData.title || !taskFormData.subject}
+                  >
+                    Create Task
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </div>
         </div>
 
-        {/* Sample Tasks Button - Remove this in production */}
-        {today.length === 0 && upcoming.length === 0 && (
-          <Card className="mb-6">
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <Card className="hover:shadow-md transition-all">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Today's Tasks</p>
+                  <p className="text-3xl font-bold">{taskStats.totalTasks}</p>
+                </div>
+                <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/20 rounded-full flex items-center justify-center">
+                  <Target className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+                </div>
+              </div>
+              {taskStats.totalTasks > 0 && (
+                <div className="mt-4 space-y-1">
+                  <Progress value={taskStats.completionRate} className="h-2" />
+                  <p className="text-xs text-muted-foreground">{taskStats.completionRate}% complete</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="hover:shadow-md transition-all">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Completed</p>
+                  <p className="text-3xl font-bold">{taskStats.completedTasks}</p>
+                </div>
+                <div className="w-12 h-12 bg-green-100 dark:bg-green-900/20 rounded-full flex items-center justify-center">
+                  <CheckCircle2 className="w-6 h-6 text-green-600 dark:text-green-400" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="hover:shadow-md transition-all">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Study Time Today</p>
+                  <p className="text-3xl font-bold">{sessionStats.totalTimeToday}<span className="text-lg font-normal">min</span></p>
+                </div>
+                <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900/20 rounded-full flex items-center justify-center">
+                  <Clock className="w-6 h-6 text-purple-600 dark:text-purple-400" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="hover:shadow-md transition-all">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Study Streak</p>
+                  <p className="text-3xl font-bold">{sessionStats.currentStreak}<span className="text-lg font-normal">days</span></p>
+                </div>
+                <div className="w-12 h-12 bg-orange-100 dark:bg-orange-900/20 rounded-full flex items-center justify-center">
+                  <Flame className="w-6 h-6 text-orange-600 dark:text-orange-400" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Sample Tasks Button */}
+        {todaysTasks.length === 0 && (
+          <Card className="border-dashed">
             <CardContent className="pt-6">
               <div className="text-center">
-                <p className="text-muted-foreground mb-4">No tasks yet. Create your first task or add some sample tasks to get started.</p>
-                <Button onClick={addSampleTasks} disabled={!userId}>
-                  Add Sample Tasks
-                </Button>
+                <Target className="w-12 h-12 mx-auto mb-4 text-muted-foreground opacity-50" />
+                <p className="text-lg font-semibold mb-2">No tasks for today</p>
+                <p className="text-muted-foreground mb-4">Create your first task or add some sample tasks to get started.</p>
+                <div className="flex items-center gap-3 justify-center">
+                  <Button onClick={() => setShowCreateTaskDialog(true)}>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Create Task
+                  </Button>
+                  <Button onClick={addSampleTasks} variant="outline">
+                    Add Sample Tasks
+                  </Button>
+                </div>
               </div>
             </CardContent>
           </Card>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Tasks List */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Today's Tasks */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Today's Tasks</CardTitle>
-                <CardDescription>Your study tasks for today</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-{today.length > 0 ? (
+        {/* Main Content */}
+        {tasksLoading ? (
+          <div className="space-y-6">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <Card key={i}>
+                <CardContent className="p-6">
                   <div className="space-y-3">
-                    {today.map((task: any) => (
-                      <div key={task.id} className="p-3 border rounded-lg hover:bg-muted/50 flex items-center justify-between">
-                        <div>
-                          <div className="font-medium">{task.title || task.topic}</div>
-                          <div className="text-sm text-muted-foreground">{task.subject || 'General'} • {task.duration_minutes || task.estimatedMinutes || 30} min</div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Badge variant={task.status === 'done' || task.completed ? 'success' : 'secondary'}>
-                            {formatTaskStatus(task.status ?? task.completed)}
-                          </Badge>
-                          <Button size="sm" variant="ghost" onClick={() => startTask(task.id)} disabled={!!activeTaskId || startingTaskId===task.id}>
-                            {startingTaskId===task.id ? 'Starting' : 'Start'}
-                          </Button>
-                          <Button size="sm" variant="outline" onClick={() => toggleTaskComplete(task)} disabled={completingIds.has(task.id)}>
-                            {completingIds.has(task.id) ? 'Saving...' : (task.status === 'done' || task.completed ? 'Undo' : 'Complete')}
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
+                    <Skeleton className="h-4 w-3/4" />
+                    <Skeleton className="h-3 w-1/2" />
+                    <Skeleton className="h-8 w-full" />
                   </div>
-                ) : (
-                  <div className="p-4 text-center text-muted-foreground">No tasks for today.</div>
-                )}
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : tasksError ? (
+          <Card className="border-red-200 dark:border-red-800">
+            <CardContent className="p-6">
+              <div className="text-center">
+                <div className="w-16 h-16 mx-auto mb-4 bg-red-50 dark:bg-red-900/20 rounded-full flex items-center justify-center">
+                  <Target className="w-8 h-8 text-red-500" />
+                </div>
+                <h3 className="text-lg font-semibold mb-2">Failed to load tasks</h3>
+                <p className="text-muted-foreground mb-4">{tasksError}</p>
+                <Button onClick={() => window.location.reload()} variant="outline">
+                  Try Again
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            {/* Main Tasks List */}
+            <div className="lg:col-span-2 space-y-6">
+              {/* Today's Tasks */}
+              <Card>
+                <CardHeader className="pb-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="flex items-center gap-2">
+                        <Filter className="w-5 h-5" />
+                        Today's Tasks
+                      </CardTitle>
+                      <CardDescription>Your study tasks for today</CardDescription>
+                    </div>
+                    <Badge variant="outline" className="text-xs">
+                      {filteredTasks.length} {filteredTasks.length === 1 ? 'task' : 'tasks'}
+                    </Badge>
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  {/* Filters */}
+                  <div className="flex items-center gap-4 mb-6">
+                    <Select value={selectedFilter} onValueChange={setSelectedFilter}>
+                      <SelectTrigger className="w-[140px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Tasks</SelectItem>
+                        <SelectItem value="pending">Pending</SelectItem>
+                        <SelectItem value="in-progress">In Progress</SelectItem>
+                        <SelectItem value="completed">Completed</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    
+                    {availableSubjects.length > 0 && (
+                      <Select value={selectedSubject} onValueChange={setSelectedSubject}>
+                        <SelectTrigger className="w-[140px]">
+                          <SelectValue placeholder="All Subjects" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Subjects</SelectItem>
+                          {availableSubjects.map((subject: string) => (
+                            <SelectItem key={subject} value={subject}>
+                              {subject}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  </div>
 
-            {/* Upcoming grouped by date */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Upcoming Tasks</CardTitle>
-                <CardDescription>Grouped by date</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {(() => {
-                  const groups: Record<string, any[]> = {}
-                  upcoming.forEach((t:any) => {
-                    const key = new Date(t.dueDate || t.due_date || t.date || t.due || null).toDateString()
-                    if (!groups[key]) groups[key] = []
-                    groups[key].push(t)
-                  })
-                  const sortedKeys = Object.keys(groups).sort((a,b)=> new Date(a).getTime() - new Date(b).getTime())
-                  if (sortedKeys.length === 0) return <p className="text-muted-foreground">No upcoming tasks.</p>
-                  return sortedKeys.map(k => (
-                    <div key={k} className="mb-4">
-                      <div className="flex items-center justify-between mb-2">
-                        <h4 className="font-semibold">{new Date(k).toLocaleDateString()}</h4>
-                        <span className="text-sm text-muted-foreground">{groups[k].length} tasks</span>
-                      </div>
-                      <div className="space-y-2">
-                        {groups[k].map((task:any)=> (
-                          <div key={task.id} className="p-3 border rounded hover:bg-muted/50 flex items-center justify-between">
-                            <div>
-                              <div className="font-medium">{task.title || task.topic}</div>
-                              <div className="text-xs text-muted-foreground">{task.subject || 'General'}</div>
+                  {/* Tasks List */}
+                  <div className="space-y-3">
+                    {filteredTasks.length > 0 ? (
+                      filteredTasks.map((task: any) => (
+                        <Card key={task.id} className={cn(
+                          "hover:shadow-md transition-all duration-200",
+                          activeTaskId === task.id && "ring-2 ring-primary"
+                        )}>
+                          <CardContent className="p-4">
+                            <div className="flex items-start justify-between gap-4">
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-start gap-3 mb-3">
+                                  <div className="flex-1">
+                                    <h4 className="font-semibold text-base mb-1 line-clamp-1">
+                                      {task.title}
+                                    </h4>
+                                    <p className="text-sm text-muted-foreground mb-2">
+                                      {task.subject} • {task.estimatedMinutes || task.duration_minutes || 30} min
+                                    </p>
+                                    {task.description && (
+                                      <p className="text-xs text-muted-foreground line-clamp-2 mb-2">
+                                        {task.description}
+                                      </p>
+                                    )}
+                                  </div>
+                                  
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <Badge className={cn(
+                                      "text-xs",
+                                      task.priority === 'High' && 'bg-red-100 text-red-700 dark:bg-red-900/20 dark:text-red-300',
+                                      task.priority === 'Medium' && 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/20 dark:text-yellow-300',
+                                      task.priority === 'Low' && 'bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-300'
+                                    )} variant="secondary">
+                                      {task.priority}
+                                    </Badge>
+                                    <Badge variant={
+                                      task.completed || task.status === 'completed' ? 'default' : 
+                                      task.status === 'in-progress' ? 'secondary' : 'outline'
+                                    }>
+                                      {task.completed || task.status === 'completed' ? 'Completed' : 
+                                       task.status === 'in-progress' ? 'In Progress' : 'Pending'}
+                                    </Badge>
+                                  </div>
+                                </div>
+                                
+                                {task.progress !== undefined && task.progress > 0 && (
+                                  <div className="mb-3">
+                                    <div className="flex justify-between text-xs mb-1">
+                                      <span>Progress</span>
+                                      <span>{Math.round(task.progress)}%</span>
+                                    </div>
+                                    <Progress value={task.progress} className="h-2" />
+                                  </div>
+                                )}
+                              </div>
+                              
+                              {/* Action Buttons */}
+                              <div className="flex items-center gap-2">
+                                {activeTaskId === task.id ? (
+                                  <div className="flex items-center gap-1">
+                                    <Badge variant="default" className="text-xs">
+                                      <Timer className="w-3 h-3 mr-1" />
+                                      Active
+                                    </Badge>
+                                    <Button 
+                                      size="sm" 
+                                      variant="outline"
+                                      onClick={() => handleCompleteTask(task)}
+                                      disabled={processingIds.has(task.id)}
+                                    >
+                                      <CheckCircle2 className="w-3 h-3" />
+                                    </Button>
+                                  </div>
+                                ) : (
+                                  <>
+                                    {!task.completed && task.status !== 'completed' && (
+                                      <Button
+                                        size="sm"
+                                        onClick={() => handleStartTask(task)}
+                                        disabled={processingIds.has(task.id) || !!activeTaskId}
+                                        className="bg-blue-600 hover:bg-blue-700"
+                                      >
+                                        {processingIds.has(task.id) ? (
+                                          <div className="w-3 h-3 border border-white border-t-transparent rounded-full animate-spin" />
+                                        ) : (
+                                          <PlayCircle className="w-3 h-3 mr-1" />
+                                        )}
+                                        Start
+                                      </Button>
+                                    )}
+                                    
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => handleCompleteTask(task)}
+                                      disabled={processingIds.has(task.id)}
+                                    >
+                                      {processingIds.has(task.id) ? (
+                                        <div className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin" />
+                                      ) : (
+                                        <CheckCircle2 className="w-3 h-3" />
+                                      )}
+                                    </Button>
+                                    
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() => handleDeleteTask(task)}
+                                      disabled={processingIds.has(task.id)}
+                                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                    >
+                                      <Trash2 className="w-3 h-3" />
+                                    </Button>
+                                  </>
+                                )}
+                              </div>
                             </div>
-                            <div className="flex items-center gap-2">
-                              <Badge variant={task.status==='completed'? 'success' : 'secondary'}>{formatTaskStatus(task.status ?? task.completed)}</Badge>
-                              <Button size="sm" variant="ghost" onClick={() => startTask(task.id)} disabled={!!activeTaskId || startingTaskId===task.id}>{startingTaskId===task.id? 'Starting':'Start'}</Button>
+                          </CardContent>
+                        </Card>
+                      ))
+                    ) : (
+                      <div className="text-center py-12">
+                        <Target className="w-16 h-16 mx-auto mb-4 text-muted-foreground opacity-50" />
+                        <h3 className="text-lg font-semibold mb-2">No tasks found</h3>
+                        <p className="text-muted-foreground">
+                          {selectedFilter !== 'all' || selectedSubject !== 'all'
+                            ? 'Try adjusting your filters'
+                            : 'Create your first task to get started'
+                          }
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+              
+              {/* Upcoming Tasks */}
+              {upcoming.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Upcoming Tasks</CardTitle>
+                    <CardDescription>Tasks scheduled for future dates</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      {upcoming.slice(0, 5).map((task: any) => (
+                        <div key={task.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50">
+                          <div>
+                            <div className="font-medium">{task.title}</div>
+                            <div className="text-sm text-muted-foreground">
+                              {task.subject} • Due {new Date(task.dueDate || task.due_date).toLocaleDateString()}
                             </div>
                           </div>
-                        ))}
-                      </div>
+                          <Badge variant="outline">{task.estimatedMinutes || 30}min</Badge>
+                        </div>
+                      ))}
                     </div>
-                  ))
-                })()}
-              </CardContent>
-            </Card>
-          </div>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
 
-          {/* Sidebar */}
-          <div className="space-y-6">
-            {/* Timer */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Timer className="w-5 h-5" />
-                  Study Timer
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {activeTaskId ? (
-                  <StudyTimer
-                    duration={((): number => {
-                      const t: any = today.find((x:any)=>x.id===activeTaskId)
-                      return t?.estimatedMinutes || t?.estimated_minutes || t?.duration_minutes || 30
-                    })()}
-                    status={timerStatus}
-                    onStatusChange={handleTimerStatusChange}
-                    onComplete={handleTimerComplete}
-                    externalProgress={(today.find(t=>t.id===activeTaskId) as any)?.progress ?? 0}
-                    pomodoro={false}
-                    breakMinutes={5}
-                  />
-                ) : (
-                  <div className="text-center text-muted-foreground py-8">
-                    <Timer className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                    <p>Select a task to start the timer</p>
+            {/* Sidebar */}
+            <div className="space-y-6">
+              {/* Study Timer */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Timer className="w-5 h-5" />
+                    Study Timer
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {activeTaskId ? (
+                    <TimerErrorBoundary 
+                      taskTitle={filteredTasks.find((t: any) => t.id === activeTaskId)?.title}
+                      compact={false}
+                    >
+                      <EnhancedStudyTimer
+                        duration={((): number => {
+                          const task = filteredTasks.find((t: any) => t.id === activeTaskId)
+                          return task?.estimatedMinutes || task?.duration_minutes || 30
+                        })()
+                        status={timerStatus}
+                        onStatusChange={handleTimerStatusChange}
+                        onComplete={handleTimerComplete}
+                        taskId={activeTaskId}
+                        taskTitle={filteredTasks.find((t: any) => t.id === activeTaskId)?.title}
+                        subject={filteredTasks.find((t: any) => t.id === activeTaskId)?.subject}
+                        compact={false}
+                        showTaskInfo={true}
+                      />
+                    </TimerErrorBoundary>
+                  ) : (
+                    <div className="text-center py-8">
+                      <Timer className="w-16 h-16 mx-auto mb-4 text-muted-foreground opacity-50" />
+                      <p className="text-muted-foreground">Select a task to start the timer</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Quick Log Session */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Quick Log Session</CardTitle>
+                  <CardDescription>Log a completed study session</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="quickTopic">Topic</Label>
+                    <Input
+                      id="quickTopic"
+                      placeholder="e.g., Math Review"
+                      value={quickLogTopic}
+                      onChange={(e) => setQuickLogTopic(e.target.value)}
+                    />
                   </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Log Session */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Log Study Session</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="topic">Topic</Label>
-                  <Input 
-                    id="topic"
-                    value={topic} 
-                    onChange={e => setTopic(e.target.value)}
-                    placeholder="e.g., Algebra"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="duration">Duration (minutes)</Label>
-                  <Input 
-                    id="duration"
-                    type="number" 
-                    value={minutes} 
-                    onChange={e => setMinutes(parseInt(e.target.value) || 0)}
-                    placeholder="30"
-                  />
-                </div>
-                <Button onClick={track} className="w-full">
-                  <BookOpen className="w-4 h-4 mr-2" />
-                  Log Session
-                </Button>
-                {status && (
-                  <div className="p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
-                    <p className="text-sm text-green-800 dark:text-green-200">{status}</p>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="quickDuration">Duration (minutes)</Label>
+                    <Input
+                      id="quickDuration"
+                      type="number"
+                      min="1"
+                      max="300"
+                      value={quickLogMinutes}
+                      onChange={(e) => setQuickLogMinutes(parseInt(e.target.value) || 25)}
+                    />
                   </div>
-                )}
-              </CardContent>
-            </Card>
+                  
+                  <Button 
+                    onClick={handleQuickLogSession} 
+                    className="w-full"
+                    disabled={!quickLogTopic.trim()}
+                  >
+                    <BookOpen className="w-4 h-4 mr-2" />
+                    Log Session
+                  </Button>
+                  
+                  {quickLogStatus && (
+                    <div className="p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                      <p className="text-sm text-green-800 dark:text-green-200">{quickLogStatus}</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
 
-            {/* Quick Stats */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Today&apos;s Progress</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm">Tasks Completed</span>
-                  <span className="font-semibold">{([...(today as any[]), ...(upcoming as any[])] as any[]).filter((t:any)=>t.status==='done' || t.completed).length}/{([...(today as any[]), ...(upcoming as any[])] as any[]).length || 3}</span>
-                </div>
-                <Progress value={([...(today as any[]), ...(upcoming as any[])] as any[]).length? Math.round((([...(today as any[]), ...(upcoming as any[])] as any[]).filter((t:any)=>t.status==='done' || t.completed).length/Math.max(1,([...(today as any[]), ...(upcoming as any[])] as any[]).length))*100):33} className="h-2" />
-                <div className="flex items-center justify-between">
-                  <span className="text-sm">Study Time Goal</span>
-                  <span className="font-semibold">{sessions.filter(s => {
-                    const sessionDate = new Date(s.created_at).toDateString()
-                    const today = new Date().toDateString()
-                    return sessionDate === today
-                  }).reduce((a,b)=>a+(b.duration_min||0),0)}/180 min</span>
-                </div>
-                <Progress value={Math.min(100, Math.round((sessions.filter(s => {
-                  const sessionDate = new Date(s.created_at).toDateString()
-                  const today = new Date().toDateString()
-                  return sessionDate === today
-                }).reduce((a,b)=>a+(b.duration_min||0),0)/180)*100))} className="h-2" />
-              </CardContent>
-            </Card>
+              {/* Session Stats */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Today's Progress</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="text-center p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                      <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                        {sessionStats.sessionsToday}
+                      </div>
+                      <div className="text-xs text-muted-foreground">Sessions</div>
+                    </div>
+                    
+                    <div className="text-center p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                      <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+                        {sessionStats.totalTimeToday}
+                      </div>
+                      <div className="text-xs text-muted-foreground">Minutes</div>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span>Daily Goal</span>
+                      <span>{sessionStats.totalTimeToday}/120 min</span>
+                    </div>
+                    <Progress 
+                      value={Math.min(100, (sessionStats.totalTimeToday / 120) * 100)} 
+                      className="h-2" 
+                    />
+                  </div>
+                </CardContent>
+              </Card>
 
-            {/* Recommendations from Planner / AI */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <BookOpen className="w-4 h-4" />
-                  Recommended Resources
-                </CardTitle>
-                <CardDescription className="text-xs">AI-powered suggestions for today's tasks</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {/* derive topics from today's tasks */}
-                <div>
-                  <React.Suspense fallback={<div className="text-sm text-muted-foreground">Loading recommendations…</div>}>
-                    {/* Dynamically import to keep initial bundle small */}
-                    <RecommendationsPanel topics={[...new Set(today.map((t:any)=> t.subject || t.topic).filter(Boolean))]} />
-                  </React.Suspense>
-                </div>
-              </CardContent>
-            </Card>
+              {/* Content Recommendations */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Lightbulb className="w-4 h-4" />
+                    Recommended Resources
+                  </CardTitle>
+                  <CardDescription>AI-powered suggestions for today's topics</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <EnhancedRecommendationsPanel 
+                    topics={todaysTopics} 
+                    maxItems={5}
+                    compact={true}
+                  />
+                </CardContent>
+              </Card>
+            </div>
           </div>
+        )}
         </div>
-      </div>
-    </MainLayout>
+      </MainLayout>
+    </TaskErrorBoundary>
   )
 }

@@ -10,6 +10,7 @@ import { LoadingButton, LoadingOverlay, SkeletonCard } from '@/components/ui/loa
 import MinimalTimer from '@/components/ui/minimal-timer'
 
 import { MainLayout } from '@/components/navigation'
+import { PlannerErrorBoundary } from '@/components/planner/PlannerErrorBoundary'
 import { 
   Calendar, 
   Clock, 
@@ -118,8 +119,10 @@ export default function PlannerPage() {
                              category === 'ocw_courses' ? 'ocw' : 
                              category === 'documentation' ? 'docs' : 
                              category === 'ai_generated' ? 'ai' : 'general',
-                      title: resource.title || resource.name || resource.name || 'Untitled Resource',
-                      url: resource.url || resource.link || '#'
+                      title: resource.title || resource.name || 'Untitled Resource',
+                      url: resource.url || resource.link || `https://www.youtube.com/results?search_query=${encodeURIComponent(topic + ' tutorial')}`,
+                      duration: resource.duration || resource.metadata?.videoDuration || 10,
+                      quality_score: resource.quality_score || resource.recommendation_score || 5
                     })
                   })
                 }
@@ -277,15 +280,58 @@ export default function PlannerPage() {
 
   async function markSession(date: string, topic: string, status: string, durationMin?: number){
     try {
+      // Optimistically update the UI first
+      const sessionKey = `${date}-${topic}`
+      setSessionStatus(prev => ({ ...prev, [sessionKey]: status as 'pending' | 'in-progress' | 'completed' }))
+      
+      // Also update the plan sessions optimistically
+      setPlan(prevPlan => {
+        if (!prevPlan?.sessions) return prevPlan
+        
+        const updatedSessions = prevPlan.sessions.map((s: any) => 
+          s.date === date && s.topic === topic 
+            ? { ...s, status, ...(durationMin ? { duration_min: durationMin } : {}) }
+            : s
+        )
+        
+        return {
+          ...prevPlan,
+          sessions: updatedSessions
+        }
+      })
+      
+      // Update backend
       const resp = await api('/api/resources/progress', {
         method: 'POST',
-        body: JSON.stringify({ sessions: [{ date, topic, status, ...(durationMin ? { duration_min: durationMin } : {}) }] })
+        body: JSON.stringify({ 
+          sessions: [{ 
+            date, 
+            topic, 
+            status, 
+            ...(durationMin ? { duration_min: durationMin } : {}) 
+          }] 
+        })
       })
-      // Backend may return only {ok:true, queued:n} due to batching; update UI optimistically
-      if ((resp as any)?.plan) setPlan((resp as any).plan)
-      setSessionStatus(prev => ({ ...prev, [`${date}-${topic}`]: status as 'pending' | 'in-progress' | 'completed' }))
+      
+      // If backend returns updated plan, use it
+      if ((resp as any)?.plan) {
+        setPlan((resp as any).plan)
+      }
+      
     } catch(e:any){
-      pushError({ errorCode: e?.errorCode||'PLAN_PROGRESS_FAIL', errorMessage: e?.errorMessage, details: e })
+      // Revert optimistic update on error
+      const sessionKey = `${date}-${topic}`
+      setSessionStatus(prev => {
+        const newStatus = { ...prev }
+        delete newStatus[sessionKey]
+        return newStatus
+      })
+      
+      pushError({ 
+        errorCode: e?.errorCode||'PLAN_PROGRESS_FAIL', 
+        errorMessage: e?.errorMessage || 'Failed to update session status', 
+        details: e 
+      })
     }
   }
 
@@ -299,10 +345,11 @@ export default function PlannerPage() {
   }
 
   return (
-    <MainLayout>
-      {/* Spinner overlay during regeneration */}
-      <LoadingOverlay show={optimistic} title="Regenerating plan..." description="Re-optimizing schedule based on your new deadline" />
-      <div className='p-6 space-y-8'>
+    <PlannerErrorBoundary>
+      <MainLayout>
+        {/* Spinner overlay during regeneration */}
+        <LoadingOverlay show={optimistic} title="Regenerating plan..." description="Re-optimizing schedule based on your new deadline" />
+        <div className='p-6 space-y-8'>
         {/* Header */}
         <div className='flex flex-col md:flex-row md:items-center md:justify-between gap-4'>
           <div>
@@ -760,7 +807,8 @@ export default function PlannerPage() {
             </CardContent>
           </Card>
         )}
-      </div>
-    </MainLayout>
+        </div>
+      </MainLayout>
+    </PlannerErrorBoundary>
   )
 }

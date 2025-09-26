@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { NoDataPlaceholder } from "@/components/ui/no-data-placeholder";
 import MinimalTimer from "@/components/ui/minimal-timer";
+import { DashboardErrorBoundary } from "@/components/dashboard/DashboardErrorBoundary";
 import Link from "next/link";
 import { 
   Calendar, 
@@ -217,8 +218,9 @@ export default function DashboardPage(){
   const chartColors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
 
   return (
-    <MainLayout>
-      <div className="p-6 space-y-8">
+    <DashboardErrorBoundary>
+      <MainLayout>
+        <div className="container mx-auto py-8 space-y-8">
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
@@ -655,8 +657,9 @@ export default function DashboardPage(){
             )}
           </CardContent>
         </Card>
-      </div>
-    </MainLayout>
+        </div>
+      </MainLayout>
+    </DashboardErrorBoundary>
   );
 }
 

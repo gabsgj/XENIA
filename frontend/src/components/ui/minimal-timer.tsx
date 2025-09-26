@@ -40,11 +40,19 @@ export function MinimalTimer({
     if (s === 'completed') {
       setRemaining(0)
       setManuallyPaused(false)
+      setIsRunning(false)
+      startedRef.current = false
     }
-    // When status is pending, only reset remaining if there is no externalProgress
-    if (s === 'pending' && (externalProgress === undefined || externalProgress === null)) {
-      setRemaining(totalSeconds)
+    // When status is pending, reset state properly
+    if (s === 'pending') {
+      // Reset to full duration if no external progress, or use external progress
+      const initialRemaining = externalProgress !== undefined && externalProgress !== null
+        ? Math.max(0, totalSeconds * (1 - externalProgress / 100))
+        : totalSeconds
+      setRemaining(initialRemaining)
       setManuallyPaused(false)
+      setIsRunning(false)
+      startedRef.current = false
     }
 
     // Only set running state from external status when auto-start is allowed and not manually paused
@@ -52,7 +60,7 @@ export function MinimalTimer({
     if (!noAutoStart && !manuallyPaused) {
       setIsRunning(s === 'in-progress')
     }
-  }, [status, totalSeconds, noAutoStart, manuallyPaused])
+  }, [status, totalSeconds, noAutoStart, manuallyPaused, externalProgress])
 
   useEffect(() => {
     // Only sync from externalProgress before the local timer has started,
@@ -117,13 +125,17 @@ export function MinimalTimer({
 
   const complete = useCallback(() => {
     setIsRunning(false)
-    setRemaining(0)
     setManuallyPaused(false)
     startedRef.current = false
-    // Immediately mark as completed in UI and notify parent
-    onStatusChange('completed')
-    onComplete(Math.max(1, Math.round((totalSeconds - remaining) / 60)))
-  }, [onComplete, onStatusChange, totalSeconds, remaining])
+    
+    // Use a ref to get the current remaining value to avoid stale closures
+    setRemaining(currentRemaining => {
+      // Immediately mark as completed in UI and notify parent
+      onStatusChange('completed')
+      onComplete(Math.max(1, Math.round((totalSeconds - currentRemaining) / 60)))
+      return 0
+    })
+  }, [onComplete, onStatusChange, totalSeconds])
 
   const formatTime = (s: number) => {
     const m = Math.floor(s / 60)

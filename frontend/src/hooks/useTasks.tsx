@@ -1,62 +1,279 @@
 "use client"
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { api, getUserId } from '@/lib/api'
+import { useErrorContext } from '@/lib/error-context'
 
 export interface Task {
   id: string
   title: string
   subject: string
+  topic?: string
   difficulty: 'Easy' | 'Medium' | 'Hard'
   estimatedMinutes: number
+  duration_minutes?: number
   priority: 'High' | 'Medium' | 'Low'
   phase: string
   completed: boolean
+  status: 'pending' | 'in-progress' | 'completed' | 'done'
   dueDate: string
-  status?: string
   due_date?: string
-  duration_minutes?: number
+  created_at?: string
+  updated_at?: string
+  user_id?: string
+  progress?: number
+}
+
+interface TasksState {
+  today: Task[]
+  upcoming: Task[]
+  all: Task[]
+  loading: boolean
+  error: string | null
+  lastFetch: Date | null
 }
 
 export function useTasks(){
-  const [today, setToday] = useState<Task[]>([])
-  const [upcoming, setUpcoming] = useState<Task[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  const getHeaders = () => ({
-    'Content-Type': 'application/json',
-    'X-User-Id': getUserId()
+  const [state, setState] = useState<TasksState>({
+    today: [],
+    upcoming: [],
+    all: [],
+    loading: true,
+    error: null,
+    lastFetch: null
   })
+  const { pushError } = useErrorContext()
 
-  async function fetchToday(){
-    setLoading(true)
-    try{
-      const j = await api('/api/tasks/daily')
-      setToday((j as any).tasks || [])
-    }catch(e:any){
-      setError(String(e))
-    }finally{setLoading(false)}
-  }
+  const updateTaskLocally = useCallback((taskId: string, updates: Partial<Task>) => {
+    setState(prev => ({
+      ...prev,
+      today: prev.today.map(task => task.id === taskId ? { ...task, ...updates } : task),
+      upcoming: prev.upcoming.map(task => task.id === taskId ? { ...task, ...updates } : task),
+      all: prev.all.map(task => task.id === taskId ? { ...task, ...updates } : task)
+    }))
+  }, [])
 
-  async function fetchUpcoming(){
-    try{
-      const j = await api('/api/tasks/upcoming')
-      setUpcoming((j as any).tasks || [])
-    }catch(e:any){
-      setError(String(e))
+  const fetchTasks = useCallback(async (type: 'today' | 'upcoming' | 'all' = 'all') => {
+    try {
+      setState(prev => ({ ...prev, loading: true, error: null }))
+      
+      const endpoints = {
+        today: '/api/tasks/daily',
+        upcoming: '/api/tasks/upcoming',
+        all: '/api/tasks'
+      }
+      
+      let responses: any = {}
+      
+      if (type === 'all') {
+        // Fetch all types
+        const [todayResp, upcomingResp, allResp] = await Promise.allSettled([
+          api(endpoints.today),
+          api(endpoints.upcoming),
+          api(endpoints.all)
+        ])
+        
+        responses.today = todayResp.status === 'fulfilled' ? todayResp.value : { tasks: [] }
+        responses.upcoming = upcomingResp.status === 'fulfilled' ? upcomingResp.value : { tasks: [] }
+        responses.all = allResp.status === 'fulfilled' ? allResp.value : { tasks: [] }
+      } else {
+        responses[type] = await api(endpoints[type])
+      }
+      
+      setState(prev => ({
+        ...prev,
+        today: responses.today?.tasks || prev.today,
+        upcoming: responses.upcoming?.tasks || prev.upcoming, 
+        all: responses.all?.tasks || prev.all,
+        loading: false,
+        lastFetch: new Date()
+      }))
+      
+    } catch (e: any) {
+      const errorMsg = e?.errorMessage || e?.message || 'Failed to fetch tasks'
+      setState(prev => ({ ...prev, error: errorMsg, loading: false }))
+      pushError({ 
+        errorCode: e?.errorCode || 'TASKS_FETCH_FAIL', 
+        errorMessage: errorMsg, 
+        details: e 
+      })
     }
-  }
+  }, [pushError])
 
-  useEffect(()=>{ fetchToday(); fetchUpcoming() }, [])
+  const fetchToday = useCallback(() => fetchTasks('today'), [fetchTasks])
+  const fetchUpcoming = useCallback(() => fetchTasks('upcoming'), [fetchTasks])
+  const fetchAll = useCallback(() => fetchTasks('all'), [fetchTasks])
 
-  async function completeTask(taskId: string){
-    await api('/api/tasks/complete', { 
-      method: 'POST', 
-      body: JSON.stringify({ task_id: taskId, user_id: getUserId() })
+  const createTask = useCallback(async (taskData: Omit<Task, 'id' | 'created_at' | 'updated_at'>) => {
+    try {
+      setState(prev => ({ ...prev, loading: true }))
+      
+      const response = await api('/api/tasks', {
+        method: 'POST',
+        body: JSON.stringify({ ...taskData, user_id: getUserId() })
+      })
+      
+      if (response?.task) {
+        setState(prev => ({
+          ...prev,
+          today: taskData.dueDate === new Date().toISOString().split('T')[0] 
+            ? [...prev.today, response.task] 
+            : prev.today,
+          upcoming: taskData.dueDate > new Date().toISOString().split('T')[0]
+            ? [...prev.upcoming, response.task]
+            : prev.upcoming,
+          all: [...prev.all, response.task],
+          loading: false
+        }))
+      }
+      
+      return response?.task
+    } catch (e: any) {
+      const errorMsg = e?.errorMessage || 'Failed to create task'
+      setState(prev => ({ ...prev, error: errorMsg, loading: false }))
+      pushError({ 
+        errorCode: e?.errorCode || 'TASK_CREATE_FAIL', 
+        errorMessage: errorMsg, 
+        details: e 
+      })
+      throw e
+    }
+  }, [pushError])
+
+  const updateTask = useCallback(async (taskId: string, updates: Partial<Task>) => {
+    // Store original task for rollback
+    const originalTask = state.all.find(t => t.id === taskId) || 
+                        state.today.find(t => t.id === taskId) || 
+                        state.upcoming.find(t => t.id === taskId)
+    
+    try {
+      updateTaskLocally(taskId, updates) // Optimistic update
+      
+      const response = await api(`/api/tasks/${taskId}`, {
+        method: 'PUT',
+        body: JSON.stringify({ ...updates, user_id: getUserId() })
+      })
+      
+      if (response?.task) {
+        updateTaskLocally(taskId, response.task)
+      }
+      
+      return response?.task
+    } catch (e: any) {
+      // Revert to original state on failure
+      if (originalTask) {
+        updateTaskLocally(taskId, originalTask)
+      } else {
+        // If we can't find original, refresh from server
+        await fetchTasks('all')
+      }
+      
+      const errorMsg = e?.errorMessage || 'Failed to update task'
+      pushError({ 
+        errorCode: e?.errorCode || 'TASK_UPDATE_FAIL', 
+        errorMessage: errorMsg, 
+        details: e 
+      })
+      throw e
+    }
+  }, [updateTaskLocally, fetchTasks, pushError, state])
+
+  const completeTask = useCallback(async (taskId: string) => {
+    try {
+      updateTaskLocally(taskId, { status: 'completed', completed: true }) // Optimistic update
+      
+      const response = await api('/api/tasks/complete', {
+        method: 'POST',
+        body: JSON.stringify({ task_id: taskId, user_id: getUserId() })
+      })
+      
+      if (response?.success) {
+        updateTaskLocally(taskId, { 
+          status: 'completed', 
+          completed: true, 
+          progress: 100 
+        })
+      }
+      
+      return response
+    } catch (e: any) {
+      // Revert optimistic update on failure
+      await fetchTasks('all')
+      const errorMsg = e?.errorMessage || 'Failed to complete task'
+      pushError({ 
+        errorCode: e?.errorCode || 'TASK_COMPLETE_FAIL', 
+        errorMessage: errorMsg, 
+        details: e 
+      })
+      throw e
+    }
+  }, [updateTaskLocally, fetchTasks, pushError])
+
+  const deleteTask = useCallback(async (taskId: string) => {
+    try {
+      setState(prev => ({
+        ...prev,
+        today: prev.today.filter(task => task.id !== taskId),
+        upcoming: prev.upcoming.filter(task => task.id !== taskId),
+        all: prev.all.filter(task => task.id !== taskId)
+      }))
+      
+      await api(`/api/tasks/${taskId}`, { method: 'DELETE' })
+    } catch (e: any) {
+      // Revert optimistic update on failure
+      await fetchTasks('all')
+      const errorMsg = e?.errorMessage || 'Failed to delete task'
+      pushError({ 
+        errorCode: e?.errorCode || 'TASK_DELETE_FAIL', 
+        errorMessage: errorMsg, 
+        details: e 
+      })
+      throw e
+    }
+  }, [fetchTasks, pushError])
+
+  const toggleTaskStatus = useCallback(async (taskId: string) => {
+    const task = state.all.find(t => t.id === taskId) || 
+                state.today.find(t => t.id === taskId) || 
+                state.upcoming.find(t => t.id === taskId)
+    
+    if (!task) return
+    
+    const newStatus = task.status === 'completed' || task.completed ? 'pending' : 'completed'
+    const newCompleted = newStatus === 'completed'
+    
+    return updateTask(taskId, { 
+      status: newStatus, 
+      completed: newCompleted, 
+      progress: newCompleted ? 100 : 0 
     })
-    // refresh
-    await fetchToday(); await fetchUpcoming()
-  }
+  }, [state, updateTask])
 
-  return { today, upcoming, loading, error, fetchToday, fetchUpcoming, completeTask }
+  // Initial fetch
+  useEffect(() => {
+    fetchTasks('all')
+  }, [])
+
+  // Refresh data periodically
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (state.lastFetch && Date.now() - state.lastFetch.getTime() > 5 * 60 * 1000) {
+        fetchTasks('all')
+      }
+    }, 30000) // Check every 30 seconds
+    
+    return () => clearInterval(interval)
+  }, [state.lastFetch, fetchTasks])
+
+  return {
+    ...state,
+    fetchToday,
+    fetchUpcoming,
+    fetchAll,
+    createTask,
+    updateTask,
+    completeTask,
+    deleteTask,
+    toggleTaskStatus,
+    refresh: () => fetchTasks('all')
+  }
 }
