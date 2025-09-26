@@ -17,14 +17,14 @@ YOUTUBE_VIDEO_FIELDS = "items(id/videoId,snippet/title,snippet/channelTitle,snip
 
 # Enhanced catalog sources with quality ratings
 OPENCOURSEWARE_INDEX = [
-    {"title": "MIT OpenCourseWare", "url": "https://ocw.mit.edu", "quality": 9, "type": "university"},
-    {"title": "Khan Academy", "url": "https://www.khanacademy.org", "quality": 9, "type": "interactive"},
+    {"title": "MIT OpenCourseWare", "url": "https://ocw.mit.edu/search/?q={query}", "quality": 9, "type": "university"},
+    {"title": "Khan Academy", "url": "https://www.khanacademy.org/search?page_search_query={query}", "quality": 9, "type": "interactive"},
     {"title": "Coursera Free Courses", "url": "https://www.coursera.org/courses?query={query}", "quality": 8, "type": "mooc"},
     {"title": "edX", "url": "https://www.edx.org/search?q={query}", "quality": 8, "type": "mooc"},
-    {"title": "freeCodeCamp", "url": "https://www.freecodecamp.org", "quality": 8, "type": "interactive"},
-    {"title": "Codecademy", "url": "https://www.codecademy.com", "quality": 7, "type": "interactive"},
-    {"title": "W3Schools", "url": "https://www.w3schools.com", "quality": 7, "type": "reference"},
-    {"title": "MDN Web Docs", "url": "https://developer.mozilla.org", "quality": 9, "type": "reference"},
+    {"title": "freeCodeCamp", "url": "https://www.freecodecamp.org/news/search/?query={query}", "quality": 8, "type": "interactive"},
+    {"title": "Codecademy", "url": "https://www.codecademy.com/search?query={query}", "quality": 7, "type": "interactive"},
+    {"title": "W3Schools", "url": "https://www.w3schools.com/search/results.aspx?query={query}", "quality": 7, "type": "reference"},
+    {"title": "MDN Web Docs", "url": "https://developer.mozilla.org/en-US/search?q={query}", "quality": 9, "type": "reference"},
 ]
 
 # Enhanced documentation sources with subject-specific resources
@@ -316,14 +316,14 @@ YOUTUBE_VIDEO_FIELDS = "items(id/videoId,snippet/title,snippet/channelTitle,snip
 
 # Enhanced catalog sources with quality ratings
 OPENCOURSEWARE_INDEX = [
-    {"title": "MIT OpenCourseWare", "url": "https://ocw.mit.edu", "quality": 9, "type": "university"},
-    {"title": "Khan Academy", "url": "https://www.khanacademy.org", "quality": 9, "type": "interactive"},
+    {"title": "MIT OpenCourseWare", "url": "https://ocw.mit.edu/search/?q={query}", "quality": 9, "type": "university"},
+    {"title": "Khan Academy", "url": "https://www.khanacademy.org/search?page_search_query={query}", "quality": 9, "type": "interactive"},
     {"title": "Coursera Free Courses", "url": "https://www.coursera.org/courses?query={query}", "quality": 8, "type": "mooc"},
     {"title": "edX", "url": "https://www.edx.org/search?q={query}", "quality": 8, "type": "mooc"},
-    {"title": "freeCodeCamp", "url": "https://www.freecodecamp.org", "quality": 8, "type": "interactive"},
-    {"title": "Codecademy", "url": "https://www.codecademy.com", "quality": 7, "type": "interactive"},
-    {"title": "W3Schools", "url": "https://www.w3schools.com", "quality": 7, "type": "reference"},
-    {"title": "MDN Web Docs", "url": "https://developer.mozilla.org", "quality": 9, "type": "reference"},
+    {"title": "freeCodeCamp", "url": "https://www.freecodecamp.org/news/search/?query={query}", "quality": 8, "type": "interactive"},
+    {"title": "Codecademy", "url": "https://www.codecademy.com/search?query={query}", "quality": 7, "type": "interactive"},
+    {"title": "W3Schools", "url": "https://www.w3schools.com/search/results.aspx?query={query}", "quality": 7, "type": "reference"},
+    {"title": "MDN Web Docs", "url": "https://developer.mozilla.org/en-US/search?q={query}", "quality": 9, "type": "reference"},
 ]
 
 # Enhanced documentation sources with subject-specific resources
@@ -411,10 +411,28 @@ def _safe_get_json(url: str, params: Dict[str, Any] | None = None, timeout: floa
 
 
 def _youtube_search(query: str, max_results: int = 5, learning_style: str = None, difficulty: str = None) -> List[Dict[str, Any]]:
-    """Enhanced YouTube search with learning style optimization and quality filtering."""
+    """Enhanced YouTube search with learning style optimization and quality filtering.
+
+    If YOUTUBE_API_KEY is not configured, return a safe fallback that links to a YouTube
+    search for the topic, so the UI can still prioritize video content without scraping.
+    """
     if not YOUTUBE_API_KEY:
-        # Fallback: use ytsearch via no API key not allowed; return empty list to avoid scraping policies
-        return []
+        q = urllib.parse.quote_plus(f"{query} tutorial")
+        # Provide 2-3 high-level search links to keep YouTube as primary content type
+        return [
+            {
+                "source": "youtube",
+                "title": f"YouTube: {query} tutorial (search)",
+                "url": f"https://www.youtube.com/results?search_query={q}",
+                "quality_score": 7,
+                "metadata": {
+                    "learning_style": learning_style,
+                    "difficulty": difficulty,
+                    "fallback": True,
+                    "note": "Using YouTube search fallback"
+                }
+            }
+        ]
     
     # Enhanced query construction based on learning style and difficulty
     enhanced_query = query
@@ -503,19 +521,22 @@ def _youtube_search(query: str, max_results: int = 5, learning_style: str = None
 
 
 def _ocw_links(query: str) -> List[Dict[str, Any]]:
-    """Enhanced OpenCourseWare links with quality scoring."""
+    """Enhanced OpenCourseWare and MOOC links with topic-specific search and quality scoring."""
     q = urllib.parse.quote(query)
     resources: List[Dict[str, Any]] = []
     for entry in OPENCOURSEWARE_INDEX:
         url = entry["url"].format(query=q) if "{query}" in entry["url"] else entry["url"]
+        # Make title topic-specific when possible
+        title = entry["title"] if "{query}" not in entry["url"] else f"{entry['title']} - {query}"
         resources.append({
             "source": "ocw",
-            "title": entry["title"],
+            "title": title,
             "url": url,
             "quality_score": entry.get("quality", 7),
             "metadata": {
                 "type": entry.get("type", "general"),
-                "provider": entry["title"]
+                "provider": entry["title"],
+                "search_query": query
             },
         })
     

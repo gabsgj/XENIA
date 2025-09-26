@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { Modal, ModalHeader, ModalContent, ModalFooter } from '@/components/ui/modal'
+import { api } from '@/lib/api'
 
 const formatDate = (d: Date) => d.toISOString().split('T')[0]
 const addDays = (d: Date, n: number) => { const nd = new Date(d); nd.setDate(nd.getDate()+n); return nd }
@@ -49,15 +50,11 @@ const RegeneratePlanModal: React.FC<Props> = ({ currentPlan, currentProgress, is
       if (!config.newDeadline) return
       setIsValidating(true)
       try {
-        const resp = await fetch('/api/plan/check-deadline-feasibility', {
+        const data = await api('/api/plan/check-deadline-feasibility', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ plan_id: currentPlan?.id, new_deadline: formatDate(config.newDeadline) })
         })
-        if (resp.ok) {
-          const data = await resp.json()
-          setFeasibilityCheck(data)
-        }
+        setFeasibilityCheck(data)
       } catch (err) {
         console.warn('Deadline check failed', err)
       } finally {

@@ -262,22 +262,34 @@ export default function UploadPage() {
     setGeneratingPlan(true)
 
     try {
-      const deadlineISO = deadline ? new Date(deadline).toISOString() : null
-      
+      // Format deadline as a date-only string for the backend schema (YYYY-MM-DD)
+      const newDeadline = deadline ? new Date(deadline).toISOString().split('T')[0] : null
+
       // Get user ID from Supabase authentication
       const userId = getUserId()
-      
+
+      // Ensure topics is an array of strings (schema expects list of strings)
+      const normalizedTopics = topics.map((t: any) => (typeof t === 'string' ? t : (t?.topic || t?.name || String(t))).toString())
+
+      // Build payload that matches backend PlanSchema to avoid validation errors
+      const payload: any = {
+        user_id: userId,
+        topics: normalizedTopics,
+      }
+
+      // Map frontend "learningStyle" into backend "learning_pace" field name
+      if (learningStyle) payload.learning_pace = learningStyle
+
+      // Only include new_deadline if the user provided a deadline (avoid null which fails validation)
+      if (newDeadline) payload.new_deadline = newDeadline
+
+      // DEBUG: log outgoing payload so we can inspect server validation issues
+      // (This will appear in the browser console)
+      console.log('Generate plan payload:', payload)
+
       const planData = await api('/api/plan/generate', {
         method: 'POST',
-        body: JSON.stringify({
-          user_id: userId, // Use actual user ID from authentication
-          horizon_days: deadline ? Math.max(3, Math.ceil((new Date(deadline).getTime() - Date.now()) / (1000 * 60 * 60 * 24))) : 14,
-          preferred_hours_per_day: hoursPerDay,
-          deadline: deadlineISO,
-          learning_style: learningStyle,
-          topics: topics, // Pass extracted topics to study plan generation
-          topic_details: topicDetails // Pass detailed topic metadata for enhanced planning
-        })
+        body: JSON.stringify(payload)
       })
       
       // Store the generated plan
@@ -290,6 +302,11 @@ export default function UploadPage() {
       window.location.href = '/dashboard'
       
     } catch (e: any) {
+      // Surface backend validation details and error payload in UI for debugging
+      console.error('Plan generation failed:', e)
+      const details = e?.details ? JSON.stringify(e.details) : null
+      const message = `${e?.errorCode || 'PLAN_GENERATION_FAIL'}: ${e?.errorMessage || 'Failed to generate enhanced study plan'}`
+      setErrorMessage(details ? `${message} — details: ${details}` : message)
       pushError({
         errorCode: e?.errorCode || 'PLAN_GENERATION_FAIL',
         errorMessage: e?.errorMessage || 'Failed to generate enhanced study plan',

@@ -2,6 +2,7 @@ from flask import Blueprint, request
 from ..errors import ApiError
 from ..utils import get_user_id_from_request
 from ..services.ingestion import handle_upload
+from ..schemas import UploadSchema
 import logging
 
 logger = logging.getLogger('xenia')
@@ -21,6 +22,11 @@ def _extract_user_id() -> str:
 @upload_bp.post("/syllabus")
 def upload_syllabus():
     """Upload syllabus endpoint expected by tests"""
+    schema = UploadSchema()
+    errors = schema.validate(request.files)
+    if errors:
+        raise ApiError("UPLOAD_400", "Invalid input", details=errors)
+
     logger.info("📚 Syllabus upload endpoint called")
     if "file" not in request.files:
         logger.error("   No file provided in syllabus upload")
@@ -37,6 +43,11 @@ def upload_syllabus():
 @upload_bp.post("/assessment")
 def upload_assessment():
     """Upload assessment endpoint expected by tests"""
+    schema = UploadSchema()
+    errors = schema.validate(request.files)
+    if errors:
+        raise ApiError("UPLOAD_400", "Invalid input", details=errors)
+        
     logger.info("📝 Assessment upload endpoint called")
     if "file" not in request.files:
         logger.error("   No file provided in assessment upload")
