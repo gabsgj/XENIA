@@ -285,7 +285,7 @@ export default function PlannerPage() {
       setSessionStatus(prev => ({ ...prev, [sessionKey]: status as 'pending' | 'in-progress' | 'completed' }))
       
       // Also update the plan sessions optimistically
-      setPlan(prevPlan => {
+      setPlan((prevPlan: any) => {
         if (!prevPlan?.sessions) return prevPlan
         
         const updatedSessions = prevPlan.sessions.map((s: any) => 

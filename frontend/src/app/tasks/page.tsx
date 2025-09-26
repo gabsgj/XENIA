@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { useErrorContext } from '@/lib/error-context'
 import { 
   Plus, 
@@ -141,7 +141,11 @@ export default function TasksPage(){
         return bPriority - aPriority
       }
       
-      return new Date(a.dueDate || a.due_date).getTime() - new Date(b.dueDate || b.due_date).getTime()
+      const aDateStr = (a.dueDate || a.due_date) ?? ''
+      const bDateStr = (b.dueDate || b.due_date) ?? ''
+      const aTime = isNaN(new Date(aDateStr).getTime()) ? Number.POSITIVE_INFINITY : new Date(aDateStr).getTime()
+      const bTime = isNaN(new Date(bDateStr).getTime()) ? Number.POSITIVE_INFINITY : new Date(bDateStr).getTime()
+      return aTime - bTime
     })
   }, [todaysTasks, selectedFilter, selectedSubject])
 
@@ -151,7 +155,8 @@ export default function TasksPage(){
   }, [all])
 
   const todaysTopics = useMemo(() => {
-    return [...new Set(filteredTasks.map(task => task.subject || task.topic).filter(Boolean))]
+    const topics = filteredTasks.map(task => task.subject || task.topic)
+    return [...new Set(topics.filter((t): t is string => Boolean(t)))]
   }, [filteredTasks])
 
   const taskStats = useMemo(() => {
@@ -534,7 +539,7 @@ export default function TasksPage(){
                   </div>
                 </div>
                 
-                <DialogFooter>
+                <div className="flex justify-end gap-2 pt-2">
                   <Button 
                     variant="outline" 
                     onClick={() => setShowCreateTaskDialog(false)}
@@ -547,7 +552,7 @@ export default function TasksPage(){
                   >
                     Create Task
                   </Button>
-                </DialogFooter>
+                </div>
               </DialogContent>
             </Dialog>
           </div>
@@ -693,7 +698,7 @@ export default function TasksPage(){
                 <CardContent className="pt-0">
                   {/* Filters */}
                   <div className="flex items-center gap-4 mb-6">
-                    <Select value={selectedFilter} onValueChange={setSelectedFilter}>
+                    <Select value={selectedFilter} onValueChange={(v) => setSelectedFilter(v as 'all' | 'pending' | 'in-progress' | 'completed')}>
                       <SelectTrigger className="w-[140px]">
                         <SelectValue />
                       </SelectTrigger>
@@ -904,7 +909,7 @@ export default function TasksPage(){
                         duration={((): number => {
                           const task = filteredTasks.find((t: any) => t.id === activeTaskId)
                           return task?.estimatedMinutes || task?.duration_minutes || 30
-                        })()
+                        })()}
                         status={timerStatus}
                         onStatusChange={handleTimerStatusChange}
                         onComplete={handleTimerComplete}

@@ -298,7 +298,7 @@ export function useStudySession(){
     
     const sortedDates = Object.keys(sessionsByDate).sort().reverse()
     let streak = 0
-    let currentDate = new Date()
+    const currentDate = new Date()
     
     for (const dateStr of sortedDates) {
       const date = new Date(dateStr)

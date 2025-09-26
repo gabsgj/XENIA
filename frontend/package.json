@@ -7,7 +7,7 @@
     "build": "next build",
     "build:turbo": "next build --turbopack",
     "start": "next start",
-    "lint": "eslint",
+    "lint": "eslint src",
     "type-check": "tsc --noEmit"
   },
   "dependencies": {

@@ -12,8 +12,10 @@ import { TimerErrorBoundary } from '@/components/ui/timer-error-boundary'
 import { AlertTriangle, Bug } from 'lucide-react'
 
 // Component that intentionally throws an error
-function ErrorComponent({ type }: { type: string }) {
+const ErrorComponent: React.FC<{ type: string }> = ({ type }) => {
   throw new Error(`Test error from ${type} component`)
+  // Unreachable, but satisfies JSX return type
+  return null as any
 }
 
 interface ErrorBoundaryTestProps {

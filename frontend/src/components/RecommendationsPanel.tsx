@@ -411,7 +411,7 @@ export default function RecommendationsPanel({
               <option value="all">All Levels</option>
               {availableDifficulties.map(difficulty => (
                 <option key={difficulty} value={difficulty}>
-                  {difficulty?.charAt(0).toUpperCase() + difficulty?.slice(1)}
+{(difficulty ?? '').charAt(0).toUpperCase() + (difficulty ?? '').slice(1)}
                 </option>
               ))}
             </select>

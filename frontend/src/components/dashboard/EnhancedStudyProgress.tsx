@@ -80,7 +80,7 @@ export function EnhancedStudyProgress({
         api('/api/tasks')
       ]);
 
-      let progressData: ProgressData = {
+      const progressData: ProgressData = {
         total_tasks: 0,
         completed_tasks: 0,
         completion_percentage: 0,

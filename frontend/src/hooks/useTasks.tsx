@@ -62,7 +62,7 @@ export function useTasks(){
         all: '/api/tasks'
       }
       
-      let responses: any = {}
+      const responses: any = {}
       
       if (type === 'all') {
         // Fetch all types

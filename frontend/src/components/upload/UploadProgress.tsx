@@ -43,9 +43,6 @@ export function UploadProgress({ uploadId, onComplete, className }: UploadProgre
   const router = useRouter();
 
   useEffect(() => {
-    let interval: NodeJS.Timeout;
-    let timeInterval: NodeJS.Timeout;
-
     const checkStatus = async () => {
       try {
         const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/upload/status/${uploadId}`);
@@ -107,10 +104,10 @@ export function UploadProgress({ uploadId, onComplete, className }: UploadProgre
 
     // Start status checking
     checkStatus(); // Initial check
-    interval = setInterval(checkStatus, 2000); // Check every 2 seconds
+    const interval = setInterval(checkStatus, 2000); // Check every 2 seconds
     
     // Start time tracking
-    timeInterval = setInterval(() => {
+    const timeInterval = setInterval(() => {
       setTimeElapsed(prev => prev + 1);
     }, 1000);
 
