@@ -34,7 +34,7 @@ export function useTasks(){
       const res = await fetch('/api/tasks/daily', {
         headers: getHeaders()
       })
-      if (!res.ok) throw new Error('Failed')
+      if (!res.ok) throw new Error(`Failed: ${res.status}`)
       const j = await res.json()
       setToday(j.tasks || [])
     }catch(e:any){
@@ -47,7 +47,7 @@ export function useTasks(){
       const res = await fetch('/api/tasks/upcoming', {
         headers: getHeaders()
       })
-      if (!res.ok) throw new Error('Failed')
+      if (!res.ok) throw new Error(`Failed: ${res.status}`)
       const j = await res.json()
       setUpcoming(j.tasks || [])
     }catch(e:any){

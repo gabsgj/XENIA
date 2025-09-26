@@ -22,10 +22,23 @@ export default function RecommendationsPanel({ topics }: { topics: string[] }){
     const load = async ()=>{
       setLoading(true)
       try{
-        const res = await fetch(`/api/ai/get-resources?topics=${encodeURIComponent(topics.join(','))}&max=8`)
+        const res = await fetch(`/api/resources/recommendations/${encodeURIComponent(topics[0])}?learning_style=balanced&difficulty=intermediate&free_only=true`)
         if (!res.ok) throw new Error('Failed')
         const j = await res.json()
-        let r = j.resources || []
+        let r = []
+        
+        // Handle the new API response format
+        if (j.grouped_recommendations) {
+          // Extract resources from grouped recommendations
+          Object.values(j.grouped_recommendations).forEach((group: any) => {
+            if (Array.isArray(group)) {
+              r = r.concat(group)
+            }
+          })
+        } else if (j.resources) {
+          r = j.resources
+        }
+        
         // re-rank by combining relevanceScore * (1/duration) to prefer short high-relevance
         r = r.map((it:any)=> ({ ...it, score: (it.relevanceScore || 0) * (1 / (Math.max(1, it.duration || 10))) }))
         r.sort((a:any,b:any)=> b.score - a.score)

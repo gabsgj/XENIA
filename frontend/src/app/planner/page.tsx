@@ -54,8 +54,8 @@ export default function PlannerPage() {
           const uniqueTopics = [...new Set(p.sessions.map((s:any) => s.topic))] as string[]
           const topicResourcePromises = uniqueTopics.slice(0, 5).map(async (topic: string) => {
             try {
-              const topicRes = await api(`/api/plan/resources/${encodeURIComponent(topic)}?learning_style=balanced`)
-              return { topic, resources: topicRes.resources || {} }
+              const topicRes = await api(`/api/resources/recommendations/${encodeURIComponent(topic)}?learning_style=balanced&difficulty=intermediate&free_only=true`)
+              return { topic, resources: topicRes.grouped_recommendations || {} }
             } catch (e) {
               console.warn(`Failed to fetch resources for topic: ${topic}`, e)
               return { topic, resources: {} }
@@ -69,16 +69,19 @@ export default function PlannerPage() {
             if (result.status === 'fulfilled' && result.value?.resources) {
               const { topic, resources: topicRes } = result.value
               
-              // Extract different types of resources
+              // Extract different types of resources from grouped recommendations
               Object.entries(topicRes).forEach(([category, resourceList]: [string, any]) => {
                 if (Array.isArray(resourceList)) {
                   resourceList.forEach((resource: any) => {
                     additionalResources.push({
                       ...resource,
                       topic: topic,
-                      source: category.includes('youtube') || category.includes('videos') ? 'youtube' : 
-                             category.includes('articles') ? 'article' : 
-                             category.includes('documentation') ? 'docs' : 'general'
+                      source: category === 'youtube_videos' ? 'youtube' : 
+                             category === 'ocw_courses' ? 'ocw' : 
+                             category === 'documentation' ? 'docs' : 
+                             category === 'ai_generated' ? 'ai' : 'general',
+                      title: resource.title || resource.name || resource.name || 'Untitled Resource',
+                      url: resource.url || resource.link || '#'
                     })
                   })
                 }
@@ -280,23 +283,26 @@ export default function PlannerPage() {
                               duration={s.duration_min}
                               status={s.status || 'pending'}
                               noAutoStart={true}
-                              onStatusChange={(newStatus) => updateSessionStatus(s.date, s.topic, newStatus)}
-                              onComplete={(actualTime) => markSessionCompleteAPI(s.date, s.topic, actualTime)}
+                              onStatusChange={(newStatus) => markSession(s.date, s.topic, newStatus)}
+                              onComplete={(actualTime) => markSessionComplete(`${s.date}-${s.topic}`, actualTime)}
                             />
                           </div>
                           
                           <p className='text-xs text-muted-foreground mb-2'>{s.focus}</p>
                           
                           {/* Resource suggestions for this topic */}
-                          {resources.filter((r:any) => r.topic === s.topic || s.topic.toLowerCase().includes(r.topic.toLowerCase()) || r.topic.toLowerCase().includes(s.topic.toLowerCase())).slice(0, 2).map((resource:any, rIdx:number) => (
-                            <div key={rIdx} className="mb-2 p-2 bg-blue-50 dark:bg-blue-950 rounded border-l-2 border-blue-500">
-                              <div className="flex items-center gap-2">
-                                <span className="text-xs font-medium text-blue-700 dark:text-blue-300">
-                                  {resource.source === 'youtube' ? '📺' : '📖'} {resource.source.toUpperCase()}
+                          {resources.filter((r:any) => r.topic === s.topic || s.topic.toLowerCase().includes(r.topic.toLowerCase()) || r.topic.toLowerCase().includes(r.topic.toLowerCase())).slice(0, 2).map((resource:any, rIdx:number) => (
+                            <div key={rIdx} className="mb-2 p-2 bg-slate-50 dark:bg-slate-800/50 rounded border border-slate-200 dark:border-slate-700">
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className="text-xs font-medium text-slate-600 dark:text-slate-400">
+                                  {resource.source === 'youtube' ? '🎥' : resource.source === 'ocw' ? '🎓' : '📖'} {resource.source.toUpperCase()}
                                 </span>
+                                {resource.source === 'youtube' && (
+                                  <span className="text-xs text-red-600 dark:text-red-400 font-medium">VIDEO</span>
+                                )}
                               </div>
                               <a href={resource.url} target="_blank" rel="noopener noreferrer" 
-                                 className="text-xs text-blue-600 dark:text-blue-400 hover:underline block truncate">
+                                 className="text-xs text-slate-700 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 hover:underline block truncate font-medium">
                                 {resource.title}
                               </a>
                             </div>
@@ -361,18 +367,22 @@ export default function PlannerPage() {
                                 duration={s.duration_min}
                                 status={s.status || 'pending'}
                                 noAutoStart={true}
-                                onStatusChange={(newStatus) => updateSessionStatus(s.date, s.topic, newStatus)}
-                                onComplete={(actualTime) => markSessionCompleteAPI(s.date, s.topic, actualTime)}
+                                onStatusChange={(newStatus) => markSession(s.date, s.topic, newStatus)}
+                                onComplete={(actualTime) => markSessionComplete(`${s.date}-${s.topic}`, actualTime)}
                               />
                             </td>
                             <td className='p-3'>
-                              {resources.filter((r:any) => r.topic === s.topic || s.topic.toLowerCase().includes(r.topic.toLowerCase()) || r.topic.toLowerCase().includes(s.topic.toLowerCase())).slice(0, 1).map((resource:any, rIdx:number) => (
+                              {resources.filter((r:any) => r.topic === s.topic || s.topic.toLowerCase().includes(r.topic.toLowerCase()) || r.topic.toLowerCase().includes(r.topic.toLowerCase())).slice(0, 1).map((resource:any, rIdx:number) => (
                                 <a key={rIdx} href={resource.url} target="_blank" rel="noopener noreferrer" 
-                                   className="text-blue-600 dark:text-blue-400 hover:underline text-xs flex items-center gap-1">
-                                  {resource.source === 'youtube' ? '📺' : '📖'} {resource.title.substring(0, 30)}...
+                                   className="text-slate-700 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 hover:underline text-xs flex items-center gap-1">
+                                  {resource.source === 'youtube' ? '🎥' : resource.source === 'ocw' ? '🎓' : '📖'} 
+                                  {resource.title.substring(0, 30)}...
+                                  {resource.source === 'youtube' && (
+                                    <span className="text-red-600 dark:text-red-400 font-medium ml-1">VIDEO</span>
+                                  )}
                                 </a>
                               ))}
-                              {resources.filter((r:any) => r.topic === s.topic || s.topic.toLowerCase().includes(r.topic.toLowerCase()) || r.topic.toLowerCase().includes(s.topic.toLowerCase())).length === 0 && (
+                              {resources.filter((r:any) => r.topic === s.topic || s.topic.toLowerCase().includes(r.topic.toLowerCase()) || r.topic.toLowerCase().includes(r.topic.toLowerCase())).length === 0 && (
                                 <span className="text-xs text-muted-foreground">No resources</span>
                               )}
                             </td>
@@ -411,20 +421,25 @@ export default function PlannerPage() {
                           <p className="text-muted-foreground text-sm mb-2">{s.focus}</p>
                           
                           {/* Resource suggestions */}
-                          {resources.filter((r:any) => r.topic === s.topic || s.topic.toLowerCase().includes(r.topic.toLowerCase()) || r.topic.toLowerCase().includes(s.topic.toLowerCase())).slice(0, 3).length > 0 && (
+                          {resources.filter((r:any) => r.topic === s.topic || s.topic.toLowerCase().includes(r.topic.toLowerCase()) || r.topic.toLowerCase().includes(r.topic.toLowerCase())).slice(0, 3).length > 0 && (
                             <div className="mb-3">
-                              <h4 className="text-xs font-semibold text-muted-foreground mb-2">📚 Recommended Resources:</h4>
+                              <h4 className="text-xs font-semibold text-slate-600 dark:text-slate-400 mb-2">📚 Recommended Resources:</h4>
                               <div className="grid gap-2">
-                                {resources.filter((r:any) => r.topic === s.topic || s.topic.toLowerCase().includes(r.topic.toLowerCase()) || r.topic.toLowerCase().includes(s.topic.toLowerCase())).slice(0, 3).map((resource:any, rIdx:number) => (
-                                  <div key={rIdx} className="flex items-center gap-2 p-2 bg-blue-50 dark:bg-blue-950 rounded">
+                                {resources.filter((r:any) => r.topic === s.topic || s.topic.toLowerCase().includes(r.topic.toLowerCase()) || r.topic.toLowerCase().includes(r.topic.toLowerCase())).slice(0, 3).map((resource:any, rIdx:number) => (
+                                  <div key={rIdx} className="flex items-center gap-2 p-2 bg-slate-50 dark:bg-slate-800/50 rounded border border-slate-200 dark:border-slate-700">
                                     <span className="text-xs">
-                                      {resource.source === 'youtube' ? '📺' : resource.source === 'ocw' ? '🎓' : '📖'}
+                                      {resource.source === 'youtube' ? '🎥' : resource.source === 'ocw' ? '🎓' : '📖'}
                                     </span>
                                     <a href={resource.url} target="_blank" rel="noopener noreferrer" 
-                                       className="text-xs text-blue-600 dark:text-blue-400 hover:underline flex-1 truncate">
+                                       className="text-xs text-slate-700 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 hover:underline flex-1 truncate font-medium">
                                       {resource.title}
                                     </a>
-                                    <span className="text-xs text-muted-foreground">{resource.source}</span>
+                                    <div className="flex items-center gap-1">
+                                      {resource.source === 'youtube' && (
+                                        <span className="text-xs text-red-600 dark:text-red-400 font-medium">VIDEO</span>
+                                      )}
+                                      <span className="text-xs text-slate-500 dark:text-slate-400">{resource.source}</span>
+                                    </div>
                                   </div>
                                 ))}
                               </div>
@@ -487,7 +502,7 @@ export default function PlannerPage() {
                 Study Resources
               </CardTitle>
               <CardDescription>
-                AI-curated learning materials with videos as the primary resource type
+                AI-curated learning materials with YouTube videos and educational content
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -515,25 +530,25 @@ export default function PlannerPage() {
                         </h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                           {videoResources.slice(0, showAllResources ? videoResources.length : 8).map((resource:any, idx:number) => (
-                            <Card key={`video-${idx}`} className="hover:shadow-lg transition-all border-l-4 border-l-red-500">
+                            <Card key={`video-${idx}`} className="hover:shadow-lg transition-all border-l-4 border-l-red-500 bg-white dark:bg-slate-800">
                               <CardContent className="p-4">
                                 <div className="flex items-start gap-3">
                                   <span className="text-2xl">🎥</span>
                                   <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-2 mb-2">
-                                      <Badge variant="default" className="bg-red-500 text-white text-xs">
-                                        VIDEO
+                                      <Badge variant="default" className="bg-red-500 text-white text-xs font-medium">
+                                        YOUTUBE
                                       </Badge>
-                                      <span className="text-xs text-muted-foreground">
+                                      <span className="text-xs text-slate-500 dark:text-slate-400">
                                         {resource.topic}
                                       </span>
                                     </div>
-                                    <h4 className="font-medium text-sm mb-2 line-clamp-2">
+                                    <h4 className="font-medium text-sm mb-3 line-clamp-2 text-slate-700 dark:text-slate-300">
                                       {resource.title}
                                     </h4>
                                     <Button
                                       size="sm"
-                                      className="w-full"
+                                      className="w-full bg-red-600 hover:bg-red-700 text-white"
                                       onClick={() => window.open(resource.url, '_blank')}
                                     >
                                       <Play className="w-3 h-3 mr-1" />

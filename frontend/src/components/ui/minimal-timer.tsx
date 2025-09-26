@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
-import { Play, Pause, CheckCircle } from 'lucide-react'
+import { Play, Pause, CheckCircle, RotateCcw } from 'lucide-react'
 
 interface MinimalTimerProps {
   duration: number // minutes
@@ -20,7 +20,8 @@ export function MinimalTimer({
   onStatusChange,
   onComplete,
   externalProgress,
-  className = ''
+  className = '',
+  noAutoStart = false
 }: MinimalTimerProps) {
   const totalSeconds = Math.max(1, duration) * 60
   const [remaining, setRemaining] = useState(() => Math.max(0, totalSeconds * (1 - (externalProgress ?? 0) / 100)))
@@ -111,38 +112,38 @@ export function MinimalTimer({
 
   if (status === 'completed') {
     return (
-      <div className={`${className} flex items-center gap-2 text-green-600`}>
-        <CheckCircle className="w-4 h-4" />
-        <span className="text-sm font-medium">Completed</span>
+      <div className={`${className} flex items-center gap-1.5 px-2 py-1 bg-green-50 dark:bg-green-900/20 rounded border border-green-200 dark:border-green-800`}>
+        <CheckCircle className="w-3 h-3 text-green-600" />
+        <span className="text-xs font-medium text-green-700 dark:text-green-300">Done</span>
       </div>
     )
   }
 
   return (
-    <div className={`${className} flex items-center gap-2 p-2 bg-muted/20 rounded-md`}>
-      <div className="text-sm font-mono min-w-[3rem]">{formatTime(remaining)}</div>
-      <div className="flex-1 bg-gray-200 rounded-full h-1 overflow-hidden min-w-[2rem]">
+    <div className={`${className} flex items-center gap-1.5 px-2 py-1 bg-muted/10 rounded border`}>
+      <div className="text-xs font-mono min-w-[2.5rem] text-muted-foreground">{formatTime(remaining)}</div>
+      <div className="flex-1 bg-muted/30 rounded-full h-0.5 overflow-hidden min-w-[1.5rem]">
         <div
-          className="h-1 bg-primary rounded-full transition-all duration-300"
+          className="h-0.5 bg-primary rounded-full transition-all duration-300"
           style={{ width: `${progressPercent}%` }}
         />
       </div>
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-0.5">
         {/* Start button - always visible when not completed and not running */}
         {!isRunning && status !== 'completed' && (
-          <Button size="sm" variant="ghost" onClick={start} className="h-6 w-6 p-0" aria-label="Start">
-            <Play className="w-3 h-3" />
+          <Button size="sm" variant="ghost" onClick={start} className="h-5 w-5 p-0 hover:bg-muted/50" aria-label="Start">
+            <Play className="w-2.5 h-2.5" />
           </Button>
         )}
 
         {/* Reset button - small and minimal */}
-        <Button size="sm" variant="ghost" onClick={reset} className="h-6 w-6 p-0" aria-label="Reset">
-          <RotateCcw className="w-3 h-3" />
+        <Button size="sm" variant="ghost" onClick={reset} className="h-5 w-5 p-0 hover:bg-muted/50" aria-label="Reset">
+          <RotateCcw className="w-2.5 h-2.5" />
         </Button>
 
         {/* Complete button */}
-        <Button size="sm" variant="ghost" onClick={complete} className="h-6 w-6 p-0" aria-label="Complete">
-          <CheckCircle className="w-3 h-3" />
+        <Button size="sm" variant="ghost" onClick={complete} className="h-5 w-5 p-0 hover:bg-muted/50" aria-label="Complete">
+          <CheckCircle className="w-2.5 h-2.5" />
         </Button>
       </div>
     </div>

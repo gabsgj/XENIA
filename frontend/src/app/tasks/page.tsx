@@ -38,6 +38,29 @@ export default function TasksPage(){
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null)
   const [timerStatus, setTimerStatus] = useState<'pending' | 'in-progress' | 'completed'>('pending')
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
+  // Add sample tasks for testing
+  const addSampleTasks = async () => {
+    try {
+      const sampleTasks = [
+        { title: 'Study Algebra - Chapter 5', due_date: new Date().toISOString().split('T')[0], duration_minutes: 45, subject: 'Mathematics' },
+        { title: 'Read Physics Chapter 3', due_date: new Date().toISOString().split('T')[0], duration_minutes: 30, subject: 'Physics' },
+        { title: 'Complete Chemistry Lab Report', due_date: new Date(Date.now() + 24*60*60*1000).toISOString().split('T')[0], duration_minutes: 60, subject: 'Chemistry' },
+        { title: 'Review History Notes', due_date: new Date(Date.now() + 2*24*60*60*1000).toISOString().split('T')[0], duration_minutes: 25, subject: 'History' }
+      ]
+      
+      for (const task of sampleTasks) {
+        await api('/api/tasks', { 
+          method: 'POST', 
+          body: JSON.stringify({ ...task, user_id: userId }) 
+        })
+      }
+      
+      await fetchToday()
+      await fetchUpcoming()
+    } catch (e) {
+      console.error('Failed to add sample tasks:', e)
+    }
+  }
 
   // Load user ID
   useEffect(() => {
@@ -68,7 +91,9 @@ export default function TasksPage(){
           }
         }
         setPlanResources(topicResources)
-      } catch(e){ /* ignore */ }
+      } catch(e){ 
+        console.warn('Failed to load plan resources:', e)
+      }
     }
     load()
   }, [])
@@ -188,16 +213,32 @@ export default function TasksPage(){
             const durationStr = window.prompt('Duration in minutes', '30')
             const duration = durationStr ? parseInt(durationStr || '30') : 30
             try {
-              const created = await api('/api/tasks', { method: 'POST', body: JSON.stringify({ title, due_date: due, duration_minutes: duration }) })
+              const created = await api('/api/tasks', { method: 'POST', body: JSON.stringify({ title, due_date: due, duration_minutes: duration, user_id: userId }) })
               // refresh tasks
               await fetchToday()
               await fetchUpcoming()
-            } catch(e:any){ pushError({ errorCode: e?.errorCode||'TASK_CREATE_FAIL', errorMessage: e?.errorMessage, details: e }) }
+            } catch(e:any){ 
+              pushError({ errorCode: e?.errorCode||'TASK_CREATE_FAIL', errorMessage: e?.errorMessage, details: e }) 
+            }
           }}>
             <Plus className="w-4 h-4 mr-2" />
             New Task
           </Button>
         </div>
+
+        {/* Sample Tasks Button - Remove this in production */}
+        {today.length === 0 && upcoming.length === 0 && (
+          <Card className="mb-6">
+            <CardContent className="pt-6">
+              <div className="text-center">
+                <p className="text-muted-foreground mb-4">No tasks yet. Create your first task or add some sample tasks to get started.</p>
+                <Button onClick={addSampleTasks} disabled={!userId}>
+                  Add Sample Tasks
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Tasks List */}
@@ -301,9 +342,8 @@ export default function TasksPage(){
                     onStatusChange={handleTimerStatusChange}
                     onComplete={handleTimerComplete}
                     externalProgress={(today.find(t=>t.id===activeTaskId) as any)?.progress ?? 0}
-                    pomodoro={true}
+                    pomodoro={false}
                     breakMinutes={5}
-                    taskId={activeTaskId}
                   />
                 ) : (
                   <div className="text-center text-muted-foreground py-8">

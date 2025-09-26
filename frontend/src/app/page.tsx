@@ -295,80 +295,86 @@ export default function Home() {
                 </div>
 
                 <div className="space-y-6">
-                  {/* Progress Overview - colorful */}
-                  <div className="grid grid-cols-3 gap-3">
-                    <div className="text-center p-3 rounded-lg bg-emerald-50 dark:bg-emerald-900/10">
-                      <div className="text-xl font-semibold text-slate-900 dark:text-slate-100">85%</div>
-                      <p className="text-[11px] text-muted-foreground">Weekly Goal</p>
+                  {/* Progress Overview - minimal and professional */}
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="text-center p-4 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+                      <div className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-1">85%</div>
+                      <p className="text-xs text-slate-600 dark:text-slate-400 font-medium">Weekly Goal</p>
                     </div>
-                    <div className="text-center p-3 rounded-lg bg-sky-50 dark:bg-sky-900/10">
-                      <div className="text-xl font-semibold text-slate-900 dark:text-slate-100">12</div>
-                      <p className="text-[11px] text-muted-foreground">Tasks Done</p>
+                    <div className="text-center p-4 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+                      <div className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-1">12</div>
+                      <p className="text-xs text-slate-600 dark:text-slate-400 font-medium">Tasks Done</p>
                     </div>
-                    <div className="text-center p-3 rounded-lg bg-amber-50 dark:bg-amber-900/10">
-                      <div className="text-xl font-semibold text-slate-900 dark:text-slate-100">7</div>
-                      <p className="text-[11px] text-muted-foreground">Day Streak</p>
+                    <div className="text-center p-4 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+                      <div className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-1">7</div>
+                      <p className="text-xs text-slate-600 dark:text-slate-400 font-medium">Day Streak</p>
                     </div>
                   </div>
 
-                  {/* Today's Tasks */}
+                  {/* Today's Tasks - clean and minimal */}
                   <div>
-                    <h4 className="font-semibold mb-2 flex items-center gap-2 text-sm">
-                      <Calendar className="w-4 h-4 text-primary" />
+                    <h4 className="font-semibold mb-3 flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
+                      <Calendar className="w-4 h-4 text-slate-500" />
                       Today's Focus
                     </h4>
-                    <div className="space-y-3">
-                      <div className="flex items-center gap-3 p-2 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
-                        <div className="w-2 h-2 bg-rose-500 rounded-full" />
-                        <span className="text-sm">Organic Chemistry - Chapter 5</span>
-                        <Badge variant="secondary" className="ml-auto text-[11px]">2h</Badge>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <div className="w-2 h-2 bg-slate-400 rounded-full" />
+                          <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Organic Chemistry - Chapter 5</span>
+                        </div>
+                        <Badge variant="outline" className="text-xs text-slate-600 dark:text-slate-400">2h</Badge>
                       </div>
-                      <div className="flex items-center gap-3 p-2 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
-                        <div className="w-2 h-2 bg-sky-500 rounded-full" />
-                        <span className="text-sm">Calculus - Integration</span>
-                        <Badge variant="secondary" className="ml-auto text-[11px]">1.5h</Badge>
+                      <div className="flex items-center justify-between p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <div className="w-2 h-2 bg-slate-400 rounded-full" />
+                          <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Calculus - Integration</span>
+                        </div>
+                        <Badge variant="outline" className="text-xs text-slate-600 dark:text-slate-400">1.5h</Badge>
                       </div>
-                      <div className="flex items-center gap-3 p-2 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
-                        <div className="w-2 h-2 bg-emerald-500 rounded-full" />
-                        <span className="text-sm">Physics Quiz</span>
-                        <Badge variant="secondary" className="ml-auto text-[11px]">45m</Badge>
+                      <div className="flex items-center justify-between p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <div className="w-2 h-2 bg-slate-400 rounded-full" />
+                          <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Physics Quiz</span>
+                        </div>
+                        <Badge variant="outline" className="text-xs text-slate-600 dark:text-slate-400">45m</Badge>
                       </div>
                     </div>
                   </div>
 
-                  {/* AI Generated Plan - colorful chips */}
-                  <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900/10">
-                    <div className="flex items-center justify-between mb-3">
+                  {/* AI Generated Plan - minimal design */}
+                  <div className="p-4 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+                    <div className="flex items-center justify-between mb-4">
                       <div className="flex items-center gap-3">
-                        <div className="w-6 h-6 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center shadow-sm">
-                          <UserCheck className="w-4 h-4 text-indigo-600" />
+                        <div className="w-8 h-8 bg-slate-100 dark:bg-slate-700 rounded-full flex items-center justify-center">
+                          <UserCheck className="w-4 h-4 text-slate-600 dark:text-slate-400" />
                         </div>
                         <div>
-                          <p className="text-sm font-semibold">AI Generated Plan</p>
-                          <p className="text-xs text-muted-foreground">Generating your 4-week study schedule...</p>
+                          <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">AI Generated Plan</p>
+                          <p className="text-xs text-slate-500 dark:text-slate-400">Generating your 4-week study schedule...</p>
                         </div>
                       </div>
-                      <div className="text-xs text-muted-foreground">3 steps complete</div>
+                      <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">3 steps complete</div>
                     </div>
 
                     <div className="flex flex-wrap gap-2">
-                      <div className="px-3 py-1 rounded-full bg-slate-100 text-slate-900 text-sm">Data Structures — Week 1-2</div>
-                      <div className="px-3 py-1 rounded-full bg-slate-100 text-slate-900 text-sm">Algorithms — Week 2-3</div>
-                      <div className="px-3 py-1 rounded-full bg-slate-100 text-slate-900 text-sm">System Design — Week 3-4</div>
+                      <div className="px-3 py-1.5 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 text-sm font-medium">Data Structures — Week 1-2</div>
+                      <div className="px-3 py-1.5 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 text-sm font-medium">Algorithms — Week 2-3</div>
+                      <div className="px-3 py-1.5 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 text-sm font-medium">System Design — Week 3-4</div>
                     </div>
                   </div>
 
-                  {/* AI Insights */}
-                  <div className="p-4 bg-slate-50 dark:bg-slate-800/30 rounded-xl">
+                  {/* AI Insights - minimal and clean */}
+                  <div className="p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg">
                     <div className="flex items-center gap-3 mb-2">
-                      <div className="w-6 h-6 bg-slate-200 dark:bg-slate-700 rounded-full flex items-center justify-center">
+                      <div className="w-6 h-6 bg-slate-100 dark:bg-slate-700 rounded-full flex items-center justify-center">
                         <svg className="w-3 h-3 text-slate-600 dark:text-slate-400" fill="currentColor" viewBox="0 0 24 24">
                           <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
                         </svg>
                       </div>
-                      <span className="text-sm font-semibold">AI Insight</span>
+                      <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">AI Insight</span>
                     </div>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
                       You're 15% ahead of schedule! Consider adding extra practice on integration techniques.
                     </p>
                   </div>
