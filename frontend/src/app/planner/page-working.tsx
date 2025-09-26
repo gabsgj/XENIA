@@ -20,6 +20,23 @@ import {
 } from 'lucide-react'
 
 export default function PlannerPage() {
+  const matchesTopic = (resource: any, topic: string): boolean => {
+    try {
+      if (!resource) return false
+      const rTopic = (resource.topic || '').toString().trim()
+      const sTopic = (topic || '').toString().trim()
+      if (!rTopic && !sTopic) return false
+      if (rTopic && sTopic && rTopic === sTopic) return true
+      const rl = rTopic.toLowerCase()
+      const sl = sTopic.toLowerCase()
+      if (rl && sl && (sl.includes(rl) || rl.includes(sl))) return true
+      const rTokens: string[] = rl.split(/[^a-z0-9]+/).filter(Boolean)
+      const sTokens: string[] = sl.split(/[^a-z0-9]+/).filter(Boolean)
+      return rTokens.some((t: string) => sTokens.includes(t))
+    } catch {
+      return false
+    }
+  }
   const [plan, setPlan] = useState<any>(null)
   const [topics, setTopics] = useState<any[]>([])
   const [resources, setResources] = useState<any[]>([])
@@ -102,6 +119,26 @@ export default function PlannerPage() {
       }
     })() 
   },[pushError])
+
+  // Refresh plan when window focus/visibility changes so navigating back shows updated plan
+  useEffect(() => {
+    const refresh = async () => {
+      try {
+        const p = await api('/api/plan/current')
+        if (p) setPlan(p)
+      } catch (e) {
+        // ignore
+      }
+    }
+    const onFocus = () => refresh()
+    const onVisibility = () => { if (!document.hidden) refresh() }
+    window.addEventListener('focus', onFocus)
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => {
+      window.removeEventListener('focus', onFocus)
+      document.removeEventListener('visibilitychange', onVisibility)
+    }
+  }, [])
 
   async function regen(){
     setLoading(true)
@@ -275,15 +312,15 @@ export default function PlannerPage() {
                               duration={s.duration_min}
                               status={s.status || 'pending'}
                               noAutoStart={true}
-                              onStatusChange={(newStatus) => updateSessionStatus(s.date, s.topic, newStatus)}
-                              onComplete={(actualTime) => markSessionCompleteAPI(s.date, s.topic, actualTime)}
+                              onStatusChange={(newStatus) => markSession(s.date, s.topic, newStatus)}
+                              onComplete={(actualTime) => markSessionComplete(`${s.date}-${s.topic}`, actualTime)}
                             />
                           </div>
                           
                           <p className='text-xs text-muted-foreground mb-2'>{s.focus}</p>
                           
                           {/* Resource suggestions for this topic */}
-                          {resources.filter((r:any) => r.topic === s.topic || s.topic.toLowerCase().includes(r.topic.toLowerCase()) || r.topic.toLowerCase().includes(s.topic.toLowerCase())).slice(0, 2).map((resource:any, rIdx:number) => (
+                          {resources.filter((r:any) => matchesTopic(r, s.topic)).slice(0, 2).map((resource:any, rIdx:number) => (
                             <div key={rIdx} className="mb-2 p-2 bg-blue-50 dark:bg-blue-950 rounded border-l-2 border-blue-500">
                               <div className="flex items-center gap-2">
                                 <span className="text-xs font-medium text-blue-700 dark:text-blue-300">
@@ -300,9 +337,9 @@ export default function PlannerPage() {
                           <div className="flex items-center justify-between">
                             <span className='text-xs text-muted-foreground'>{s.duration_min} min</span>
                             <div className="flex gap-1">
-                              {resources.filter((r:any) => r.topic === s.topic || s.topic.toLowerCase().includes(r.topic.toLowerCase()) || r.topic.toLowerCase().includes(s.topic.toLowerCase())).length > 0 && (
+                              {resources.filter((r:any) => matchesTopic(r, s.topic)).length > 0 && (
                                 <Button size="sm" variant="ghost" className="h-6 px-2 text-xs" onClick={() => {
-                                  const topicResources = resources.filter((r:any) => r.topic === s.topic || s.topic.toLowerCase().includes(r.topic.toLowerCase()) || r.topic.toLowerCase().includes(s.topic.toLowerCase()))
+                                  const topicResources = resources.filter((r:any) => matchesTopic(r, s.topic))
                                   alert(`Resources for ${s.topic}:\n\n${topicResources.map(r => `${r.source.toUpperCase()}: ${r.title}\n${r.url}`).join('\n\n')}`)
                                 }}>
                                   📚
@@ -356,18 +393,18 @@ export default function PlannerPage() {
                                 duration={s.duration_min}
                                 status={s.status || 'pending'}
                                 noAutoStart={true}
-                                onStatusChange={(newStatus) => updateSessionStatus(s.date, s.topic, newStatus)}
-                                onComplete={(actualTime) => markSessionCompleteAPI(s.date, s.topic, actualTime)}
+                                onStatusChange={(newStatus) => markSession(s.date, s.topic, newStatus)}
+                                onComplete={(actualTime) => markSessionComplete(`${s.date}-${s.topic}`, actualTime)}
                               />
                             </td>
                             <td className='p-3'>
-                              {resources.filter((r:any) => r.topic === s.topic || s.topic.toLowerCase().includes(r.topic.toLowerCase()) || r.topic.toLowerCase().includes(s.topic.toLowerCase())).slice(0, 1).map((resource:any, rIdx:number) => (
+                              {resources.filter((r:any) => matchesTopic(r, s.topic)).slice(0, 1).map((resource:any, rIdx:number) => (
                                 <a key={rIdx} href={resource.url} target="_blank" rel="noopener noreferrer" 
                                    className="text-blue-600 dark:text-blue-400 hover:underline text-xs flex items-center gap-1">
                                   {resource.source === 'youtube' ? '📺' : '📖'} {resource.title.substring(0, 30)}...
                                 </a>
                               ))}
-                              {resources.filter((r:any) => r.topic === s.topic || s.topic.toLowerCase().includes(r.topic.toLowerCase()) || r.topic.toLowerCase().includes(s.topic.toLowerCase())).length === 0 && (
+                              {resources.filter((r:any) => matchesTopic(r, s.topic)).length === 0 && (
                                 <span className="text-xs text-muted-foreground">No resources</span>
                               )}
                             </td>
@@ -406,11 +443,11 @@ export default function PlannerPage() {
                           <p className="text-muted-foreground text-sm mb-2">{s.focus}</p>
                           
                           {/* Resource suggestions */}
-                          {resources.filter((r:any) => r.topic === s.topic || s.topic.toLowerCase().includes(r.topic.toLowerCase()) || r.topic.toLowerCase().includes(s.topic.toLowerCase())).slice(0, 3).length > 0 && (
+                          {resources.filter((r:any) => matchesTopic(r, s.topic)).slice(0, 3).length > 0 && (
                             <div className="mb-3">
                               <h4 className="text-xs font-semibold text-muted-foreground mb-2">📚 Recommended Resources:</h4>
                               <div className="grid gap-2">
-                                {resources.filter((r:any) => r.topic === s.topic || s.topic.toLowerCase().includes(r.topic.toLowerCase()) || r.topic.toLowerCase().includes(s.topic.toLowerCase())).slice(0, 3).map((resource:any, rIdx:number) => (
+                                {resources.filter((r:any) => matchesTopic(r, s.topic)).slice(0, 3).map((resource:any, rIdx:number) => (
                                   <div key={rIdx} className="flex items-center gap-2 p-2 bg-blue-50 dark:bg-blue-950 rounded">
                                     <span className="text-xs">
                                       {resource.source === 'youtube' ? '📺' : resource.source === 'ocw' ? '🎓' : '📖'}

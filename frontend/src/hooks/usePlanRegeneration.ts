@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { api } from '@/lib/api'
 
 export function usePlanRegeneration() {
   const [isRegenerating, setIsRegenerating] = useState(false)
@@ -6,17 +7,17 @@ export function usePlanRegeneration() {
   const regenerate = async (config: any) => {
     setIsRegenerating(true)
     try {
-      const resp = await fetch('/api/plan/regenerate', {
+      const resp = await api('/api/plan/regenerate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(config)
       })
-      if (!resp.ok) {
-        const txt = await resp.text()
-        throw new Error(`Regeneration failed: ${txt}`)
+      // Normalize backend shape
+      const regenerated = resp?.data?.regenerated_plan || resp?.regenerated_plan || resp?.plan || resp
+      if (!regenerated || !regenerated.sessions) {
+        throw new Error('Regeneration returned no plan payload')
       }
-      const data = await resp.json()
-      return data
+      return regenerated
     } finally {
       setIsRegenerating(false)
     }

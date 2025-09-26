@@ -1,6 +1,6 @@
 "use client"
 import { useState, useEffect } from 'react'
-import { getUserId } from '@/lib/api'
+import { api, getUserId } from '@/lib/api'
 
 export interface Task {
   id: string
@@ -31,12 +31,8 @@ export function useTasks(){
   async function fetchToday(){
     setLoading(true)
     try{
-      const res = await fetch('/api/tasks/daily', {
-        headers: getHeaders()
-      })
-      if (!res.ok) throw new Error(`Failed: ${res.status}`)
-      const j = await res.json()
-      setToday(j.tasks || [])
+      const j = await api('/api/tasks/daily')
+      setToday((j as any).tasks || [])
     }catch(e:any){
       setError(String(e))
     }finally{setLoading(false)}
@@ -44,12 +40,8 @@ export function useTasks(){
 
   async function fetchUpcoming(){
     try{
-      const res = await fetch('/api/tasks/upcoming', {
-        headers: getHeaders()
-      })
-      if (!res.ok) throw new Error(`Failed: ${res.status}`)
-      const j = await res.json()
-      setUpcoming(j.tasks || [])
+      const j = await api('/api/tasks/upcoming')
+      setUpcoming((j as any).tasks || [])
     }catch(e:any){
       setError(String(e))
     }
@@ -58,9 +50,8 @@ export function useTasks(){
   useEffect(()=>{ fetchToday(); fetchUpcoming() }, [])
 
   async function completeTask(taskId: string){
-    await fetch('/api/tasks/complete', { 
+    await api('/api/tasks/complete', { 
       method: 'POST', 
-      headers: getHeaders(), 
       body: JSON.stringify({ task_id: taskId, user_id: getUserId() })
     })
     // refresh

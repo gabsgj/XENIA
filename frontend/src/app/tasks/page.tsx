@@ -37,7 +37,18 @@ export default function TasksPage(){
   const [userId, setUserId] = useState<string>('')
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null)
   const [timerStatus, setTimerStatus] = useState<'pending' | 'in-progress' | 'completed'>('pending')
+  const [startingTaskId, setStartingTaskId] = useState<string | null>(null)
+  const [completingIds, setCompletingIds] = useState<Set<string>>(new Set())
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
+
+  const formatTaskStatus = (s?: string | boolean) => {
+    if (!s) return 'pending'
+    const st = String(s)
+    if (st === 'done' || st === 'completed') return 'Completed'
+    if (st === 'in-progress' || st === 'in_progress') return 'In progress'
+    if (st === 'pending') return 'Pending'
+    return st.charAt(0).toUpperCase() + st.slice(1)
+  }
   // Add sample tasks for testing
   const addSampleTasks = async () => {
     try {
@@ -120,20 +131,30 @@ export default function TasksPage(){
     }
     // Start backend session
     try{
+      setStartingTaskId(taskId)
       const resp = await startSession({ taskId, durationMin: 25 })
       setActiveTaskId(taskId)
       setTimerStatus('in-progress')
     }catch(e:any){ 
       console.error('Failed to start task:', e)
       pushError({ errorCode: 'SESSION_START_FAIL', errorMessage: 'Failed to start session', details: e }) 
+    } finally {
+      setStartingTaskId(null)
     }
   }
 
   const toggleTaskComplete = async (task: any) => {
     try {
+      setCompletingIds(prev => new Set(prev).add(task.id))
       await completeTask(task.id)
     } catch (e:any) {
       pushError({ errorCode: e?.errorCode||'TASK_UPDATE_FAIL', errorMessage: e?.errorMessage, details: e })
+    } finally {
+      setCompletingIds(prev => {
+        const copy = new Set(prev)
+        copy.delete(task.id)
+        return copy
+      })
     }
   }
 
@@ -168,6 +189,13 @@ export default function TasksPage(){
       // end session and mark task complete
       if (session && session.id) {
         await endSession({ sessionId: session.id, taskId: activeTaskId, actualMinutes: actualTime, completed: true })
+        // Ensure task is marked complete in tasks API as well (some backends don't auto-toggle task status on session end)
+        try {
+          await completeTask(activeTaskId)
+        } catch (e) {
+          // swallow - we'll refresh below anyway
+          console.warn('completeTask fallback failed', e)
+        }
       } else {
         // fallback: track manually
         await api('/api/tasks/track', { method: 'POST', body: JSON.stringify({ topic: topic, duration_min: actualTime }) })
@@ -260,13 +288,13 @@ export default function TasksPage(){
                         </div>
                         <div className="flex items-center gap-2">
                           <Badge variant={task.status === 'done' || task.completed ? 'success' : 'secondary'}>
-                            {task.status || 'pending'}
+                            {formatTaskStatus(task.status ?? task.completed)}
                           </Badge>
-                          <Button size="sm" variant="ghost" onClick={() => startTask(task.id)} disabled={!!activeTaskId}>
-                            Start
+                          <Button size="sm" variant="ghost" onClick={() => startTask(task.id)} disabled={!!activeTaskId || startingTaskId===task.id}>
+                            {startingTaskId===task.id ? 'Starting' : 'Start'}
                           </Button>
-                          <Button size="sm" variant="outline" onClick={() => toggleTaskComplete(task)}>
-                            {task.status === 'done' || task.completed ? 'Undo' : 'Complete'}
+                          <Button size="sm" variant="outline" onClick={() => toggleTaskComplete(task)} disabled={completingIds.has(task.id)}>
+                            {completingIds.has(task.id) ? 'Saving...' : (task.status === 'done' || task.completed ? 'Undo' : 'Complete')}
                           </Button>
                         </div>
                       </div>
@@ -308,8 +336,8 @@ export default function TasksPage(){
                               <div className="text-xs text-muted-foreground">{task.subject || 'General'}</div>
                             </div>
                             <div className="flex items-center gap-2">
-                              <Badge variant={task.status==='completed'? 'success' : 'secondary'}>{task.status||'pending'}</Badge>
-                              <Button size="sm" variant="ghost" onClick={() => startTask(task.id)} disabled={!!activeTaskId}>Start</Button>
+                              <Badge variant={task.status==='completed'? 'success' : 'secondary'}>{formatTaskStatus(task.status ?? task.completed)}</Badge>
+                              <Button size="sm" variant="ghost" onClick={() => startTask(task.id)} disabled={!!activeTaskId || startingTaskId===task.id}>{startingTaskId===task.id? 'Starting':'Start'}</Button>
                             </div>
                           </div>
                         ))}

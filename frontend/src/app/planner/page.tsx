@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { api, getUserId } from '@/lib/api'
 import { useErrorContext } from '@/lib/error-context'
 import { Button } from '@/components/ui/button'
@@ -20,12 +20,36 @@ import {
 } from 'lucide-react'
 
 export default function PlannerPage() {
+  // Helper: safely match a resource to a session topic
+  const matchesTopic = (resource: any, topic: string): boolean => {
+    try {
+      if (!resource) return false
+      const rTopic = (resource.topic || '').toString().trim()
+      const sTopic = (topic || '').toString().trim()
+      if (!rTopic && !sTopic) return false
+      if (rTopic && sTopic && rTopic === sTopic) return true
+      const rl = rTopic.toLowerCase()
+      const sl = sTopic.toLowerCase()
+      // match if either contains the other, but avoid trivially true self-contains
+      if (rl && sl && (sl.includes(rl) || rl.includes(sl))) return true
+      // also match by simple token intersection
+  const rTokens: string[] = rl.split(/[^a-z0-9]+/).filter(Boolean)
+  const sTokens: string[] = sl.split(/[^a-z0-9]+/).filter(Boolean)
+  return rTokens.some((t: string) => sTokens.includes(t))
+    } catch {
+      return false
+    }
+  }
   const [plan, setPlan] = useState<any>(null)
   const [topics, setTopics] = useState<any[]>([])
   const [resources, setResources] = useState<any[]>([])
   const [hoursPerDay, setHoursPerDay] = useState(1.5)
   const [deadline, setDeadline] = useState('')
   const [loading, setLoading] = useState(false)
+  const [optimistic, setOptimistic] = useState(false)
+  const [prevPlan, setPrevPlan] = useState<any>(null)
+  const [initialTopics, setInitialTopics] = useState<any[]>([])
+  const [sessionStatus, setSessionStatus] = useState<Record<string, 'pending' | 'in-progress' | 'completed'>>({})
   
   // Progress tracking state
   const [completedSessions, setCompletedSessions] = useState<Set<string>>(new Set())
@@ -34,8 +58,19 @@ export default function PlannerPage() {
   
   // Resources display state
   const [showAllResources, setShowAllResources] = useState(false)
+  const [showAllDays, setShowAllDays] = useState(true)
   
   const { pushError } = useErrorContext()
+
+  const uniqueDates = useMemo(() => {
+    try {
+      const dates = Array.from(new Set<string>((plan?.sessions || []).map((s:any) => String(s.date))))
+      dates.sort((a,b) => new Date(a).getTime() - new Date(b).getTime())
+      return dates
+    } catch {
+      return [] as string[]
+    }
+  }, [plan])
   
   useEffect(()=>{ 
     (async ()=>{ 
@@ -48,6 +83,9 @@ export default function PlannerPage() {
         setPlan(p)
         setTopics(t.topics||[])
         setResources(r.resources||[])
+        if (t.topics?.length > 0) {
+          setInitialTopics(t.topics)
+        }
         
         // Also fetch topic-specific resources for current plan topics
         if (p?.sessions?.length > 0) {
@@ -106,33 +144,90 @@ export default function PlannerPage() {
     })() 
   },[pushError])
 
+  // Refresh plan when the window regains focus or visibility changes (helps when navigating back)
+  useEffect(() => {
+    const refresh = async () => {
+      try {
+        const p = await api('/api/plan/current')
+        if (p) setPlan(p)
+      } catch (e) {
+        // silent
+      }
+    }
+
+    const onFocus = () => refresh()
+    const onVisibility = () => { if (!document.hidden) refresh() }
+
+    window.addEventListener('focus', onFocus)
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => {
+      window.removeEventListener('focus', onFocus)
+      document.removeEventListener('visibilitychange', onVisibility)
+    }
+  }, [])
+
   async function regen(){
     setLoading(true)
+    // Start optimistic UI
+    setPrevPlan(plan)
+    setOptimistic(true)
+    setShowAllDays(true)
     try {
-      // Get user ID from Supabase authentication
       const userId = getUserId()
-      
-      // Get current syllabus topics to filter the regeneration
-      const syllabusTopics = topics.map((t: any) => t.topic)
-      
-      setPlan(await api('/api/plan/regenerate', { 
-        method:'POST', 
-        body: JSON.stringify({ 
+
+      // Compute an optimistic plan: update deadline and reset non-completed sessions to pending
+      const optimisticPlan = (() => {
+        try {
+          const currentSessions = (plan?.sessions || []).map((s:any) => ({
+            ...s,
+            status: s.status === 'completed' ? 'completed' : 'pending',
+          }))
+          return {
+            ...(plan || {}),
+            deadline: deadline || plan?.deadline || undefined,
+            generation_method: 'optimistic_regeneration',
+            sessions: currentSessions,
+          }
+        } catch {
+          return plan
+        }
+      })()
+      setPlan(optimisticPlan)
+
+      // Prepare optional topics list if available (backend primarily uses stored/current topics)
+      const syllabusTopics = (initialTopics.length > 0 ? initialTopics : topics)
+        .map((t: any) => (typeof t === 'string' ? t : t?.topic))
+        .filter(Boolean)
+
+      const resp = await api('/api/plan/regenerate', {
+        method:'POST',
+        body: JSON.stringify({
           user_id: userId,
           new_deadline: deadline || undefined,
           preserve_progress: true,
-          excluded_topics: [], // Could be populated from UI filters
+          excluded_topics: [],
           priority_adjustment: 'balanced',
-          learning_pace: 'moderate'
-        }) 
-      }))
-    } catch(e:any){ 
-      pushError({ 
-        errorCode: e?.errorCode||'PLAN_500', 
-        errorMessage: e?.errorMessage, 
+          learning_pace: 'moderate',
+          topics: syllabusTopics,
+        })
+      })
+
+      // Backend returns { success: true, data: { regenerated_plan, changes_summary } }
+      const newPlan = resp?.data?.regenerated_plan || resp?.regenerated_plan || resp?.plan || resp
+      if (!newPlan || !newPlan.sessions) {
+        throw new Error('Regeneration succeeded but no plan payload was returned')
+      }
+      setPlan(newPlan)
+    } catch(e:any){
+      // Revert optimistic change
+      if (prevPlan) setPlan(prevPlan)
+      pushError({
+        errorCode: e?.errorCode||'PLAN_500',
+        errorMessage: e?.errorMessage || e?.message,
         details: e
-      }) 
+      })
     } finally {
+      setOptimistic(false)
       setLoading(false)
     }
   }
@@ -180,13 +275,15 @@ export default function PlannerPage() {
     }
   }
 
-  async function markSession(date: string, topic: string, status: string){
+  async function markSession(date: string, topic: string, status: string, durationMin?: number){
     try {
       const resp = await api('/api/resources/progress', {
         method: 'POST',
-        body: JSON.stringify({ sessions: [{ date, topic, status }] })
+        body: JSON.stringify({ sessions: [{ date, topic, status, ...(durationMin ? { duration_min: durationMin } : {}) }] })
       })
-      setPlan(resp.plan)
+      // Backend may return only {ok:true, queued:n} due to batching; update UI optimistically
+      if ((resp as any)?.plan) setPlan((resp as any).plan)
+      setSessionStatus(prev => ({ ...prev, [`${date}-${topic}`]: status as 'pending' | 'in-progress' | 'completed' }))
     } catch(e:any){
       pushError({ errorCode: e?.errorCode||'PLAN_PROGRESS_FAIL', errorMessage: e?.errorMessage, details: e })
     }
@@ -203,6 +300,8 @@ export default function PlannerPage() {
 
   return (
     <MainLayout>
+      {/* Spinner overlay during regeneration */}
+      <LoadingOverlay show={optimistic} title="Regenerating plan..." description="Re-optimizing schedule based on your new deadline" />
       <div className='p-6 space-y-8'>
         {/* Header */}
         <div className='flex flex-col md:flex-row md:items-center md:justify-between gap-4'>
@@ -219,11 +318,14 @@ export default function PlannerPage() {
             <div className='flex items-center gap-2'>
               <label className='text-xs text-muted-foreground'>Deadline</label>
               <input type='date' className='px-2 py-1 border rounded bg-background text-sm'
-                value={deadline} onChange={e=> setDeadline(e.target.value)} />
+                value={deadline} onChange={e=> { setDeadline(e.target.value); setShowAllDays(true); }} />
             </div>
             <Button variant="outline" size="sm">
               <Filter className="w-4 h-4 mr-2" />
               Filter
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => setShowAllDays(v => !v)}>
+              {showAllDays ? 'Show 8 days' : 'Show full plan'}
             </Button>
             <LoadingButton
               loading={loading}
@@ -252,7 +354,7 @@ export default function PlannerPage() {
 
             <TabsContent value='kanban' className="space-y-6">
               <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6'>
-                {(Array.from(new Set<string>((plan.sessions||[]).map((s:any)=> String(s.date)))) as string[]).slice(0,8).map((date: string)=> (
+                {(showAllDays ? uniqueDates : uniqueDates.slice(0, 8)).map((date: string)=> (
                   <Card key={date} className="hover:shadow-md transition-all">
                     <CardHeader className="pb-3">
                       <CardTitle className="text-lg flex items-center gap-2">
@@ -277,21 +379,29 @@ export default function PlannerPage() {
                             </Badge>
                           </div>
                           
-                          {/* Study Timer */}
                           <div className="mb-3">
                             <MinimalTimer
+                              className="w-48"
                               duration={s.duration_min}
-                              status={s.status || 'pending'}
+                              status={sessionStatus[`${s.date}-${s.topic}`] || s.status || 'pending'}
                               noAutoStart={true}
                               onStatusChange={(newStatus) => markSession(s.date, s.topic, newStatus)}
-                              onComplete={(actualTime) => markSessionComplete(`${s.date}-${s.topic}`, actualTime)}
+                              onComplete={(actualTime) => { 
+                                // Mark complete both locally and in the plan
+                                markSession(s.date, s.topic, 'completed', actualTime)
+                                markSessionComplete(`${s.date}-${s.topic}`, actualTime)
+                              }}
                             />
                           </div>
                           
                           <p className='text-xs text-muted-foreground mb-2'>{s.focus}</p>
                           
                           {/* Resource suggestions for this topic */}
-                          {resources.filter((r:any) => r.topic === s.topic || s.topic.toLowerCase().includes(r.topic.toLowerCase()) || r.topic.toLowerCase().includes(r.topic.toLowerCase())).slice(0, 2).map((resource:any, rIdx:number) => (
+                          {resources
+                              .filter((r:any) => matchesTopic(r, s.topic))
+                              .sort((a:any,b:any)=> (b.source==='youtube'?1:0) - (a.source==='youtube'?1:0))
+                              .slice(0, 5)
+                              .map((resource:any, rIdx:number) => (
                             <div key={rIdx} className="mb-2 p-2 bg-slate-50 dark:bg-slate-800/50 rounded border border-slate-200 dark:border-slate-700">
                               <div className="flex items-center gap-2 mb-1">
                                 <span className="text-xs font-medium text-slate-600 dark:text-slate-400">
@@ -311,16 +421,16 @@ export default function PlannerPage() {
                           <div className="flex items-center justify-between">
                             <span className='text-xs text-muted-foreground'>{s.duration_min} min</span>
                             <div className="flex gap-1">
-                              {resources.filter((r:any) => r.topic === s.topic || s.topic.toLowerCase().includes(r.topic.toLowerCase()) || r.topic.toLowerCase().includes(s.topic.toLowerCase())).length > 0 && (
+                              {resources.filter((r:any) => matchesTopic(r, s.topic)).length > 0 && (
                                 <Button size="sm" variant="ghost" className="h-6 px-2 text-xs" onClick={() => {
-                                  const topicResources = resources.filter((r:any) => r.topic === s.topic || s.topic.toLowerCase().includes(r.topic.toLowerCase()) || r.topic.toLowerCase().includes(s.topic.toLowerCase()))
+                                  const topicResources = resources.filter((r:any) => matchesTopic(r, s.topic))
                                   alert(`Resources for ${s.topic}:\n\n${topicResources.map(r => `${r.source.toUpperCase()}: ${r.title}\n${r.url}`).join('\n\n')}`)
                                 }}>
                                   📚
                                 </Button>
                               )}
-                              <Button size="sm" variant="ghost" className="h-6 px-2" onClick={()=> markSession(s.date, s.topic, s.status==='completed'?'pending':'completed')}>
-                                <Play className="w-3 h-3" />
+                              <Button size="sm" variant="ghost" className="h-6 px-2" onClick={()=> markSession(s.date, s.topic, 'completed')}>
+                                <span className="text-xs">Done</span>
                               </Button>
                             </div>
                           </div>
@@ -364,15 +474,23 @@ export default function PlannerPage() {
                             </td>
                             <td className='p-3'>
                               <MinimalTimer
+                                className="w-48"
                                 duration={s.duration_min}
-                                status={s.status || 'pending'}
+                                status={sessionStatus[`${s.date}-${s.topic}`] || s.status || 'pending'}
                                 noAutoStart={true}
                                 onStatusChange={(newStatus) => markSession(s.date, s.topic, newStatus)}
-                                onComplete={(actualTime) => markSessionComplete(`${s.date}-${s.topic}`, actualTime)}
+                                onComplete={(actualTime) => { 
+                                  markSession(s.date, s.topic, 'completed', actualTime)
+                                  markSessionComplete(`${s.date}-${s.topic}`, actualTime)
+                                }}
                               />
                             </td>
                             <td className='p-3'>
-                              {resources.filter((r:any) => r.topic === s.topic || s.topic.toLowerCase().includes(r.topic.toLowerCase()) || r.topic.toLowerCase().includes(r.topic.toLowerCase())).slice(0, 1).map((resource:any, rIdx:number) => (
+                              {resources
+                                .filter((r:any) => matchesTopic(r, s.topic))
+                                .sort((a:any,b:any)=> (b.source==='youtube'?1:0) - (a.source==='youtube'?1:0))
+                                .slice(0, 1)
+                                .map((resource:any, rIdx:number) => (
                                 <a key={rIdx} href={resource.url} target="_blank" rel="noopener noreferrer" 
                                    className="text-slate-700 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 hover:underline text-xs flex items-center gap-1">
                                   {resource.source === 'youtube' ? '🎥' : resource.source === 'ocw' ? '🎓' : '📖'} 
@@ -382,7 +500,7 @@ export default function PlannerPage() {
                                   )}
                                 </a>
                               ))}
-                              {resources.filter((r:any) => r.topic === s.topic || s.topic.toLowerCase().includes(r.topic.toLowerCase()) || r.topic.toLowerCase().includes(r.topic.toLowerCase())).length === 0 && (
+                              {resources.filter((r:any) => matchesTopic(r, s.topic)).length === 0 && (
                                 <span className="text-xs text-muted-foreground">No resources</span>
                               )}
                             </td>
@@ -421,11 +539,11 @@ export default function PlannerPage() {
                           <p className="text-muted-foreground text-sm mb-2">{s.focus}</p>
                           
                           {/* Resource suggestions */}
-                          {resources.filter((r:any) => r.topic === s.topic || s.topic.toLowerCase().includes(r.topic.toLowerCase()) || r.topic.toLowerCase().includes(r.topic.toLowerCase())).slice(0, 3).length > 0 && (
+                          {resources.filter((r:any) => matchesTopic(r, s.topic)).slice(0, 3).length > 0 && (
                             <div className="mb-3">
                               <h4 className="text-xs font-semibold text-slate-600 dark:text-slate-400 mb-2">📚 Recommended Resources:</h4>
                               <div className="grid gap-2">
-                                {resources.filter((r:any) => r.topic === s.topic || s.topic.toLowerCase().includes(r.topic.toLowerCase()) || r.topic.toLowerCase().includes(r.topic.toLowerCase())).slice(0, 3).map((resource:any, rIdx:number) => (
+                                {resources.filter((r:any) => matchesTopic(r, s.topic)).slice(0, 3).map((resource:any, rIdx:number) => (
                                   <div key={rIdx} className="flex items-center gap-2 p-2 bg-slate-50 dark:bg-slate-800/50 rounded border border-slate-200 dark:border-slate-700">
                                     <span className="text-xs">
                                       {resource.source === 'youtube' ? '🎥' : resource.source === 'ocw' ? '🎓' : '📖'}
@@ -529,7 +647,7 @@ export default function PlannerPage() {
                           Featured Videos
                         </h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                          {videoResources.slice(0, showAllResources ? videoResources.length : 8).map((resource:any, idx:number) => (
+                          {videoResources.slice(0, showAllResources ? videoResources.length : 12).map((resource:any, idx:number) => (
                             <Card key={`video-${idx}`} className="hover:shadow-lg transition-all border-l-4 border-l-red-500 bg-white dark:bg-slate-800">
                               <CardContent className="p-4">
                                 <div className="flex items-start gap-3">
@@ -571,7 +689,7 @@ export default function PlannerPage() {
                           Additional Resources
                         </h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                          {otherResources.slice(0, showAllResources ? otherResources.length : 8).map((resource:any, idx:number) => (
+                          {otherResources.slice(0, showAllResources ? otherResources.length : 12).map((resource:any, idx:number) => (
                             <div key={`other-${idx}`} className="border rounded-lg p-4 hover:shadow-md transition-all">
                               <div className="flex items-start gap-3">
                                 <span className="text-2xl">
@@ -606,7 +724,7 @@ export default function PlannerPage() {
                     )}
 
                     {/* Show More/Less Button */}
-                    {(videoResources.length > 8 || otherResources.length > 8) && (
+                    {(videoResources.length > 12 || otherResources.length > 12) && (
                       <div className="text-center mt-6">
                         <Button
                           variant="outline"
@@ -635,7 +753,7 @@ export default function PlannerPage() {
               {resources.length > 16 && !showAllResources && (
                 <div className="text-center mt-6">
                   <p className="text-sm text-muted-foreground">
-                    Showing {Math.min(16, resources.length)} of {resources.length} resources
+                    Showing {Math.min(24, resources.length)} of {resources.length} resources
                   </p>
                 </div>
               )}

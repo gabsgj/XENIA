@@ -6,7 +6,10 @@ from ..services.planning import generate_plan, get_current_plan
 from ..services.plan_regeneration import PlanRegenerationService
 from ..services.progress import get_user_progress
 from ..services.weaktopics import analyze_weak_topics
-from ..supabase_client import get_supabase
+from ..supabase_client import get_supabase, supabase_call
+from ..schemas import PlanSchema
+from ..utils import is_valid_uuid
+from ..services.planning import _sync_plan_tasks
 
 logger = logging.getLogger('xenia')
 plan_bp = Blueprint("plan", __name__)
@@ -14,6 +17,11 @@ plan_bp = Blueprint("plan", __name__)
 
 @plan_bp.post("/generate")
 def generate():
+    schema = PlanSchema()
+    errors = schema.validate(request.get_json())
+    if errors:
+        raise ApiError("PLAN_400", "Invalid input", details=errors)
+
     logger.info("🎯 Generate plan endpoint called")
     uid = get_user_id_from_request(request) or ""
     if not uid:
@@ -284,6 +292,11 @@ def adjust_plan():
 @plan_bp.post('/regenerate')
 def regenerate():
     """Regenerate a study plan given a new deadline and options. Preserves completed progress when requested."""
+    schema = PlanSchema()
+    errors = schema.validate(request.get_json())
+    if errors:
+        raise ApiError("PLAN_400", "Invalid input", details=errors)
+        
     logger.info("🔁 Regenerate plan endpoint called")
     uid = get_user_id_from_request(request) or ""
     if not uid:
@@ -361,6 +374,19 @@ def regenerate():
             learning_pace=learning_pace,
             excluded_topics=excluded_topics
         )
+
+        # Persist regenerated plan so it is not lost when the user leaves the app
+        try:
+            if is_valid_uuid(uid):
+                sb = get_supabase()
+                supabase_call(lambda: sb.table("plans").upsert({"user_id": uid, "plan": regenerated}).execute())
+                # Also sync sessions to tasks so /tasks reflects the new plan
+                try:
+                    _sync_plan_tasks(uid, regenerated)
+                except Exception as te:
+                    logger.warning(f"   Failed to sync regenerated plan to tasks: {te}")
+        except Exception as pe:
+            logger.warning(f"   Failed to persist regenerated plan: {pe}")
 
         return { 'success': True, 'data': { 'regenerated_plan': regenerated, 'changes_summary': regenerated.get('changes_summary') } }, 200
 

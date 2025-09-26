@@ -149,14 +149,20 @@ export function PlannerActions({ currentPlan, onRegenerate, className }: Planner
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(request)
       });
-      
-      if (!response || !response.success) {
-        throw new Error(response?.error || 'Failed to regenerate plan');
+
+      if (!response || response.success === false) {
+        throw new Error((response && (response.error || response.errorMessage)) || 'Failed to regenerate plan');
       }
-      
+
+      // Backend shape: { success, data: { regenerated_plan, changes_summary } }
+      const regenerated = response?.data?.regenerated_plan || response?.regenerated_plan || response?.plan || null;
+      if (!regenerated || !regenerated.sessions) {
+        throw new Error('Regeneration returned no plan payload');
+      }
+
       // Update UI with new plan
-      onRegenerate(response.plan);
-      
+      onRegenerate(regenerated);
+
       // Show success message with details
       const improvements = [];
       if (regenerateOptions.adjustDifficulty) improvements.push(`Adjusted for ${pace} pace`);

@@ -9,7 +9,6 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { LoadingButton, SkeletonCard } from "@/components/ui/loading";
 import { NoDataPlaceholder } from "@/components/ui/no-data-placeholder";
 import MinimalTimer from "@/components/ui/minimal-timer";
 import Link from "next/link";
@@ -20,39 +19,32 @@ import {
   Target, 
   BookOpen, 
   Award,
-  Play,
   Plus,
   ArrowRight
 } from "lucide-react";
-import axios from "axios";
 
 export default function DashboardPage(){
   const [data, setData] = useState<any>(null);
   const [plan, setPlan] = useState<any>(null);
   const [topics, setTopics] = useState<any[]>([]);
-  const [resources, setResources] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState<any>(null);
-  const [aggregates, setAggregates] = useState<any>(null);
   const [weekly, setWeekly] = useState<any[]>([]);
   const { pushError } = useErrorContext();
   
   const fetchData = async () => {
     setLoading(true)
     try{ 
-      const [analytics, currentPlan, topicResp, resResp, progressResp] = await Promise.all([
+      const [analytics, currentPlan, topicResp, progressResp] = await Promise.all([
         api('/api/analytics/student').catch(()=> null),
         api('/api/plan/current').catch(()=> null),
         api('/api/resources/topics').catch(()=> ({topics:[]})),
-        api('/api/resources/list').catch(()=> ({resources:[]})),
         api('/api/progress/user/' + getUserId()).catch(()=> ({progress:{}}))
       ])
       if(analytics) setData(analytics)
       if(currentPlan) setPlan(currentPlan)
       setTopics((topicResp as any)?.topics||[])
-      setResources((resResp as any)?.resources||[])
       setProgress((progressResp as any)?.progress||{})
-      setAggregates(analytics?.stats || null)
       setWeekly(analytics?.weekly_progress || [])
     } catch(e:any){ 
       pushError({ errorCode: e?.errorCode||'CONTENT_API_FAIL', errorMessage: e?.errorMessage, details: e }) 
@@ -88,10 +80,10 @@ export default function DashboardPage(){
         method: 'POST',
         body: JSON.stringify({ sessions: [{ date, topic, status: newStatus }] })
       })
-      if (resp.ok && resp.plan) {
-        setPlan(resp.plan)
-        // Refresh all data to update analytics
-        setTimeout(fetchData, 500) // Small delay to ensure backend processing completes
+      if (resp.ok) {
+        // If plan was returned, optimistically update; always refresh shortly after (batcher may queue updates)
+        if ((resp as any).plan) setPlan((resp as any).plan)
+        setTimeout(fetchData, 600)
       }
     } catch(e:any){
       pushError({ errorCode: e?.errorCode||'PLAN_PROGRESS_FAIL', errorMessage: e?.errorMessage, details: e })
@@ -100,15 +92,21 @@ export default function DashboardPage(){
 
   const markSessionComplete = async (date: string, topic: string, actualTime: number) => {
     try {
-      // Update the session status to completed and potentially adjust the duration
+      // Update the session status to completed and adjust the duration
       const resp = await api('/api/resources/progress', {
         method: 'POST',
         body: JSON.stringify({ sessions: [{ date, topic, status: 'completed', duration_min: actualTime }] })
       })
-      if (resp.ok && resp.plan) {
-        setPlan(resp.plan)
-        // Refresh all data to update analytics
-        setTimeout(fetchData, 500) // Small delay to ensure backend processing completes
+      // Also mark topic as completed in syllabus (best-effort)
+      try {
+        await api('/api/resources/topics/status', {
+          method: 'POST',
+          body: JSON.stringify({ topic, status: 'completed', user_id: getUserId() })
+        })
+      } catch {}
+      if (resp.ok) {
+        if ((resp as any).plan) setPlan((resp as any).plan)
+        setTimeout(fetchData, 600)
       }
     } catch(e:any){
       pushError({ errorCode: e?.errorCode||'PLAN_PROGRESS_FAIL', errorMessage: e?.errorMessage, details: e })
@@ -218,19 +216,7 @@ export default function DashboardPage(){
 
   const chartColors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
 
-  // Fetch progress data for the user
-  useEffect(() => {
-    async function fetchProgress() {
-      setLoading(true);
-      const userId = getUserId();
-      const [resp] = await Promise.all([
-        api('/api/progress/user/' + userId).catch(()=> ({progress:{}})),
-      ])
-      setProgress((resp as any)?.progress || {});
-      setLoading(false);
-    }
-    fetchProgress();
-  }, []);  return (
+  return (
     <MainLayout>
       <div className="p-6 space-y-8">
         {/* Header */}
@@ -360,9 +346,10 @@ export default function DashboardPage(){
                           <p className="text-sm text-muted-foreground">{task.topic}</p>
                         </div>
                         <MinimalTimer
-                          className="flex-1 max-w-sm"
+                          className="w-48"
                           duration={task.duration}
                           status={task.status}
+                          noAutoStart={true}
                           onStatusChange={(newStatus) => updateSessionStatus(task.date, task.topic, newStatus)}
                           onComplete={(actualTime) => markSessionComplete(task.date, task.topic, actualTime)}
                           externalProgress={task.progress}
