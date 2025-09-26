@@ -41,7 +41,8 @@ export function MinimalTimer({
       setRemaining(0)
       setManuallyPaused(false)
     }
-    if (s === 'pending') {
+    // When status is pending, only reset remaining if there is no externalProgress
+    if (s === 'pending' && (externalProgress === undefined || externalProgress === null)) {
       setRemaining(totalSeconds)
       setManuallyPaused(false)
     }

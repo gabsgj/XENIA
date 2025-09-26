@@ -349,6 +349,7 @@ export default function DashboardPage(){
                           className="w-48"
                           duration={task.duration}
                           status={task.status}
+                          noAutoStart={true}
                           onStatusChange={(newStatus) => updateSessionStatus(task.date, task.topic, newStatus)}
                           onComplete={(actualTime) => markSessionComplete(task.date, task.topic, actualTime)}
                           externalProgress={task.progress}

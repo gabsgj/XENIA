@@ -144,6 +144,28 @@ export default function PlannerPage() {
     })() 
   },[pushError])
 
+  // Refresh plan when the window regains focus or visibility changes (helps when navigating back)
+  useEffect(() => {
+    const refresh = async () => {
+      try {
+        const p = await api('/api/plan/current')
+        if (p) setPlan(p)
+      } catch (e) {
+        // silent
+      }
+    }
+
+    const onFocus = () => refresh()
+    const onVisibility = () => { if (!document.hidden) refresh() }
+
+    window.addEventListener('focus', onFocus)
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => {
+      window.removeEventListener('focus', onFocus)
+      document.removeEventListener('visibilitychange', onVisibility)
+    }
+  }, [])
+
   async function regen(){
     setLoading(true)
     // Start optimistic UI

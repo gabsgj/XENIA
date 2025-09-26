@@ -82,8 +82,9 @@ export function StudyTimer({
         ...prev,
         isRunning: status === 'in-progress',
         completed: status === 'completed',
-        remainingSeconds: status === 'completed' ? 0 : prev.totalSeconds,
-        progress: status === 'completed' ? 100 : (status === 'pending' ? 0 : prev.progress)
+        // If pending and we have external progress, preserve remainingSeconds derived from that progress
+        remainingSeconds: status === 'completed' ? 0 : (status === 'pending' && externalProgress !== undefined ? prev.remainingSeconds : prev.totalSeconds),
+        progress: status === 'completed' ? 100 : (status === 'pending' && externalProgress !== undefined ? prev.progress : (status === 'pending' ? 0 : prev.progress))
       }))
 
       // Clear any running interval

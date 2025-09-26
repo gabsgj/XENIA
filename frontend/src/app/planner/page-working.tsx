@@ -120,6 +120,26 @@ export default function PlannerPage() {
     })() 
   },[pushError])
 
+  // Refresh plan when window focus/visibility changes so navigating back shows updated plan
+  useEffect(() => {
+    const refresh = async () => {
+      try {
+        const p = await api('/api/plan/current')
+        if (p) setPlan(p)
+      } catch (e) {
+        // ignore
+      }
+    }
+    const onFocus = () => refresh()
+    const onVisibility = () => { if (!document.hidden) refresh() }
+    window.addEventListener('focus', onFocus)
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => {
+      window.removeEventListener('focus', onFocus)
+      document.removeEventListener('visibilitychange', onVisibility)
+    }
+  }, [])
+
   async function regen(){
     setLoading(true)
     try {
