@@ -40,3 +40,9 @@ dist-ssr
 __pycache__/
 
 *.pyc
+
+# Virtual environments and caches
+backend/.venv/
+backend/venv/
+**/.venv/
+**/__pycache__/
