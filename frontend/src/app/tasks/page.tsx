@@ -287,17 +287,16 @@ const [taskFormData, setTaskFormData] = useState<TaskFormData>({
   }
 
   const handleCompleteTask = async (task: any) => {
+    const isActive = activeTaskId === task.id
     try {
       setProcessingIds(prev => new Set(prev).add(task.id))
       
-      if (activeTaskId === task.id && activeSession?.id) {
+      if (isActive && activeSession?.id) {
         await endSession({ 
           sessionId: activeSession.id, 
           taskId: task.fromPlan ? undefined : task.id, 
           completed: true 
         })
-        setActiveTaskId(null)
-        setTimerStatus('pending')
       }
       
       if (!task.fromPlan) {
@@ -314,6 +313,12 @@ const [taskFormData, setTaskFormData] = useState<TaskFormData>({
         } catch (e) {
           pushError({ errorCode: 'PLAN_PROGRESS_FAIL', errorMessage: 'Failed to complete plan session', details: e })
         }
+      }
+      
+      // Always stop the timer UI if this was the active task (even if no backend session was created)
+      if (isActive) {
+        setActiveTaskId(null)
+        setTimerStatus('pending')
       }
       
     } catch (e: any) {
@@ -533,7 +538,7 @@ setTaskFormData({
       <MainLayout>
         <div className="container mx-auto p-8 max-w-[1440px]">
         {/* Enhanced Header with better hierarchy */}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
+        <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-8">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">
               Tasks & Sessions
@@ -541,15 +546,43 @@ setTaskFormData({
             <p className="text-muted-foreground mt-2">Manage your study tasks and track your learning progress</p>
           </div>
           
-          <div className="flex items-center gap-3">
-            <Button 
-              size="lg" 
-              className="bg-primary hover:bg-primary/90 shadow-sm"
-              onClick={() => setShowCreateTaskDialog(true)}
-            >
-              <Plus className="w-5 h-5 mr-2" />
-              New Task
-            </Button>
+          <div className="flex flex-col items-end gap-3 w-full md:w-auto">
+            {activeTaskId ? (
+              <TimerErrorBoundary 
+                taskTitle={filteredTasks.find((t: any) => t.id === activeTaskId)?.title}
+                compact={false}
+              >
+                <Card className="shadow-sm w-full md:w-[420px]">
+                  <CardContent className="p-4">
+                    <EnhancedStudyTimer
+                      duration={((): number => {
+                        const task = filteredTasks.find((t: any) => t.id === activeTaskId)
+                        return task?.estimatedMinutes || task?.duration_minutes || 30
+                      })()}
+                      status={timerStatus}
+                      onStatusChange={handleTimerStatusChange}
+                      onComplete={handleTimerComplete}
+                      taskId={activeTaskId}
+                      taskTitle={filteredTasks.find((t: any) => t.id === activeTaskId)?.title}
+                      subject={filteredTasks.find((t: any) => t.id === activeTaskId)?.subject}
+                      compact={false}
+                      showTaskInfo={true}
+                    />
+                  </CardContent>
+                </Card>
+              </TimerErrorBoundary>
+            ) : null}
+
+            <div className="flex items-center gap-3">
+              <Button 
+                size="lg" 
+                className="bg-primary hover:bg-primary/90 shadow-sm"
+                onClick={() => setShowCreateTaskDialog(true)}
+              >
+                <Plus className="w-5 h-5 mr-2" />
+                New Task
+              </Button>
+            </div>
           </div>
         </div>
 
@@ -1236,51 +1269,7 @@ setTaskFormData({
 
             {/* Sidebar - Auxiliary Tools */}
             <div className="space-y-6">
-              {/* Study Timer - Enhanced Design */}
-              <Card className="shadow-sm">
-                <CardHeader className="pb-4">
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <Timer className="w-5 h-5 text-primary" />
-                    Study Timer
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {activeTaskId ? (
-                    <TimerErrorBoundary 
-                      taskTitle={filteredTasks.find((t: any) => t.id === activeTaskId)?.title}
-                      compact={false}
-                    >
-                      <div className="space-y-3">
-                        <div className="p-3 bg-muted/50 rounded-lg">
-                          <p className="text-sm font-medium mb-1">Active Task</p>
-                          <p className="text-sm text-muted-foreground line-clamp-2">
-                            {filteredTasks.find((t: any) => t.id === activeTaskId)?.title}
-                          </p>
-                        </div>
-                        <EnhancedStudyTimer
-                          duration={((): number => {
-                            const task = filteredTasks.find((t: any) => t.id === activeTaskId)
-                            return task?.estimatedMinutes || task?.duration_minutes || 30
-                          })()}
-                          status={timerStatus}
-                          onStatusChange={handleTimerStatusChange}
-                          onComplete={handleTimerComplete}
-                          taskId={activeTaskId}
-                          taskTitle={filteredTasks.find((t: any) => t.id === activeTaskId)?.title}
-                          subject={filteredTasks.find((t: any) => t.id === activeTaskId)?.subject}
-                          compact={false}
-                          showTaskInfo={false}
-                        />
-                      </div>
-                    </TimerErrorBoundary>
-                  ) : (
-                    <div className="text-center py-12">
-                      <Timer className="w-12 h-12 mx-auto mb-3 text-muted-foreground opacity-30" />
-                      <p className="text-sm text-muted-foreground">Select a task to start the timer</p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+              {/* (Timer moved to the header top-right dock) */}
 
               {/* Quick Log Session - Cleaner Design */}
               <Card className="shadow-sm">
