@@ -14,7 +14,8 @@ import {
   Bot, 
   User, 
   Loader2,
-  X
+  X,
+  AlertTriangle
 } from 'lucide-react'
 
 export default function TutorPage(){
@@ -44,6 +45,7 @@ export default function TutorPage(){
   ])
   const [loading, setLoading] = useState(false)
   const [userId, setUserId] = useState<string>('')
+  const [tutorStatus, setTutorStatus] = useState<{ service: string; available_providers?: string[] } | null>(null)
   const { pushError } = useErrorContext()
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -83,11 +85,19 @@ export default function TutorPage(){
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  // Fetch history after we have a user id
+  // Fetch history and service status after we have a user id
   useEffect(() => {
     if (!userId) return
     let cancelled = false
     ;(async () => {
+      try {
+        // Tutor service status
+        const s = await fetch(`${API_BASE}/api/tutor/status`).then(r => r.json()).catch(() => null)
+        if (!cancelled) {
+          const data = (s && (s.data || s)) || null
+          if (data && typeof data.service === 'string') setTutorStatus({ service: data.service, available_providers: data.available_providers || [] })
+        }
+      } catch {/* ignore */}
       try {
         const r = await fetch(`${API_BASE}/api/tutor/history`, {
           headers: { 'X-User-Id': userId }
@@ -151,13 +161,13 @@ export default function TutorPage(){
           headers: { 'X-User-Id': currentUserId }
         })
         const j = await r.json().catch(()=> null)
-        if(!r.ok){ 
-          pushError({ errorCode: 'TUTOR_API_DOWN', errorMessage: j?.error || 'Tutor failed', details: j })
+if(!r.ok || (j && j.success === false)){
+          pushError({ errorCode: 'TUTOR_API_DOWN', errorMessage: (j && (j.error || j.final_answer || j.message)) || 'Tutor failed', details: j })
           return 
         }
-  // APIResponseBuilder wraps payload in a { success, data, meta } envelope.
-  // prefer the inner data if present so we get { answer, steps, history }
-  response = (j && j.data) ? j.data : j
+        // APIResponseBuilder wraps payload in a { success, data, meta } envelope.
+        // prefer the inner data if present so we get { answer, steps, history }
+        response = (j && j.data) ? j.data : j
       } else {
         const r = await fetch(`${API_BASE}/api/tutor/ask`, { 
           method:'POST', 
@@ -168,13 +178,13 @@ export default function TutorPage(){
           body: JSON.stringify({ question, user_id: currentUserId }) 
         })
         const j = await r.json().catch(()=> null)
-        if(!r.ok){ 
-          pushError({ errorCode:'TUTOR_TIMEOUT', errorMessage: j?.error || 'Tutor timed out', details:j})
+if(!r.ok || (j && j.success === false)){
+          pushError({ errorCode:'TUTOR_TIMEOUT', errorMessage: (j && (j.error || j.final_answer || j.message)) || 'Tutor timed out', details:j})
           return 
         }
-  // APIResponseBuilder wraps payload in a { success, data, meta } envelope.
-  // prefer the inner data if present so we get { answer, steps, history }
-  response = (j && j.data) ? j.data : j
+        // APIResponseBuilder wraps payload in a { success, data, meta } envelope.
+        // prefer the inner data if present so we get { answer, steps, history }
+        response = (j && j.data) ? j.data : j
       }
 
       // Helper: try to extract steps and a clean textual answer without raw JSON
@@ -311,6 +321,14 @@ export default function TutorPage(){
               <p className='text-muted-foreground'>Get instant help with your studies</p>
             </div>
           </div>
+          {tutorStatus && tutorStatus.service !== 'operational' && (
+            <div className='mt-4 p-3 border-l-4 border-yellow-500 bg-yellow-50 dark:bg-yellow-900/20 rounded'>
+              <div className='flex items-center gap-2 text-sm text-yellow-800 dark:text-yellow-200'>
+                <AlertTriangle className='w-4 h-4' />
+                <span>Service is currently degraded. I’ll still try to help using robust fallbacks.</span>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Messages */}
@@ -450,8 +468,8 @@ export default function TutorPage(){
           <input
             ref={fileInputRef}
             type='file'
-            accept='.png,.jpg,.jpeg,.pdf'
-            onChange={e => setFile(e.target.files?.[0] || null)}
+            accept='.png,.jpg,.jpeg'
+            onChange={(e) => setFile(e.target.files?.[0] || null)}
             className='hidden'
           />
 

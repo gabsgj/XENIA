@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { api, getUserId } from "@/lib/api";
 import { useErrorContext } from "@/lib/error-context";
-import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, PieChart, Pie, Cell } from "recharts";
+import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, PieChart, Pie, Cell, BarChart, Bar } from "recharts";
 import { MainLayout } from "@/components/navigation";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -37,17 +37,20 @@ export default function DashboardPage(){
   const fetchData = useCallback(async () => {
     setLoading(true)
     try{ 
-      const [analytics, currentPlan, topicResp, progressResp] = await Promise.all([
+      const [analytics, currentPlan, topicResp, progressResp, dashboardResp] = await Promise.all([
         api('/api/analytics/student').catch(()=> null),
         api('/api/plan/current').catch(()=> null),
         api('/api/resources/topics').catch(()=> ({topics:[]})),
-        api('/api/progress/user/' + getUserId()).catch(()=> ({progress:{}}))
+        api('/api/progress/user/' + getUserId()).catch(()=> ({progress:{}})),
+        api('/api/dashboard').catch(()=> null)
       ])
       if(analytics) setData(analytics)
       if(currentPlan) setPlan(currentPlan)
       setTopics((topicResp as any)?.topics||[])
       setProgress((progressResp as any)?.progress||{})
-      setWeekly(analytics?.weekly_progress || [])
+      // Prefer weekly from dashboard, fallback to analytics
+      const weeklyFromDash = (dashboardResp && (dashboardResp.weeklyProgress || dashboardResp.weekly_progress)) || []
+      setWeekly(weeklyFromDash.length ? weeklyFromDash : (analytics?.weekly_progress || []))
     } catch(e:any){ 
       pushError({ errorCode: e?.errorCode||'CONTENT_API_FAIL', errorMessage: e?.errorMessage, details: e }) 
     } finally { setLoading(false) }
@@ -271,7 +274,7 @@ export default function DashboardPage(){
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <Card className="hover:shadow-md transition-all">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
@@ -420,11 +423,11 @@ export default function DashboardPage(){
               </CardHeader>
               <CardContent>
                 <div className="h-64">
-                  {loading ? (
+{loading ? (
                     <div className="flex items-center justify-center h-full">
                       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
                     </div>
-                  ) : studyChartData.length > 0 ? (
+                  ) : studyChartData.length > 1 ? (
                     <ResponsiveContainer width="100%" height="100%">
                       <AreaChart data={studyChartData}>
                         <XAxis dataKey='date' />
@@ -440,7 +443,7 @@ export default function DashboardPage(){
                       </AreaChart>
                     </ResponsiveContainer>
                   ) : (
-                    <NoDataPlaceholder />
+                    <NoDataPlaceholder message="Not enough data yet — complete a few study sessions to see your trend" />
                   )}
                 </div>
               </CardContent>
@@ -457,11 +460,11 @@ export default function DashboardPage(){
               </CardHeader>
               <CardContent>
                 <div style={{ width: '100%', height: 160 }}>
-                  {loading ? (
+{loading ? (
                     <div className="flex items-center justify-center h-full">
                       <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
                     </div>
-                  ) : weeklyChartData.length > 0 ? (
+                  ) : weeklyChartData.length > 1 ? (
                     <ResponsiveContainer width="100%" height="100%">
                       <AreaChart data={weeklyChartData}>
                         <XAxis dataKey="week" />
@@ -471,7 +474,7 @@ export default function DashboardPage(){
                       </AreaChart>
                     </ResponsiveContainer>
                   ) : (
-                    <NoDataPlaceholder />
+                    <NoDataPlaceholder message="More data required — come back after a few days of activity" />
                   )}
                 </div>
               </CardContent>
@@ -485,32 +488,24 @@ export default function DashboardPage(){
               </CardHeader>
               <CardContent>
                 <div style={{ width: '100%', height: 200 }}>
-                  {loading ? (
+{loading ? (
                     <div className="flex items-center justify-center h-full">
                       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
                     </div>
                   ) : data?.subject_performance?.length > 0 ? (
                     <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie
-                          data={data?.subject_performance?.map((subject: any) => ({
-                            name: subject.subject,
-                            value: subject.completion
-                          })) || []}
-                          dataKey="value"
-                          nameKey="name"
-                          outerRadius={70}
-                          fill="#82ca9d"
-                        >
-                          {(data?.subject_performance || []).map((_: any, idx: number) => (
-                            <Cell key={`cell-${idx}`} fill={chartColors[idx % chartColors.length]} />
-                          ))}
-                        </Pie>
+                      <BarChart data={(data?.subject_performance || []).map((s: any) => ({
+                        subject: s.subject,
+                        completion: Number(s.completion || 0)
+                      }))}>
+                        <XAxis dataKey="subject" hide={false} interval={0} angle={-30} textAnchor="end" height={60} />
+                        <YAxis domain={[0, 100]} />
                         <Tooltip />
-                      </PieChart>
+                        <Bar dataKey="completion" fill="#82ca9d" />
+                      </BarChart>
                     </ResponsiveContainer>
                   ) : (
-                    <NoDataPlaceholder />
+                    <NoDataPlaceholder message="No subject performance yet — take quizzes or complete tasks to populate this" />
                   )}
                 </div>
               </CardContent>
@@ -592,7 +587,7 @@ export default function DashboardPage(){
                       </PieChart>
                     </ResponsiveContainer>
                   ) : (
-                    <NoDataPlaceholder />
+<NoDataPlaceholder message="No data yet — start a study session or take a quiz to see progress here" />
                   )}
                 </div>
                 <div className="grid grid-cols-2 gap-2 mt-4">
@@ -691,7 +686,7 @@ export default function DashboardPage(){
                         <td className="p-2 text-sm text-muted-foreground">{stats.correct}</td>
                         <td className="p-2 text-sm text-muted-foreground">{stats.wrong}</td>
                         <td className="p-2 text-sm text-muted-foreground">{(stats.last_score * 100).toFixed(0)}%</td>
-                        <td className="p-2 text-sm text-muted-foreground">{new Date(stats.last_updated).toLocaleString()}</td>
+<td className="p-2 text-sm text-muted-foreground">{stats.last_updated ? new Date(stats.last_updated).toLocaleString() : '—'}</td>
                       </tr>
                     ))}
                   </tbody>

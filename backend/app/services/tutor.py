@@ -207,7 +207,7 @@ class EnhancedTutor:
             return {'steps': [], 'answer': '', 'raw': ''}
 
 def solve_question(
-    question: Optional[str], image_bytes: Optional[bytes], user_id: str, include_history: bool = True
+    question: Optional[str], image_bytes: Optional[bytes], user_id: str, include_history: bool = True, file_type: Optional[str] = None
 ) -> Dict:
     """Enhanced question solving with advanced AI tutoring capabilities."""
     
@@ -215,10 +215,26 @@ def solve_question(
         if not question and not image_bytes:
             raise ApiError("TUTOR_INVALID_INPUT", "No input provided to tutor", status=400)
         
-        # Extract text from image if provided
+        # Extract text from file/image if provided
         if not question and image_bytes:
-            question = EnhancedTutor.extract_text_from_image(image_bytes)
-            logger.info(f"Extracted question from image: {question[:100]}...")
+            # Handle supported image types via OCR, and text files via decode.
+            ft = (file_type or '').lower()
+            if ft in ('png','jpg','jpeg'):
+                question = EnhancedTutor.extract_text_from_image(image_bytes)
+                logger.info(f"Extracted question from image: {question[:100]}...")
+            elif ft == 'txt':
+                try:
+                    question = image_bytes.decode('utf-8', errors='ignore')
+                    logger.info(f"Extracted question from text file: {len(question)} chars")
+                except Exception as e:
+                    logger.warning(f"Failed to decode text file: {e}")
+                    question = ''
+            elif ft in ('pdf','doc','docx'):
+                # Currently not supported for server-side parsing without extra deps. Return a friendly message.
+                raise ApiError("TUTOR_INVALID_INPUT", "Unsupported file type for OCR. Please upload a PNG/JPG image or paste your question text.", status=400)
+            else:
+                # Unknown type, attempt OCR as a best-effort; if fails, proceed to validation below.
+                question = EnhancedTutor.extract_text_from_image(image_bytes)
         
         if not question or len(question.strip()) < 3:
             raise ApiError("TUTOR_INVALID_INPUT", "Question is too short or unclear", status=400)

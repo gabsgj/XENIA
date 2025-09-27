@@ -150,6 +150,38 @@ export default function QuizPage() {
     }
   }, [answers]);
 
+  const startQuizWithConfig = async (topics: string[], qDuration: number, qCount: number) => {
+    setLoading(true);
+    try {
+      const resp = await api("/api/quiz/generate", {
+        method: "POST",
+        body: JSON.stringify({
+          user_id: getRealUserId(),
+          topics,
+          num_questions: qCount,
+          options_count: 4,
+          duration: qDuration,
+          user_profile: userProfile,
+          syllabus,
+        }),
+      });
+      setQuiz(resp.quiz);
+      setAnswers(Array(resp.quiz.questions.length).fill(-1));
+      setStep("quiz");
+      setQuestionTimer(0);
+      setStreakCount(0);
+      setMaxStreak(0);
+    } catch (err: any) {
+      pushError({
+        errorCode: err?.errorCode || "QUIZ_GENERATE_FAILED",
+        errorMessage: err?.errorMessage || "Failed to generate quiz",
+        details: err,
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleStartQuiz = async () => {
     setLoading(true);
     try {
@@ -250,10 +282,12 @@ export default function QuizPage() {
                   <Button
                     className="w-full mt-4 bg-blue-600 hover:bg-blue-700 text-white"
                     size="sm"
-                    onClick={() => {
+onClick={() => {
+                      const topics = availableTopics.slice(0, 2);
                       setNumQuestions(5);
                       setDuration(5);
-                      setSelectedTopics(availableTopics.slice(0, 2));
+                      setSelectedTopics(topics);
+                      startQuizWithConfig(topics, 5, 5);
                     }}
                   >
                     Start Assessment
@@ -270,10 +304,12 @@ export default function QuizPage() {
                   <Button
                     className="w-full mt-4 bg-slate-600 hover:bg-slate-700 text-white"
                     size="sm"
-                    onClick={() => {
+onClick={() => {
+                      const topics = availableTopics.slice(0, 3);
                       setNumQuestions(10);
                       setDuration(15);
-                      setSelectedTopics(availableTopics.slice(0, 3));
+                      setSelectedTopics(topics);
+                      startQuizWithConfig(topics, 15, 10);
                     }}
                   >
                     Start Assessment
@@ -290,10 +326,12 @@ export default function QuizPage() {
                   <Button
                     className="w-full mt-4 bg-slate-800 hover:bg-slate-900 text-white"
                     size="sm"
-                    onClick={() => {
+onClick={() => {
+                      const topics = availableTopics.slice(0, 4);
                       setNumQuestions(20);
                       setDuration(30);
-                      setSelectedTopics(availableTopics.slice(0, 4));
+                      setSelectedTopics(topics);
+                      startQuizWithConfig(topics, 30, 20);
                     }}
                   >
                     Start Assessment
@@ -741,7 +779,7 @@ export default function QuizPage() {
                     </Button>
                     <Button
                       onClick={handleSubmitQuiz}
-                      disabled={loading || answers.includes(-1)}
+                      disabled={loading}
                       size="lg"
                       className="bg-slate-900 hover:bg-slate-800 text-white shadow-md hover:shadow-lg transition-all px-8"
                     >

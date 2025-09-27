@@ -39,7 +39,7 @@ def ask_tutor():
                 # Comprehensive file validation
                 validation_result = validate_uploaded_file(file.filename, file_content)
                 logger.info(f"File validation passed: {validation_result['filename']} ({validation_result['file_size']} bytes)")
-                
+                file_type = validation_result.get('detected_type')
             except FileValidationError as e:
                 if e.error_code == "FILE_TOO_LARGE":
                     return APIResponseBuilder.error(ErrorCode.FILE_TOO_LARGE, e.message, status_code=413)
@@ -70,7 +70,12 @@ def ask_tutor():
         logger.info(f"Tutor request from user: {user_id[:8]}... Question: {question[:50] if question else 'Image upload'}...")
         
         # Process the question
-        result = solve_question(question=question, image_bytes=file_content, user_id=user_id)
+        # If file content is provided, we also pass the detected file type when available.
+        try:
+            result = solve_question(question=question, image_bytes=file_content, user_id=user_id, file_type=locals().get('file_type'))
+        except TypeError:
+            # Backward compatibility if function signature differs
+            result = solve_question(question=question, image_bytes=file_content, user_id=user_id)
         
         # Return successful response
         return APIResponseBuilder.success(

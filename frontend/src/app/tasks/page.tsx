@@ -46,7 +46,7 @@ import { TimerErrorBoundary } from '@/components/ui/timer-error-boundary'
 import { useTasks } from '@/hooks/useTasks'
 import { useStudySession } from '@/hooks/useStudySession'
 import { cn } from '@/lib/utils'
-import { api } from '@/lib/api'
+import { api, getUserId } from '@/lib/api'
 
 interface TaskFormData {
   title: string
@@ -241,21 +241,25 @@ const [taskFormData, setTaskFormData] = useState<TaskFormData>({
         }
       }
       
-      // Start new session
-      await startSession({ 
-        taskId: task.fromPlan ? undefined : task.id, 
-        durationMin: task.estimatedMinutes || task.duration_minutes || 25,
-        topic: task.title,
-        subject: task.subject
-      })
-      
-      setActiveTaskId(task.id)
-      setTimerStatus('in-progress')
-      
-      // Update task status (only for real tasks)
-      if (!task.fromPlan) {
+// For plan items, do not create a backend task session (no task_id). Just mark in-progress.
+      if (task.fromPlan) {
+        setActiveTaskId(task.id)
+        setTimerStatus('in-progress')
+      } else {
+        // Start new session tied to the task
+        await startSession({ 
+          taskId: task.id, 
+          durationMin: task.estimatedMinutes || task.duration_minutes || 25,
+          topic: task.title,
+          subject: task.subject
+        })
+        setActiveTaskId(task.id)
+        setTimerStatus('in-progress')
         await updateTask(task.id, { status: 'in-progress' })
-      } else if (task.__plan) {
+      }
+      
+      // For plan items, optimistically update local plan and notify backend
+      if (task.fromPlan && task.__plan) {
         // Optimistically update local plan item
         setPlanToday(prev => prev.map(p => p.id === task.id ? { ...p, status: 'in-progress' } : p))
         // Best-effort: update backend plan status to in-progress
@@ -456,22 +460,17 @@ setTaskFormData({
     }
   }
 
-  const handleQuickLogSession = async () => {
+const handleQuickLogSession = async () => {
     try {
-      await startSession({
-        topic: quickLogTopic || 'General Study',
-        subject: 'General',
-        durationMin: quickLogMinutes
-      })
-      
-      // Immediately complete the session
-      if (activeSession?.id) {
-        await endSession({
-          sessionId: activeSession.id,
-          actualMinutes: quickLogMinutes,
-          completed: true
+      // Use track endpoint for logging ad-hoc sessions without a task_id
+      await api('/api/tasks/track', {
+        method: 'POST',
+        body: JSON.stringify({
+          user_id: getUserId(),
+          topic: quickLogTopic || 'General Study',
+          duration_min: quickLogMinutes
         })
-      }
+      })
       
       setQuickLogStatus('Session logged successfully!')
       setQuickLogTopic('')

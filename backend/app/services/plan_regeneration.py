@@ -21,7 +21,8 @@ class PlanRegenerationService:
                                   preserve_progress: bool = True,
                                   priority_adjustment: Optional[str] = None,
                                   learning_pace: Optional[str] = None,
-                                  excluded_topics: Optional[List[str]] = None):
+                                  excluded_topics: Optional[List[str]] = None,
+                                  hours_per_day: Optional[float] = None):
         """Regenerate a plan using an AI-backed SmartScheduler while preserving
         completed tasks and respecting topic dependencies and spaced repetition.
         """
@@ -37,6 +38,14 @@ class PlanRegenerationService:
             'excluded_topics': excluded_topics,
             'preserve_progress': preserve_progress
         }
+
+        # Respect hours/day as a secondary constraint via a per-day session cap (45m per session)
+        if hours_per_day is not None:
+            try:
+                max_sessions = max(1, int((float(hours_per_day) * 60) // 45))
+                options['max_sessions_per_day'] = max_sessions
+            except Exception:
+                pass
 
         logger.info('   Invoking SmartScheduler with options: %s', options)
         regenerated = self.scheduler.schedule(current_copy, new_deadline, preserve_progress=preserve_progress, options=options)

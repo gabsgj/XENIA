@@ -223,6 +223,7 @@ export default function PlannerPage() {
           priority_adjustment: 'balanced',
           learning_pace: 'moderate',
           topics: syllabusTopics,
+          hours_per_day: hoursPerDay // pass hours/day as a secondary constraint
         })
       })
 
@@ -231,6 +232,19 @@ export default function PlannerPage() {
       if (!newPlan || !newPlan.sessions) {
         throw new Error('Regeneration succeeded but no plan payload was returned')
       }
+
+      // Secondary adjustment: respect hours/day after deadline has been applied
+      try {
+        await api('/api/plan/adjust', {
+          method: 'POST',
+          body: JSON.stringify({
+            new_hours_per_day: hoursPerDay,
+            user_id: userId,
+            adjustment_type: 'hours_update'
+          })
+        })
+      } catch {/* non-fatal */}
+
       setPlan(newPlan)
     } catch(e:any){
       // Revert optimistic change

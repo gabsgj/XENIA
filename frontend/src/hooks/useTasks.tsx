@@ -218,7 +218,7 @@ export function useTasks(){
         body: JSON.stringify({ task_id: taskId, user_id: getUserId() })
       })
       
-      if (response?.success) {
+      if ((response as any)?.success || (response as any)?.ok) {
         updateTaskLocally(taskId, { 
           status: 'completed', 
           completed: true, 

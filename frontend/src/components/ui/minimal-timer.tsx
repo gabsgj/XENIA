@@ -155,7 +155,7 @@ export function MinimalTimer({
   }
 
   return (
-    <div className={`${className} flex flex-wrap sm:flex-nowrap items-center gap-2 px-2 py-1 bg-background rounded border w-full overflow-hidden`}>
+    <div className={`${className} flex flex-wrap sm:flex-nowrap items-center gap-2 px-2 py-1 bg-background rounded border w-full`}>
       <div className="text-xs font-mono min-w-[2.75rem] text-muted-foreground">{formatTime(remaining)}</div>
       <div className="flex-1 bg-muted/30 rounded-full h-1 overflow-hidden min-w-[2rem]">
         <div
@@ -163,29 +163,30 @@ export function MinimalTimer({
           style={{ width: `${progressPercent}%` }}
         />
       </div>
-      <div className="flex items-center gap-1 shrink-0">
+      <div className="flex items-center gap-1 shrink-0 ml-auto">
         {/* Start button - visible when not running and not completed */}
         {!isRunning && (
-          <Button size="sm" variant="ghost" onClick={start} className="h-6 w-6 p-0 hover:bg-muted/50" aria-label="Start">
+          <Button size="sm" variant="ghost" onClick={start} className="h-6 w-6 p-0 hover:bg-muted/50" aria-label="Start" title="Start">
             <Play className="w-3 h-3" />
           </Button>
         )}
 
         {/* Pause button - visible when running */}
         {isRunning && (
-          <Button size="sm" variant="ghost" onClick={pause} className="h-6 w-6 p-0 hover:bg-muted/50" aria-label="Pause">
+          <Button size="sm" variant="ghost" onClick={pause} className="h-6 w-6 p-0 hover:bg-muted/50" aria-label="Pause" title="Pause">
             <Pause className="w-3 h-3" />
           </Button>
         )}
 
         {/* Reset button - always visible */}
-        <Button size="sm" variant="ghost" onClick={reset} className="h-6 w-6 p-0 hover:bg-muted/50" aria-label="Reset">
+        <Button size="sm" variant="ghost" onClick={reset} className="h-6 w-6 p-0 hover:bg-muted/50" aria-label="Reset" title="Reset">
           <RotateCcw className="w-3 h-3" />
         </Button>
 
-        {/* Complete button - visible when not completed */}
-        <Button size="sm" variant="ghost" onClick={complete} className="h-6 w-6 p-0 hover:bg-muted/50" aria-label="Complete">
-          <CheckCircle className="w-3 h-3" />
+        {/* Complete button - visible when not completed; make it obvious in kanban */}
+        <Button size="sm" variant="outline" onClick={complete} className="h-6 px-2 py-0 hover:bg-muted/50" aria-label="Complete" title="Complete">
+          <CheckCircle className="w-3 h-3 mr-1" />
+          <span className="hidden sm:inline text-xs">Complete</span>
         </Button>
       </div>
     </div>

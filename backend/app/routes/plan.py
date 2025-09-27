@@ -311,6 +311,7 @@ def regenerate():
         priority_adjustment = data.get('priority_adjustment')
         learning_pace = data.get('learning_pace')
         excluded_topics = data.get('excluded_topics', []) or []
+        hours_per_day = data.get('hours_per_day')  # optional; secondary to deadline
 
         if not new_deadline:
             raise ApiError('PLAN_400', 'new_deadline is required')
@@ -372,7 +373,8 @@ def regenerate():
             preserve_progress=preserve_progress,
             priority_adjustment=priority_adjustment,
             learning_pace=learning_pace,
-            excluded_topics=excluded_topics
+            excluded_topics=excluded_topics,
+            hours_per_day=hours_per_day
         )
 
         # Persist regenerated plan so it is not lost when the user leaves the app
