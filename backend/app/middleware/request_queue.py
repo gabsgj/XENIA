@@ -10,7 +10,8 @@ import time
 from functools import wraps
 from typing import Callable
 
-DEFAULT_MAX_CONCURRENT = int(__import__('os').getenv('MAX_CONCURRENT_REQUESTS', '50'))
+# Concurrent request limiting disabled - set to very high value
+DEFAULT_MAX_CONCURRENT = 10000
 
 # Semaphore for sync code
 _sync_semaphore = threading.BoundedSemaphore(DEFAULT_MAX_CONCURRENT)
@@ -20,30 +21,22 @@ _async_semaphore = asyncio.Semaphore(DEFAULT_MAX_CONCURRENT)
 
 
 def with_request_semaphore(func: Callable):
-    """Decorator for sync functions to limit concurrent execution."""
+    """Decorator for sync functions - rate limiting disabled."""
 
     @wraps(func)
     def wrapper(*args, **kwargs):
-        acquired = _sync_semaphore.acquire(timeout=30)
-        if not acquired:
-            raise RuntimeError("Request queue timeout - too many concurrent requests")
-        try:
-            return func(*args, **kwargs)
-        finally:
-            try:
-                _sync_semaphore.release()
-            except Exception:
-                pass
+        # Rate limiting disabled - directly call function
+        return func(*args, **kwargs)
 
     return wrapper
 
 
 def async_with_request_semaphore(func: Callable):
-    """Decorator for async functions to limit concurrent execution."""
+    """Decorator for async functions - rate limiting disabled."""
 
     @wraps(func)
     async def wrapper(*args, **kwargs):
-        async with _async_semaphore:
-            return await func(*args, **kwargs)
+        # Rate limiting disabled - directly call function
+        return await func(*args, **kwargs)
 
     return wrapper

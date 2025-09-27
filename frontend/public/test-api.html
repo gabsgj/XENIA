@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Connection Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+        .test-result {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .success {
+            background-color: #d4edda;
+            border-color: #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background-color: #f8d7da;
+            border-color: #f5c6cb;
+            color: #721c24;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            cursor: pointer;
+        }
+        pre {
+            background: #f4f4f4;
+            padding: 10px;
+            border-radius: 3px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>API Connection Diagnostic Tool</h1>
+    
+    <div>
+        <h2>Current Configuration</h2>
+        <div id="config"></div>
+    </div>
+
+    <div>
+        <h2>Tests</h2>
+        <button onclick="testHealth()">Test Health Endpoint</button>
+        <button onclick="testTasks()">Test Tasks API</button>
+        <button onclick="testTutorStatus()">Test AI Tutor Status</button>
+        <button onclick="createTestTask()">Create Test Task</button>
+        <button onclick="clearLocalStorage()">Clear LocalStorage & Reset</button>
+    </div>
+
+    <div id="results"></div>
+
+    <script>
+        const API_BASE = 'http://localhost:8000';
+        
+        // Initialize or get user ID
+        function getUserId() {
+            let userId = localStorage.getItem('supabase_user_id');
+            if (!userId) {
+                userId = crypto.randomUUID();
+                localStorage.setItem('supabase_user_id', userId);
+            }
+            return userId;
+        }
+
+        // Show configuration
+        function showConfig() {
+            const config = {
+                'API Base URL': API_BASE,
+                'User ID': getUserId(),
+                'LocalStorage Items': Object.keys(localStorage).length,
+                'Browser': navigator.userAgent.substring(0, 50) + '...'
+            };
+            
+            document.getElementById('config').innerHTML = `<pre>${JSON.stringify(config, null, 2)}</pre>`;
+        }
+
+        // Add result to page
+        function addResult(title, success, data) {
+            const resultDiv = document.createElement('div');
+            resultDiv.className = `test-result ${success ? 'success' : 'error'}`;
+            resultDiv.innerHTML = `
+                <h3>${title}</h3>
+                <pre>${JSON.stringify(data, null, 2)}</pre>
+            `;
+            document.getElementById('results').prepend(resultDiv);
+        }
+
+        // Test functions
+        async function testHealth() {
+            try {
+                const response = await fetch(`${API_BASE}/health`);
+                const data = await response.json();
+                addResult('Health Check', response.ok, {
+                    status: response.status,
+                    data: data
+                });
+            } catch (error) {
+                addResult('Health Check', false, {
+                    error: error.message
+                });
+            }
+        }
+
+        async function testTasks() {
+            try {
+                const userId = getUserId();
+                const response = await fetch(`${API_BASE}/api/tasks`, {
+                    headers: {
+                        'X-User-Id': userId,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                const data = await response.json();
+                addResult('Tasks API', response.ok, {
+                    status: response.status,
+                    userId: userId,
+                    tasksCount: data.tasks ? data.tasks.length : 0,
+                    data: data
+                });
+            } catch (error) {
+                addResult('Tasks API', false, {
+                    error: error.message,
+                    stack: error.stack
+                });
+            }
+        }
+
+        async function testTutorStatus() {
+            try {
+                const response = await fetch(`${API_BASE}/api/tutor/status`);
+                const data = await response.json();
+                addResult('AI Tutor Status', response.ok, {
+                    status: response.status,
+                    service: data.data?.service,
+                    providers: data.data?.available_providers,
+                    fallback: data.data?.fallback_enabled,
+                    data: data
+                });
+            } catch (error) {
+                addResult('AI Tutor Status', false, {
+                    error: error.message
+                });
+            }
+        }
+
+        async function createTestTask() {
+            try {
+                const userId = getUserId();
+                const taskData = {
+                    user_id: userId,
+                    title: `Test Task ${new Date().toLocaleTimeString()}`,
+                    subject: 'Testing',
+                    due_date: new Date().toISOString().split('T')[0],
+                    duration_minutes: 30,
+                    priority: 'Medium',
+                    status: 'pending'
+                };
+                
+                const response = await fetch(`${API_BASE}/api/tasks`, {
+                    method: 'POST',
+                    headers: {
+                        'X-User-Id': userId,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(taskData)
+                });
+                const data = await response.json();
+                addResult('Create Test Task', response.ok, {
+                    status: response.status,
+                    sentData: taskData,
+                    receivedData: data
+                });
+            } catch (error) {
+                addResult('Create Test Task', false, {
+                    error: error.message,
+                    stack: error.stack
+                });
+            }
+        }
+
+        function clearLocalStorage() {
+            const oldUserId = getUserId();
+            localStorage.clear();
+            const newUserId = getUserId();
+            addResult('LocalStorage Cleared', true, {
+                oldUserId: oldUserId,
+                newUserId: newUserId,
+                message: 'LocalStorage cleared and new user ID generated'
+            });
+            showConfig();
+        }
+
+        // Initialize on load
+        window.onload = () => {
+            showConfig();
+        };
+    </script>
+</body>
+</html>

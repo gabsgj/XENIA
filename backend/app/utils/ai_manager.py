@@ -28,7 +28,6 @@ class ProviderConfig:
     api_key: str
     timeout: int = 30
     max_retries: int = 2
-    rate_limit_per_minute: int = 20
     circuit_breaker_threshold: int = 5
     circuit_breaker_timeout: int = 300  # 5 minutes
 
@@ -39,32 +38,7 @@ class CircuitBreakerState:
     status: ProviderStatus = ProviderStatus.HEALTHY
     next_attempt_time: Optional[datetime] = None
 
-class RateLimiter:
-    def __init__(self, max_requests_per_minute: int):
-        self.max_requests = max_requests_per_minute
-        self.requests = []
-        self.lock = Lock()
-    
-    def can_make_request(self) -> bool:
-        with self.lock:
-            now = datetime.now()
-            # Remove requests older than 1 minute
-            self.requests = [req_time for req_time in self.requests 
-                           if now - req_time < timedelta(minutes=1)]
-            
-            if len(self.requests) < self.max_requests:
-                self.requests.append(now)
-                return True
-            return False
-    
-    def get_wait_time(self) -> int:
-        """Get seconds to wait before next request is allowed"""
-        with self.lock:
-            if not self.requests:
-                return 0
-            oldest_request = min(self.requests)
-            wait_time = 60 - (datetime.now() - oldest_request).total_seconds()
-            return max(0, int(wait_time))
+# Rate limiting removed - no longer needed
 
 class AIProviderManager:
     """Manages AI providers with circuit breaker, rate limiting, and timeout handling."""
@@ -72,7 +46,6 @@ class AIProviderManager:
     def __init__(self):
         self.providers = {}
         self.circuit_breakers = {}
-        self.rate_limiters = {}
         self.provider_order = ['gemini', 'openai', 'anthropic']
         self._initialize_providers()
     
@@ -84,8 +57,7 @@ class AIProviderManager:
             self.providers['gemini'] = ProviderConfig(
                 name='gemini',
                 api_key=gemini_key,
-                timeout=int(os.getenv("AI_REQUEST_TIMEOUT_SECONDS", "30")),
-                rate_limit_per_minute=int(os.getenv("AI_RATE_LIMIT_PER_MINUTE", "20"))
+                timeout=int(os.getenv("AI_REQUEST_TIMEOUT_SECONDS", "30"))
             )
         
         # OpenAI configuration
@@ -94,8 +66,7 @@ class AIProviderManager:
             self.providers['openai'] = ProviderConfig(
                 name='openai',
                 api_key=openai_key,
-                timeout=int(os.getenv("AI_REQUEST_TIMEOUT_SECONDS", "30")),
-                rate_limit_per_minute=int(os.getenv("AI_RATE_LIMIT_PER_MINUTE", "20"))
+                timeout=int(os.getenv("AI_REQUEST_TIMEOUT_SECONDS", "30"))
             )
         
         # Anthropic configuration
@@ -104,14 +75,12 @@ class AIProviderManager:
             self.providers['anthropic'] = ProviderConfig(
                 name='anthropic',
                 api_key=anthropic_key,
-                timeout=int(os.getenv("AI_REQUEST_TIMEOUT_SECONDS", "30")),
-                rate_limit_per_minute=int(os.getenv("AI_RATE_LIMIT_PER_MINUTE", "20"))
+                timeout=int(os.getenv("AI_REQUEST_TIMEOUT_SECONDS", "30"))
             )
         
-        # Initialize circuit breakers and rate limiters
+        # Initialize circuit breakers
         for provider_name, config in self.providers.items():
             self.circuit_breakers[provider_name] = CircuitBreakerState()
-            self.rate_limiters[provider_name] = RateLimiter(config.rate_limit_per_minute)
         
         logger.info(f"Initialized AI providers: {list(self.providers.keys())}")
     
@@ -127,7 +96,7 @@ class AIProviderManager:
         return any(pattern.lower() in key_lower for pattern in demo_patterns.get(provider, []))
     
     def _can_use_provider(self, provider_name: str) -> bool:
-        """Check if provider can be used (rate limit + circuit breaker)."""
+        """Check if provider can be used (circuit breaker check only)."""
         if provider_name not in self.providers:
             return False
         
@@ -141,13 +110,6 @@ class AIProviderManager:
             # Try to close circuit breaker
             circuit_breaker.status = ProviderStatus.DEGRADED
             logger.info(f"Attempting to close circuit breaker for {provider_name}")
-        
-        # Check rate limit
-        rate_limiter = self.rate_limiters[provider_name]
-        if not rate_limiter.can_make_request():
-            wait_time = rate_limiter.get_wait_time()
-            logger.warning(f"Rate limit exceeded for {provider_name}, wait {wait_time}s")
-            return False
         
         return True
     
@@ -382,14 +344,11 @@ class AIProviderManager:
         status = {}
         for provider_name in self.providers:
             circuit_breaker = self.circuit_breakers[provider_name]
-            rate_limiter = self.rate_limiters[provider_name]
             
             status[provider_name] = {
                 "status": circuit_breaker.status.value,
                 "failure_count": circuit_breaker.failure_count,
-                "last_failure": circuit_breaker.last_failure_time.isoformat() if circuit_breaker.last_failure_time else None,
-                "requests_remaining": rate_limiter.max_requests - len(rate_limiter.requests),
-                "wait_time_seconds": rate_limiter.get_wait_time()
+                "last_failure": circuit_breaker.last_failure_time.isoformat() if circuit_breaker.last_failure_time else None
             }
         
         return status
