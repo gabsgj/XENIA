@@ -98,7 +98,7 @@ export function useStudySession(){
     try {
       setState(prev => ({ ...prev, loading: true, error: null }))
       
-      // Create a local session object without hitting the server to avoid schema mismatches
+      // Create a local session object immediately for responsive UI
       const localSession: StudySession = {
         id: `${Date.now()}`,
         task_id: taskId,
@@ -116,7 +116,23 @@ export function useStudySession(){
         loading: false
       }))
       
+      // Start the local timer right away
       startTimer()
+
+      // If a task is provided, also persist the session server-side (best-effort)
+      if (taskId) {
+        api('/api/tasks/session/start', {
+          method: 'POST',
+          body: JSON.stringify({
+            user_id: getUserId(),
+            task_id: taskId,
+            duration_min: durationMin,
+          })
+        }).catch((err) => {
+          console.warn('Failed to start backend session; proceeding locally', err)
+        })
+      }
+
       return localSession
       
     } catch (e: any) {
@@ -174,18 +190,30 @@ const endSession = useCallback(async ({
       // Calculate actual duration if not provided
       const finalActualMinutes = actualMinutes || Math.max(1, Math.floor(state.elapsedTime / 60))
       
-      // Record the completed study time using the track endpoint
+      // Decide persistence strategy: if tied to a task, end via backend session API; otherwise, track as ad-hoc study
+      const finalTaskId = taskId || state.activeSession?.task_id
       try {
-        await api('/api/tasks/track', {
-          method: 'POST',
-          body: JSON.stringify({
-            user_id: getUserId(),
-            topic: state.activeSession?.topic || 'General Study',
-            duration_min: finalActualMinutes
+        if (finalTaskId) {
+          await api('/api/tasks/session/end', {
+            method: 'PUT',
+            body: JSON.stringify({
+              session_id: sessionId,
+              task_id: finalTaskId,
+              user_id: getUserId()
+            })
           })
-        })
-      } catch (trackErr) {
-        console.warn('Failed to record session via track endpoint', trackErr)
+        } else {
+          await api('/api/tasks/track', {
+            method: 'POST',
+            body: JSON.stringify({
+              user_id: getUserId(),
+              topic: state.activeSession?.topic || 'General Study',
+              duration_min: finalActualMinutes
+            })
+          })
+        }
+      } catch (persistErr) {
+        console.warn('Failed to persist session end', persistErr)
       }
       
       // Stop timer and update state

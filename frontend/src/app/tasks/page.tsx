@@ -43,6 +43,7 @@ import { EnhancedStudyTimer } from '@/components/ui/enhanced-study-timer'
 import EnhancedRecommendationsPanel from '@/components/EnhancedRecommendationsPanel'
 import { TaskErrorBoundary } from '@/components/tasks/TaskErrorBoundary'
 import { TimerErrorBoundary } from '@/components/ui/timer-error-boundary'
+import { TaskList, FocusCard, UpcomingList, QuickLogPanel, DailyProgressCard, ActiveTimerDock } from '@/components/tasks'
 import { useTasks } from '@/hooks/useTasks'
 import { useStudySession } from '@/hooks/useStudySession'
 import { cn } from '@/lib/utils'
@@ -595,31 +596,13 @@ setTaskFormData({
           </div>
           
           <div className="flex flex-col items-end gap-3 w-full md:w-auto">
-            {activeTaskId ? (
-              <TimerErrorBoundary 
-                taskTitle={filteredTasks.find((t: any) => t.id === activeTaskId)?.title}
-                compact={false}
-              >
-                <Card className="shadow-sm w-full md:w-[420px]">
-                  <CardContent className="p-4">
-                    <EnhancedStudyTimer
-                      duration={((): number => {
-                        const task = filteredTasks.find((t: any) => t.id === activeTaskId)
-                        return task?.estimatedMinutes || task?.duration_minutes || 30
-                      })()}
-                      status={timerStatus}
-                      onStatusChange={handleTimerStatusChange}
-                      onComplete={handleTimerComplete}
-                      taskId={activeTaskId}
-                      taskTitle={filteredTasks.find((t: any) => t.id === activeTaskId)?.title}
-                      subject={filteredTasks.find((t: any) => t.id === activeTaskId)?.subject}
-                      compact={false}
-                      showTaskInfo={true}
-                    />
-                  </CardContent>
-                </Card>
-              </TimerErrorBoundary>
-            ) : null}
+            <ActiveTimerDock 
+              activeTaskId={activeTaskId}
+              task={filteredTasks.find((t: any) => t.id === activeTaskId)}
+              status={timerStatus}
+              onStatusChange={handleTimerStatusChange}
+              onComplete={handleTimerComplete}
+            />
 
             <div className="flex items-center gap-3">
               <Button 
@@ -1124,55 +1107,17 @@ setTaskFormData({
             {/* Main Column - Primary Focus Area */}
             <div className="space-y-6">
               {/* Today's Focus - Featured Task with enhanced styling */}
-              {filteredTasks.length > 0 && filteredTasks.filter(t => !t.completed && t.status !== 'completed').length > 0 && (
-                <Card className="border shadow-sm">
-                  <CardHeader className="pb-4">
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      <Target className="w-5 h-5 text-primary" />
-                      Today's Focus
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {(() => {
-                      const nextTask = filteredTasks.find(t => !t.completed && t.status !== 'completed')
-                      if (!nextTask) return null
-                      return (
-                        <div>
-                          <h3 className="font-semibold text-xl mb-4">{nextTask.title}</h3>
-                          <div className="flex items-center gap-4 text-sm text-muted-foreground mb-4">
-                            <span className="flex items-center gap-1.5">
-                              <BookOpen className="w-4 h-4" />
-                              {nextTask.subject}
-                            </span>
-                            <span className="flex items-center gap-1.5">
-                              <Clock className="w-4 h-4" />
-                              {nextTask.estimatedMinutes || nextTask.duration_minutes || 30} min
-                            </span>
-                            <Badge variant="secondary" className="text-xs">
-                              {nextTask.priority || 'Medium'} Priority
-                            </Badge>
-                          </div>
-                          <Button 
-                            onClick={() => handleStartTask(nextTask)}
-                            disabled={processingIds.has(nextTask.id) || (!!activeTaskId && activeTaskId !== nextTask.id)}
-                            className="w-full bg-primary hover:bg-primary/90 font-medium py-5"
-                            size="lg"
-                          >
-                            {processingIds.has(nextTask.id) ? (
-                              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                            ) : (
-                              <>
-                                <PlayCircle className="w-5 h-5 mr-2" />
-                                Start This Task
-                              </>
-                            )}
-                          </Button>
-                        </div>
-                      )
-                    })()}
-                  </CardContent>
-                </Card>
-              )}
+              {(() => {
+                const nextTask = filteredTasks.find((t: any) => !t.completed && t.status !== 'completed')
+                return nextTask ? (
+                  <FocusCard 
+                    task={nextTask as any}
+                    onStart={(t) => handleStartTask(t)}
+                    processing={processingIds.has(nextTask.id)}
+                    activeTaskId={activeTaskId}
+                  />
+                ) : null
+              })()}
 
               {/* Today's Tasks */}
               <Card>
@@ -1222,191 +1167,15 @@ setTaskFormData({
                   {/* Tasks List with improved spacing and interaction */}
                   <div className="space-y-3">
                     {filteredTasks.length > 0 ? (
-                      filteredTasks.map((task: any) => (
-                        <div
-                          key={task.id}
-                          className={cn(
-                            "group relative p-5 rounded-lg border bg-card hover:shadow-md transition-all duration-200",
-                            activeTaskId === task.id && "ring-2 ring-primary border-primary",
-                            task.completed || task.status === 'completed' ? "opacity-60" : ""
-                          )}
-                        >
-                          <div className="flex items-start gap-4">
-                            {/* Task Content */}
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-start justify-between mb-4">
-                                <div className="flex-1">
-                                  <h4 className="font-semibold text-base mb-2">
-                                    {task.title}
-                                  </h4>
-                                  <p className="text-sm text-muted-foreground">
-                                    {task.subject}
-                                  </p>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  {(task.completed || task.status === 'completed') && (
-                                    <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400" />
-                                  )}
-                                  {!task.fromPlan && (
-                                    <DropdownMenu>
-                                      <DropdownMenuTrigger asChild>
-                                        <Button 
-                                          variant="ghost" 
-                                          size="icon"
-                                          className="opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8"
-                                        >
-                                          <MoreVertical className="h-4 w-4" />
-                                        </Button>
-                                      </DropdownMenuTrigger>
-                                      <DropdownMenuContent align="end" className="w-48">
-                                        <DropdownMenuItem 
-                                          onClick={() => {
-                                            setEditingTask(task)
-                                            setShowEditTaskDialog(true)
-                                          }}
-                                          className="cursor-pointer"
-                                        >
-                                          <Edit className="mr-2 h-4 w-4" />
-                                          Edit
-                                        </DropdownMenuItem>
-                                        {!task.completed && task.status !== 'completed' && (
-                                          <DropdownMenuItem 
-                                            onClick={() => handleCompleteTask(task)}
-                                            className="cursor-pointer"
-                                          >
-                                            <CheckCircle2 className="mr-2 h-4 w-4" />
-                                            Mark as Complete
-                                          </DropdownMenuItem>
-                                        )}
-                                        <DropdownMenuSeparator />
-                                        <DropdownMenuItem 
-                                          onClick={() => handleDeleteTask(task)}
-                                          className="cursor-pointer text-red-600 dark:text-red-400"
-                                        >
-                                          <Trash2 className="mr-2 h-4 w-4" />
-                                          Delete
-                                        </DropdownMenuItem>
-                                      </DropdownMenuContent>
-                                    </DropdownMenu>
-                                  )}
-                                </div>
-                              </div>
-                              
-                              <div className="flex items-center gap-4 text-sm text-muted-foreground mb-4">
-                                {task.dueDate && (
-                                  <span className="flex items-center gap-1.5">
-                                    <Calendar className="w-3.5 h-3.5" />
-                                    Due {new Date(task.dueDate).toLocaleDateString()}
-                                  </span>
-                                )}
-                                <span className="flex items-center gap-1.5">
-                                  <Clock className="w-3.5 h-3.5" />
-                                  {task.estimatedMinutes || task.duration_minutes || 30} min
-                                </span>
-                                <Badge className={cn(
-                                  "text-xs",
-                                  task.priority === 'High' && 'bg-red-100 text-red-700 dark:bg-red-900/20 dark:text-red-300',
-                                  task.priority === 'Medium' && 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/20 dark:text-yellow-300',
-                                  task.priority === 'Low' && 'bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-300'
-                                )} variant="secondary">
-                                  {task.priority} Priority
-                                </Badge>
-                              </div>
-                              
-                              {task.description && (
-                                <p className="text-sm text-muted-foreground line-clamp-2 mb-4">
-                                  {task.description}
-                                </p>
-                              )}
-                              
-                              {task.progress !== undefined && task.progress > 0 && (
-                                <div className="mb-4">
-                                  <div className="flex justify-between text-xs mb-2">
-                                    <span>Progress</span>
-                                    <span>{Math.round(task.progress)}%</span>
-                                  </div>
-                                  <Progress value={task.progress} className="h-2" />
-                                </div>
-                              )}
-                              
-                              {/* Action Buttons */}
-                              <div className="flex items-center gap-2 mt-3">
-                                {activeTaskId === task.id ? (
-                                  <>
-                                    <Badge variant="default" className="text-xs">
-                                      <Timer className="w-3 h-3 mr-1" />
-                                      Timer Running
-                                    </Badge>
-                                    <Button 
-                                      size="sm" 
-                                      variant="outline"
-                                      onClick={() => handleCompleteTask(task)}
-                                      disabled={processingIds.has(task.id)}
-                                    >
-                                      Mark Complete
-                                    </Button>
-                                  </>
-                                ) : (
-                                  <>
-                                    {!task.completed && task.status !== 'completed' && (
-                                      <Button
-                                        size="sm"
-                                        variant="default"
-                                        onClick={() => handleStartTask(task)}
-                                        disabled={processingIds.has(task.id) || (!!activeTaskId && activeTaskId !== task.id)}
-                                      >
-                                        {processingIds.has(task.id) ? (
-                                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                                        ) : (
-                                          <>
-                                            <PlayCircle className="w-4 h-4 mr-1" />
-                                            Start
-                                          </>
-                                        )}
-                                      </Button>
-                                    )}
-                                    
-                                    {(task.completed || task.status === 'completed') ? (
-                                      <span className="text-sm text-green-600 dark:text-green-400 flex items-center gap-1">
-                                        <CheckCircle2 className="w-4 h-4" />
-                                        Completed
-                                      </span>
-                                    ) : (
-                                      <Button
-                                        size="sm"
-                                        variant="ghost"
-                                        onClick={() => handleCompleteTask(task)}
-                                        disabled={processingIds.has(task.id)}
-                                      >
-                                        {processingIds.has(task.id) ? (
-                                          <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                                        ) : (
-                                          <>
-                                            <CheckCircle2 className="w-4 h-4 mr-1" />
-                                            Complete
-                                          </>
-                                        )}
-                                      </Button>
-                                    )}
-                                    
-                                    {!task.fromPlan && (
-                                      <Button
-                                        size="sm"
-                                        variant="ghost"
-                                        onClick={() => handleDeleteTask(task)}
-                                        disabled={processingIds.has(task.id)}
-                                        className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity"
-                                      >
-                                        <MoreVertical className="w-4 h-4" />
-                                      </Button>
-                                    )}
-                                  </>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      ))
+                      <TaskList 
+                        tasks={filteredTasks as any}
+                        activeTaskId={activeTaskId}
+                        processingIds={processingIds}
+                        onStart={(t) => handleStartTask(t)}
+                        onComplete={(t) => handleCompleteTask(t)}
+                        onDelete={(t) => handleDeleteTask(t)}
+                        onEdit={(t) => { setEditingTask(t); setShowEditTaskDialog(true) }}
+                      />
                     ) : (
                       <div className="text-center py-12">
                         <Target className="w-16 h-16 mx-auto mb-4 text-muted-foreground opacity-50" />
@@ -1431,63 +1200,12 @@ setTaskFormData({
                     <CardDescription>Tasks scheduled for future dates</CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <div className="space-y-3">
-{upcoming.slice(0, 5).map((task: any) => (
-                        <div key={task.id} className="group flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors">
-                          <div>
-                            <div className="font-medium">{task.title}</div>
-                            <div className="text-sm text-muted-foreground">
-                              {task.subject} • Due {new Date(task.dueDate || task.due_date).toLocaleDateString()}
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Badge variant="outline">{task.estimatedMinutes || 30}min</Badge>
-                            {!task.fromPlan && (
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button 
-                                    variant="ghost" 
-                                    size="icon"
-                                    className="opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8"
-                                  >
-                                    <MoreVertical className="h-4 w-4" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end" className="w-48">
-                                  <DropdownMenuItem 
-                                    onClick={() => {
-                                      setEditingTask(task)
-                                      setShowEditTaskDialog(true)
-                                    }}
-                                    className="cursor-pointer"
-                                  >
-                                    <Edit className="mr-2 h-4 w-4" />
-                                    Edit
-                                  </DropdownMenuItem>
-                                  {!task.completed && task.status !== 'completed' && (
-                                    <DropdownMenuItem 
-                                      onClick={() => handleCompleteTask(task)}
-                                      className="cursor-pointer"
-                                    >
-                                      <CheckCircle2 className="mr-2 h-4 w-4" />
-                                      Mark as Complete
-                                    </DropdownMenuItem>
-                                  )}
-                                  <DropdownMenuSeparator />
-                                  <DropdownMenuItem 
-                                    onClick={() => handleDeleteTask(task)}
-                                    className="cursor-pointer text-red-600 dark:text-red-400"
-                                  >
-                                    <Trash2 className="mr-2 h-4 w-4" />
-                                    Delete
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                    <UpcomingList 
+                      tasks={upcoming.slice(0, 5) as any}
+                      onEdit={(t) => { setEditingTask(t); setShowEditTaskDialog(true) }}
+                      onComplete={(t) => handleCompleteTask(t)}
+                      onDelete={(t) => handleDeleteTask(t)}
+                    />
                   </CardContent>
                 </Card>
               )}
@@ -1498,114 +1216,24 @@ setTaskFormData({
               {/* (Timer moved to the header top-right dock) */}
 
               {/* Quick Log Session - Cleaner Design */}
-              <Card className="shadow-sm">
-                <CardHeader className="pb-4">
-                  <CardTitle className="text-lg">Quick Log Session</CardTitle>
-                  <CardDescription className="text-xs">Log a completed study session</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="quickTopic" className="text-sm">Topic</Label>
-                    <Input
-                      id="quickTopic"
-                      placeholder="e.g., Math Review"
-                      value={quickLogTopic}
-                      onChange={(e) => setQuickLogTopic(e.target.value)}
-                      className="h-9"
-                    />
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="quickDuration" className="text-sm">Duration (minutes)</Label>
-                    <Input
-                      id="quickDuration"
-                      type="number"
-                      min="1"
-                      max="300"
-                      value={quickLogMinutes}
-                      onChange={(e) => setQuickLogMinutes(parseInt(e.target.value) || 25)}
-                      className="h-9"
-                    />
-                  </div>
-                  
-                  <Button 
-                    onClick={handleQuickLogSession} 
-                    className="w-full bg-primary hover:bg-primary/90"
-                    disabled={!quickLogTopic.trim()}
-                  >
-                    <BookOpen className="w-4 h-4 mr-2" />
-                    Log Session
-                  </Button>
-                  
-                  {quickLogStatus && (
-                    <div className="p-2.5 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-md">
-                      <p className="text-xs text-green-800 dark:text-green-200">{quickLogStatus}</p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+              <QuickLogPanel 
+                topic={quickLogTopic}
+                onTopicChange={setQuickLogTopic}
+                minutes={quickLogMinutes}
+                onMinutesChange={(v) => setQuickLogMinutes(v)}
+                onSubmit={handleQuickLogSession}
+                status={quickLogStatus}
+              />
 
               {/* Today's Progress - Simplified */}
-              <Card className="shadow-sm">
-                <CardHeader className="pb-4">
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <TrendingUp className="w-5 h-5 text-primary" />
-                    Today's Progress
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {/* Single Progress Bar Design */}
-                    <div>
-                      <div className="flex justify-between items-baseline mb-2">
-                        <span className="text-sm font-medium">Daily Goal</span>
-                        <span className="text-sm text-muted-foreground">
-                          {taskStats.completedTasks} / {taskStats.totalTasks} Tasks
-                        </span>
-                      </div>
-                      <Progress 
-                        value={taskStats.completionRate} 
-                        className="h-2 mb-1" 
-                      />
-                      <p className="text-xs text-muted-foreground text-right">
-                        {taskStats.completionRate}% Complete
-                      </p>
-                    </div>
-                    
-                    <div className="border-t pt-4">
-                      <div className="flex justify-between items-center mb-2">
-                        <span className="text-sm font-medium">Study Time</span>
-                        <span className="text-sm text-muted-foreground">
-                          {sessionStats.totalTimeToday}m / 180m
-                        </span>
-                      </div>
-                      <Progress 
-                        value={Math.min(100, (sessionStats.totalTimeToday / 180) * 100)} 
-                        className="h-2 mb-1" 
-                      />
-                      <p className="text-xs text-muted-foreground text-right">
-                        {Math.round((sessionStats.totalTimeToday / 180) * 100)}% of target
-                      </p>
-                    </div>
-                    
-                    <div className="grid grid-cols-2 gap-3 pt-2">
-                      <div className="text-center p-2 bg-muted/50 rounded">
-                        <div className="text-lg font-semibold">
-                          {sessionStats.sessionsToday}
-                        </div>
-                        <div className="text-xs text-muted-foreground">Sessions</div>
-                      </div>
-                      <div className="text-center p-2 bg-muted/50 rounded">
-                        <div className="text-lg font-semibold">
-                          <Flame className="w-4 h-4 inline mr-1 text-orange-500" />
-                          {analyticsData?.profile?.streak_days || 0}
-                        </div>
-                        <div className="text-xs text-muted-foreground">Day Streak</div>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+              <DailyProgressCard 
+                completionRate={taskStats.completionRate}
+                totalTasks={taskStats.totalTasks}
+                completedTasks={taskStats.completedTasks}
+                totalTimeToday={sessionStats.totalTimeToday}
+                sessionsToday={sessionStats.sessionsToday}
+                streakDays={analyticsData?.profile?.streak_days || 0}
+              />
 
               {/* Content Recommendations - YouTube Primary */}
               <Card className="shadow-sm">

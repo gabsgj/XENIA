@@ -13,6 +13,10 @@ export const ERROR_DESCRIPTIONS: Record<string, string> = {
   ASSESSMENT_OCR_FAIL: "OCR failed to read your image.",
   CONTENT_NOT_FOUND: "Requested content not found.",
   CONTENT_API_FAIL: "Content service failed.",
+  // Task & DB specific codes used by backend
+  TASK_404: "Task not found.",
+  DB_WRITE_FAIL: "We couldn't save your changes. Please try again.",
+  DB_READ_FAIL: "We couldn't load your data. Please try again.",
 };
 
 export function deriveErrorCode(path: string, status: number, serverCode?: string): string {

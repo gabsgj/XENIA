@@ -1,9 +1,10 @@
 import logging
-from flask import Blueprint, request
+from flask import Blueprint, request, jsonify
 from ..errors import ApiError
 from ..supabase_client import get_supabase
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import uuid
+import json
 
 logger = logging.getLogger('xenia')
 tasks_bp = Blueprint("tasks", __name__)
@@ -36,7 +37,7 @@ from ..services.user_util import ensure_user_record
 
 @tasks_bp.get("/")
 def get_tasks():
-    logger.info("📋 Get tasks endpoint called")
+    logger.info("📋 Get all tasks endpoint called")
     sb = get_supabase()
     user_id = request.headers.get("X-User-Id") or request.args.get("user_id")
     if not user_id:
@@ -45,20 +46,28 @@ def get_tasks():
     from ..utils import normalize_user_id
     norm_user_id = normalize_user_id(user_id)
     
-    # Return ALL tasks for this user, not just today's
+    # Return ALL tasks for this user
     try:
         resp = sb.table("tasks").select("*").eq("user_id", norm_user_id).execute()
         db_tasks = resp.data or []
         
-        # Map database schema to frontend expected format
+        # Enhanced mapping with metadata stored in JSON
         tasks = []
         for db_task in db_tasks:
+            # Parse metadata if available
+            metadata = {}
+            if db_task.get("metadata"):
+                try:
+                    metadata = json.loads(db_task["metadata"]) if isinstance(db_task["metadata"], str) else db_task["metadata"]
+                except:
+                    metadata = {}
+            
             tasks.append({
                 "id": db_task.get("id"),
-                "title": db_task.get("topic", "Untitled"),  # Map 'topic' to 'title'
-                "subject": "General",  # Default since not in DB
+                "title": db_task.get("title") or db_task.get("topic", "Untitled"),
+                "subject": metadata.get("subject") or db_task.get("subject") or "General",
                 "due_date": db_task.get("due_date"),
-                "dueDate": db_task.get("due_date"),  # Provide both formats
+                "dueDate": db_task.get("due_date"),
                 "duration_minutes": 30,  # Default since not in DB
                 "estimatedMinutes": 30,  # Provide both formats
                 "priority": "Medium",  # Default since not in DB
