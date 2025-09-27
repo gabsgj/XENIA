@@ -1,5 +1,5 @@
 try:
-    from marshmallow import Schema, fields, validate  # type: ignore
+    from marshmallow import Schema, fields, validate, EXCLUDE  # type: ignore
 except Exception:  # pragma: no cover - environment fallback
     # Minimal fallback so tests can import schemas without installing marshmallow.
     # This implements just enough behavior for `.validate()` calls used in routes/tests.
@@ -60,13 +60,19 @@ except Exception:  # pragma: no cover - environment fallback
 
 
 class PlanSchema(Schema):
+    class Meta:
+        # Ignore any extra fields rather than raising errors (e.g., forward/backward compat)
+        unknown = EXCLUDE
+
     user_id = fields.Str(required=True)
+    plan_id = fields.Str(required=False)
     new_deadline = fields.Date(required=False)
     preserve_progress = fields.Bool(required=False)
     excluded_topics = fields.List(fields.Str(), required=False)
     priority_adjustment = fields.Str(required=False)
     learning_pace = fields.Str(required=False)
     topics = fields.List(fields.Str(), required=False)
+    hours_per_day = fields.Float(required=False)
 
 
 class UploadSchema(Schema):

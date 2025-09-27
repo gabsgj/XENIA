@@ -1411,7 +1411,7 @@ def filter_syllabus_content(extracted_text: str) -> str:
             logger.info("🤖 Using Gemini for advanced content filtering...")
             
             genai.configure(api_key=os.getenv("GEMINI_API_KEY").strip())
-            model = genai.GenerativeModel(os.getenv("GEMINI_MODEL", "gemini-2.5-flash"))
+            model = genai.GenerativeModel(os.getenv("GEMINI_MODEL", "gemini-2.5-pro"))
 
             prompt = f"""
             Analyze the following syllabus text and extract ONLY the core academic topics and their descriptions.
