@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { api, getUserId } from "@/lib/api";
 import { useErrorContext } from "@/lib/error-context";
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, PieChart, Pie, Cell } from "recharts";
@@ -34,7 +34,7 @@ export default function DashboardPage(){
   const { pushError } = useErrorContext();
   const [dashSessionStatus, setDashSessionStatus] = useState<Record<string, 'pending' | 'in-progress' | 'completed'>>({})
   
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true)
     try{ 
       const [analytics, currentPlan, topicResp, progressResp] = await Promise.all([
@@ -51,11 +51,11 @@ export default function DashboardPage(){
     } catch(e:any){ 
       pushError({ errorCode: e?.errorCode||'CONTENT_API_FAIL', errorMessage: e?.errorMessage, details: e }) 
     } finally { setLoading(false) }
-  }
+  }, [pushError])
 
   useEffect(()=>{ 
     fetchData() 
-  },[pushError])
+  },[fetchData])
 
   // Add window focus listener to refresh data when returning to dashboard
   useEffect(() => {
@@ -64,24 +64,25 @@ export default function DashboardPage(){
     }
     
     window.addEventListener('focus', handleFocus)
-    document.addEventListener('visibilitychange', () => {
+    const onVisibility = () => {
       if (!document.hidden) {
         fetchData()
       }
-    })
+    }
+    document.addEventListener('visibilitychange', onVisibility)
     
     return () => {
       window.removeEventListener('focus', handleFocus)
-      document.removeEventListener('visibilitychange', handleFocus)
+      document.removeEventListener('visibilitychange', onVisibility)
     }
-  }, [])
+  }, [fetchData])
 
   const updateSessionStatus = async (date: string, topic: string, newStatus: 'pending' | 'in-progress' | 'completed') => {
     try {
       const key = `${date}-${topic}`
       // Optimistic local status update for instant UI feedback
       setDashSessionStatus(prev => ({ ...prev, [key]: newStatus }))
-      setPlan(prev => {
+      setPlan((prev: any) => {
         if (!prev?.sessions) return prev
         return {
           ...prev,
@@ -106,7 +107,7 @@ export default function DashboardPage(){
       const key = `${date}-${topic}`
       // Optimistic local update
       setDashSessionStatus(prev => ({ ...prev, [key]: 'completed' }))
-      setPlan(prev => {
+      setPlan((prev: any) => {
         if (!prev?.sessions) return prev
         return {
           ...prev,

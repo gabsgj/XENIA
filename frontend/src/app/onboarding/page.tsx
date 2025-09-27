@@ -10,7 +10,6 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import Logo from "@/components/logo";
 import { Clock, Target, Calendar, TrendingUp } from "lucide-react";
 

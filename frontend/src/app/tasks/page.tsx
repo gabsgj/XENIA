@@ -1142,15 +1142,59 @@ setTaskFormData({
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-3">
-                      {upcoming.slice(0, 5).map((task: any) => (
-                        <div key={task.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50">
+{upcoming.slice(0, 5).map((task: any) => (
+                        <div key={task.id} className="group flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors">
                           <div>
                             <div className="font-medium">{task.title}</div>
                             <div className="text-sm text-muted-foreground">
                               {task.subject} • Due {new Date(task.dueDate || task.due_date).toLocaleDateString()}
                             </div>
                           </div>
-                          <Badge variant="outline">{task.estimatedMinutes || 30}min</Badge>
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline">{task.estimatedMinutes || 30}min</Badge>
+                            {!task.fromPlan && (
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button 
+                                    variant="ghost" 
+                                    size="icon"
+                                    className="opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8"
+                                  >
+                                    <MoreVertical className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-48">
+                                  <DropdownMenuItem 
+                                    onClick={() => {
+                                      setEditingTask(task)
+                                      // TODO: open edit modal
+                                    }}
+                                    className="cursor-pointer"
+                                  >
+                                    <Edit className="mr-2 h-4 w-4" />
+                                    Edit
+                                  </DropdownMenuItem>
+                                  {!task.completed && task.status !== 'completed' && (
+                                    <DropdownMenuItem 
+                                      onClick={() => handleCompleteTask(task)}
+                                      className="cursor-pointer"
+                                    >
+                                      <CheckCircle2 className="mr-2 h-4 w-4" />
+                                      Mark as Complete
+                                    </DropdownMenuItem>
+                                  )}
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem 
+                                    onClick={() => handleDeleteTask(task)}
+                                    className="cursor-pointer text-red-600 dark:text-red-400"
+                                  >
+                                    <Trash2 className="mr-2 h-4 w-4" />
+                                    Delete
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            )}
+                          </div>
                         </div>
                       ))}
                     </div>
