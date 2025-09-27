@@ -127,15 +127,25 @@ export function useTasks(){
     try {
       setState(prev => ({ ...prev, loading: true }))
       
+      // Backend expects snake_case keys: due_date, duration_minutes
+      const payload = {
+        user_id: getUserId(),
+        title: taskData.title,
+        subject: taskData.subject || 'General',
+        due_date: taskData.dueDate,
+        duration_minutes: (taskData as any).duration_minutes ?? taskData.estimatedMinutes ?? (taskData as any).duration ?? 30,
+        status: 'pending'
+      }
+
       const response = await api('/api/tasks', {
         method: 'POST',
-        body: JSON.stringify({ ...taskData, user_id: getUserId() })
+        body: JSON.stringify(payload)
       })
       
       if (response?.task) {
         const respTask: any = response.task || {}
-  const fallbackDuration = (taskData as any).duration ?? (taskData as any).duration_minutes ?? (taskData as any).estimatedMinutes
-  const estimated = Number(respTask.estimatedMinutes ?? respTask.duration_minutes ?? respTask.duration ?? fallbackDuration ?? 30)
+        const fallbackDuration = (taskData as any).duration ?? (taskData as any).duration_minutes ?? (taskData as any).estimatedMinutes
+        const estimated = Number(respTask.estimatedMinutes ?? respTask.duration_minutes ?? respTask.duration ?? fallbackDuration ?? 30)
         const due = respTask.dueDate ?? respTask.due_date ?? taskData.dueDate
         const normalized = {
           ...respTask,

@@ -370,17 +370,20 @@ const [taskFormData, setTaskFormData] = useState<TaskFormData>({
 
   const handleCreateTask = async () => {
     try {
-await createTask({
-        ...taskFormData,
+      await createTask({
+        title: taskFormData.title,
+        subject: taskFormData.subject,
         dueDate: taskFormData.dueDate,
         estimatedMinutes: taskFormData.duration,
+        difficulty: taskFormData.difficulty,
+        priority: taskFormData.priority,
         status: taskFormData.status,
         completed: false,
         phase: 'active'
       })
       
       setShowCreateTaskDialog(false)
-setTaskFormData({
+      setTaskFormData({
         title: '',
         subject: '',
         dueDate: new Date().toISOString().split('T')[0],

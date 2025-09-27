@@ -19,11 +19,11 @@ def get_tasks():
     from ..utils import normalize_user_id
     norm_user_id = normalize_user_id(user_id)
     
-    today = datetime.now(timezone.utc).date().isoformat()
+    # Return ALL tasks for this user, not just today's
     try:
-        resp = sb.table("tasks").select("*").eq("user_id", norm_user_id).eq("due_date", today).execute()
+        resp = sb.table("tasks").select("*").eq("user_id", norm_user_id).execute()
         tasks = resp.data or []
-        logger.info(f"   Retrieved {len(tasks)} tasks for today")
+        logger.info(f"   Retrieved {len(tasks)} tasks")
         return {"tasks": tasks}
     except Exception as e:
         logger.warning(f"   Failed to fetch tasks: {e}")
@@ -79,7 +79,7 @@ def complete_task():
     data = request.get_json(silent=True) or {}
     
     task_id = data.get("task_id")
-    user_id = data.get("user_id")
+    user_id = data.get("user_id") or request.headers.get("X-User-Id")
     
     logger.info(f"   Task ID: {task_id}")
     logger.info(f"   User ID: {user_id}")
@@ -89,15 +89,19 @@ def complete_task():
         raise ApiError("PLAN_400", "Missing task_id")
     
     try:
-        logger.info("   Updating task status to 'done'...")
-        sb.table("tasks").update({"status": "done"}).eq("id", task_id).execute()
+        logger.info("   Updating task status to 'completed'...")
+        sb.table("tasks").update({"status": "completed"}).eq("id", task_id).execute()
         logger.info("   Task status updated successfully")
         
-        logger.info(f"   Awarding 20 XP to user {user_id}")
-        sb.rpc("add_xp", {"p_user_id": user_id, "p_xp": 20}).execute()
-        logger.info("   XP awarded successfully")
+        if user_id:
+            try:
+                logger.info(f"   Awarding 20 XP to user {user_id}")
+                sb.rpc("add_xp", {"p_user_id": user_id, "p_xp": 20}).execute()
+                logger.info("   XP awarded successfully")
+            except Exception as xp_error:
+                logger.warning(f"   XP award failed (non-fatal): {xp_error}")
         
-        result = {"ok": True}
+        result = {"ok": True, "success": True}
         logger.info(f"   Task completion processed for task {task_id}")
         return result
     except Exception as e:
@@ -107,9 +111,25 @@ def complete_task():
 
 @tasks_bp.get('/daily')
 def get_daily_tasks():
-    """Return today's tasks for the authenticated user (alias of /)."""
+    """Return today's tasks for the authenticated user."""
     logger.info("📆 Get daily tasks")
-    return get_tasks()
+    sb = get_supabase()
+    user_id = request.headers.get("X-User-Id") or request.args.get("user_id")
+    if not user_id:
+        raise ApiError("AUTH_401", "Missing user_id")
+    
+    from ..utils import normalize_user_id
+    norm_user_id = normalize_user_id(user_id)
+    
+    today = datetime.now(timezone.utc).date().isoformat()
+    try:
+        resp = sb.table("tasks").select("*").eq("user_id", norm_user_id).eq("due_date", today).execute()
+        tasks = resp.data or []
+        logger.info(f"   Retrieved {len(tasks)} tasks for today")
+        return {"tasks": tasks}
+    except Exception as e:
+        logger.warning(f"   Failed to fetch today's tasks: {e}")
+        raise ApiError("DB_READ_FAIL", "Unable to fetch today's tasks")
 
 
 @tasks_bp.get('/upcoming')
@@ -237,9 +257,11 @@ def create_task():
     
     user_id = data.get("user_id") or request.headers.get("X-User-Id")
     title = data.get("title")
-    due_date = data.get("due_date")
-    duration_minutes = data.get("duration_minutes", 30)
+    due_date = data.get("due_date") or data.get("dueDate")
+    duration_minutes = data.get("duration_minutes", data.get("estimatedMinutes", 30))
     subject = data.get("subject", "General")
+    priority = data.get("priority", "Medium")
+    difficulty = data.get("difficulty", "Medium")
     
     if not user_id:
         raise ApiError("AUTH_401", "Missing user_id")
@@ -257,6 +279,8 @@ def create_task():
             "subject": subject,
             "due_date": due_date,
             "duration_minutes": duration_minutes,
+            "priority": priority,
+            "difficulty": difficulty,
             "status": "pending",
             "created_at": datetime.now(timezone.utc).isoformat()
         }

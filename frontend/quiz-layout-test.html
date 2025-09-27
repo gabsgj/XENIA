@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quiz Layout Test - Improved Subject Tags</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            padding: 20px;
+            background-color: #f8fafc;
+            color: #334155;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            margin-bottom: 30px;
+            color: #1e293b;
+        }
+
+        .section {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 24px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .section-header {
+            font-size: 13px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #64748b;
+            margin-bottom: 16px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        /* IMPROVED FLEXBOX LAYOUT */
+        .subject-tag-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            width: 100%;
+        }
+
+        /* IMPROVED TAG DESIGN */
+        .subject-tag {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 8px 16px;
+            font-size: 14px;
+            font-weight: 500;
+            border-radius: 8px;
+            border: 1.5px solid #e2e8f0;
+            background-color: #ffffff;
+            color: #334155;
+            cursor: pointer;
+            transition: all 0.2s ease-in-out;
+            user-select: none;
+            white-space: nowrap;
+            min-height: 40px;
+            flex-shrink: 0;
+        }
+
+        .subject-tag:hover {
+            background-color: #f8fafc;
+            border-color: #cbd5e1;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+
+        /* SELECTED STATE */
+        .subject-tag.selected {
+            background-color: #3b82f6;
+            border-color: #3b82f6;
+            color: #ffffff;
+            font-weight: 600;
+            box-shadow: 0 2px 8px rgba(59, 130, 246, 0.25);
+        }
+
+        .subject-tag.selected:hover {
+            background-color: #2563eb;
+            border-color: #2563eb;
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.35);
+        }
+
+        .subject-tag.selected::before {
+            content: '✓';
+            margin-right: 6px;
+            font-weight: bold;
+        }
+
+        /* TODAY'S TOPICS */
+        .subject-tag.today {
+            background-color: #fef3c7;
+            border-color: #fbbf24;
+            color: #92400e;
+        }
+
+        .subject-tag.today:hover {
+            background-color: #fde68a;
+            border-color: #f59e0b;
+        }
+
+        .subject-tag.today.selected {
+            background-color: #f59e0b;
+            border-color: #f59e0b;
+            color: #ffffff;
+        }
+
+        /* SELECTED COUNT */
+        .selected-count {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            background-color: #f0f9ff;
+            border: 1px solid #bfdbfe;
+            border-radius: 8px;
+            color: #1e40af;
+            font-size: 14px;
+            font-weight: 500;
+            margin-top: 16px;
+        }
+
+        .checkmark {
+            color: #10b981;
+        }
+
+        /* COMPARISON SECTION */
+        .comparison {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            margin-bottom: 24px;
+        }
+
+        .old-layout {
+            background-color: #fef2f2;
+            border: 1px solid #ef4444;
+        }
+
+        .new-layout {
+            background-color: #f0f9ff;
+            border: 1px solid #3b82f6;
+        }
+
+        .label {
+            background: #ef4444;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            margin-bottom: 12px;
+            display: inline-block;
+        }
+
+        .label.success {
+            background: #10b981;
+        }
+
+        /* OLD BROKEN GRID LAYOUT */
+        .broken-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px;
+        }
+
+        @media (max-width: 768px) {
+            .comparison {
+                grid-template-columns: 1fr;
+            }
+            .broken-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>✨ Quiz Page - Improved Subject Tag Layout</h1>
+
+        <div class="comparison">
+            <div class="section old-layout">
+                <div class="label">❌ OLD BROKEN LAYOUT (Grid)</div>
+                <h3 class="section-header">Additional Subjects</h3>
+                <div class="broken-grid">
+                    <button class="subject-tag">Linear Algebra</button>
+                    <button class="subject-tag selected">Machine Learning</button>
+                    <button class="subject-tag">Data Structures</button>
+                    <button class="subject-tag">Algorithms</button>
+                    <button class="subject-tag">Object Oriented Programming in Java</button>
+                    <button class="subject-tag">Database Management Systems</button>
+                    <button class="subject-tag">Computer Networks</button>
+                    <button class="subject-tag">Operating Systems</button>
+                    <button class="subject-tag">Web Development</button>
+                    <button class="subject-tag">Artificial Intelligence</button>
+                </div>
+                <p style="color: red; margin-top: 12px; font-size: 12px;">
+                    ⚠️ Notice how long topic names break the grid and overlap
+                </p>
+            </div>
+
+            <div class="section new-layout">
+                <div class="label success">✅ NEW IMPROVED LAYOUT (Flexbox)</div>
+                <h3 class="section-header">Additional Subjects</h3>
+                <div class="subject-tag-container">
+                    <button class="subject-tag">Linear Algebra</button>
+                    <button class="subject-tag selected">Machine Learning</button>
+                    <button class="subject-tag">Data Structures</button>
+                    <button class="subject-tag">Algorithms</button>
+                    <button class="subject-tag">Object Oriented Programming in Java</button>
+                    <button class="subject-tag">Database Management Systems</button>
+                    <button class="subject-tag">Computer Networks</button>
+                    <button class="subject-tag">Operating Systems</button>
+                    <button class="subject-tag">Web Development</button>
+                    <button class="subject-tag">Artificial Intelligence</button>
+                </div>
+                <p style="color: green; margin-top: 12px; font-size: 12px;">
+                    ✓ All tags are visible and properly wrapped
+                </p>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2 style="margin-bottom: 20px;">Full Implementation Demo</h2>
+            
+            <!-- Today's Topics -->
+            <div style="padding: 20px; background: #fef3c7; border: 1px solid #fbbf24; border-radius: 8px; margin-bottom: 24px;">
+                <h3 class="section-header" style="border-bottom: 1px solid #fbbf24;">📅 Today's Scheduled Topics</h3>
+                <div class="subject-tag-container">
+                    <button class="subject-tag today selected">Linear Algebra</button>
+                    <button class="subject-tag today">Calculus</button>
+                    <button class="subject-tag today">Machine Learning</button>
+                </div>
+            </div>
+
+            <!-- Additional Subjects -->
+            <div>
+                <h3 class="section-header">Additional Subjects</h3>
+                <div class="subject-tag-container" id="additionalSubjects">
+                    <button class="subject-tag">Physics</button>
+                    <button class="subject-tag selected">Chemistry</button>
+                    <button class="subject-tag">Biology</button>
+                    <button class="subject-tag">Data Structures</button>
+                    <button class="subject-tag selected">Algorithms</button>
+                    <button class="subject-tag">Object Oriented Programming</button>
+                    <button class="subject-tag">Database Management</button>
+                    <button class="subject-tag">Computer Networks</button>
+                    <button class="subject-tag">Operating Systems</button>
+                    <button class="subject-tag">Web Development</button>
+                    <button class="subject-tag">Mobile App Development</button>
+                    <button class="subject-tag">Cloud Computing</button>
+                    <button class="subject-tag">Artificial Intelligence</button>
+                    <button class="subject-tag">Deep Learning</button>
+                    <button class="subject-tag">Natural Language Processing</button>
+                    <button class="subject-tag">Computer Vision</button>
+                    <button class="subject-tag">Cybersecurity</button>
+                    <button class="subject-tag">Software Engineering</button>
+                    <button class="subject-tag">Discrete Mathematics</button>
+                    <button class="subject-tag">Statistics</button>
+                    <button class="subject-tag">Probability Theory</button>
+                </div>
+                <div class="selected-count">
+                    <span class="checkmark">✅</span>
+                    <span id="selectedCount">5 subjects selected</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2 style="margin-bottom: 20px;">Key Improvements</h2>
+            <ul style="line-height: 1.8; color: #475569;">
+                <li>✅ <strong>Flexbox Layout:</strong> Tags automatically wrap to the next line when they run out of space</li>
+                <li>✅ <strong>Clear Visual States:</strong> Default, hover, and selected states are clearly distinguished</li>
+                <li>✅ <strong>Proper Spacing:</strong> Consistent gaps between tags prevent overlap and improve readability</li>
+                <li>✅ <strong>Selection Feedback:</strong> Checkmark icon and color change for selected items</li>
+                <li>✅ <strong>Responsive Design:</strong> Works well on all screen sizes</li>
+                <li>✅ <strong>Data Cleaning:</strong> Duplicate topics and trailing punctuation are removed</li>
+                <li>✅ <strong>Smooth Transitions:</strong> Subtle animations for better user experience</li>
+                <li>✅ <strong>Today's Topics Highlight:</strong> Special styling for scheduled topics</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        // Add interactivity to demonstrate the selection behavior
+        document.querySelectorAll('#additionalSubjects .subject-tag').forEach(button => {
+            button.addEventListener('click', function() {
+                this.classList.toggle('selected');
+                updateSelectedCount();
+            });
+        });
+
+        function updateSelectedCount() {
+            const selected = document.querySelectorAll('#additionalSubjects .subject-tag.selected').length;
+            document.getElementById('selectedCount').textContent = 
+                `${selected} subject${selected !== 1 ? 's' : ''} selected`;
+        }
+    </script>
+</body>
+</html>

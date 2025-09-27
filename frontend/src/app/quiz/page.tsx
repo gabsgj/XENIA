@@ -14,6 +14,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
 import { useErrorContext } from "@/lib/error-context";
 import { getUserId } from "@/lib/api";
+import styles from './quiz.module.css';
 import {
   Play,
   Clock,
@@ -56,6 +57,27 @@ const DEFAULT_TOPICS = [
 // Use the global getUserId utility for consistent authentication
 const getRealUserId = () => getUserId();
 
+// Helper function to clean topic names
+const cleanTopicName = (topic: string): string => {
+  if (typeof topic !== 'string') return 'Unknown';
+  // Remove trailing punctuation like ":" or ":-"
+  return topic.replace(/[:\-]+$/, '').trim();
+};
+
+// Helper function to deduplicate topics
+const deduplicateTopics = (topics: string[]): string[] => {
+  const cleanedTopics = topics.map(cleanTopicName);
+  // Use Map to preserve order while removing duplicates
+  const uniqueMap = new Map<string, string>();
+  cleanedTopics.forEach(topic => {
+    const key = topic.toLowerCase();
+    if (!uniqueMap.has(key)) {
+      uniqueMap.set(key, topic);
+    }
+  });
+  return Array.from(uniqueMap.values());
+};
+
 export default function QuizPage() {
   const [selectedTopics, setSelectedTopics] = useState<string[]>([]);
   const [duration, setDuration] = useState<number>(10);
@@ -96,12 +118,13 @@ export default function QuizPage() {
         
         // Extract today's tasks topics
         const today = new Date().toISOString().slice(0, 10);
-        const todaysTasks = sessions
+        const todaysTasksRaw = sessions
           .filter((s: any) => s.date === today)
           .map((s: any) => s.topic.split(':')[0] || s.topic);
         
-        // Combine and deduplicate topics
-        const allTopics = [...new Set([...syllabusTopics, ...todaysTasks])];
+        // Clean and deduplicate topics
+        const todaysTasks = deduplicateTopics(todaysTasksRaw);
+        const allTopics = deduplicateTopics([...syllabusTopics, ...todaysTasksRaw]);
         
         setAvailableTopics(allTopics);
         setDailyTasks(todaysTasks);
@@ -371,12 +394,10 @@ onClick={() => {
                         <Calendar className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                         <h4 className="text-sm font-semibold text-blue-900 dark:text-blue-100">Today's Scheduled Topics</h4>
                       </div>
-                      <div className="flex flex-wrap gap-3">
+                      <div className={styles.subjectTagContainer}>
                         {dailyTasks.map((topic: string) => (
-                          <Button
+                          <button
                             key={`today-${topic}`}
-                            variant={selectedTopics.includes(topic) ? "default" : "outline"}
-                            size="sm"
                             onClick={() =>
                               setSelectedTopics((prev) =>
                                 prev.includes(topic)
@@ -384,14 +405,15 @@ onClick={() => {
                                   : [...prev, topic]
                               )
                             }
-                            className={`border-slate-300 dark:border-slate-600 ${
-                              selectedTopics.includes(topic) 
-                                ? 'bg-blue-600 hover:bg-blue-700 text-white' 
-                                : 'hover:bg-blue-50 dark:hover:bg-blue-900/20'
+                            className={`${styles.subjectTag} ${styles.todaysTopic} ${
+                              selectedTopics.includes(topic) ? styles.selected : ''
                             }`}
                           >
+                            {selectedTopics.includes(topic) && (
+                              <span className="mr-2">✓</span>
+                            )}
                             {topic}
-                          </Button>
+                          </button>
                         ))}
                       </div>
                     </div>
@@ -399,17 +421,15 @@ onClick={() => {
                   
                   {/* Available Topics */}
                   <div className="space-y-4">
-                    <h4 className="text-sm font-medium text-slate-700 dark:text-slate-300 uppercase tracking-wide">
+                    <h4 className={styles.sectionHeader}>
                       {dailyTasks.length > 0 ? 'Additional Subjects' : 'Available Subjects'}
                     </h4>
-                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                    <div className={styles.subjectTagContainer}>
                       {availableTopics
                         .filter(topic => !dailyTasks.includes(topic))
                         .map((topic: string) => (
-                        <Button
+                        <button
                           key={topic}
-                          variant={selectedTopics.includes(topic) ? "default" : "outline"}
-                          size="sm"
                           onClick={() =>
                             setSelectedTopics((prev) =>
                               prev.includes(topic)
@@ -417,24 +437,23 @@ onClick={() => {
                                 : [...prev, topic]
                             )
                           }
-                          className={`justify-start border-slate-300 dark:border-slate-600 transition-all ${
-                            selectedTopics.includes(topic) 
-                              ? 'bg-slate-900 hover:bg-slate-800 text-white' 
-                              : 'hover:bg-slate-50 dark:hover:bg-slate-800'
+                          className={`${styles.subjectTag} ${
+                            selectedTopics.includes(topic) ? styles.selected : styles.default
                           }`}
                         >
+                          {selectedTopics.includes(topic) && (
+                            <span className="mr-2">✓</span>
+                          )}
                           {topic}
-                        </Button>
+                        </button>
                       ))}
                     </div>
                     {/* Fallback topics */}
                     {availableTopics.length === 0 && !loadingTopics && (
-                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                      <div className={styles.subjectTagContainer}>
                         {DEFAULT_TOPICS.map((topic: string) => (
-                          <Button
+                          <button
                             key={topic}
-                            variant={selectedTopics.includes(topic) ? "default" : "outline"}
-                            size="sm"
                             onClick={() =>
                               setSelectedTopics((prev) =>
                                 prev.includes(topic)
@@ -442,23 +461,33 @@ onClick={() => {
                                   : [...prev, topic]
                               )
                             }
-                            className={`justify-start border-slate-300 dark:border-slate-600 transition-all ${
-                              selectedTopics.includes(topic) 
-                                ? 'bg-slate-900 hover:bg-slate-800 text-white' 
-                                : 'hover:bg-slate-50 dark:hover:bg-slate-800'
+                            className={`${styles.subjectTag} ${
+                              selectedTopics.includes(topic) ? styles.selected : styles.default
                             }`}
                           >
+                            {selectedTopics.includes(topic) && (
+                              <span className="mr-2">✓</span>
+                            )}
                             {topic}
-                          </Button>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    
+                    {/* Loading skeleton */}
+                    {loadingTopics && (
+                      <div className={styles.topicSkeleton}>
+                        {[1, 2, 3, 4, 5, 6].map(i => (
+                          <div key={i} className={styles.topicSkeletonItem}></div>
                         ))}
                       </div>
                     )}
                   </div>
                   
                   {selectedTopics.length > 0 && (
-                    <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 px-4 py-2 rounded-md">
-                      <CheckCircle className="w-4 h-4 text-green-600 dark:text-green-400" />
-                      <span className="font-medium">{selectedTopics.length} subject{selectedTopics.length !== 1 ? 's' : ''} selected</span>
+                    <div className={styles.selectedCount}>
+                      <CheckCircle className="w-4 h-4" />
+                      <span>{selectedTopics.length} subject{selectedTopics.length !== 1 ? 's' : ''} selected</span>
                     </div>
                   )}
                 </div>

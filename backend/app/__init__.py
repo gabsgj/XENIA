@@ -107,6 +107,11 @@ def create_app() -> Flask:
     app.register_blueprint(tutor_bp, url_prefix="/api/tutor")
     app.register_blueprint(plan_bp, url_prefix="/api/plan")
     app.register_blueprint(tasks_bp, url_prefix="/api/tasks")
+    # Import the update task handler to register its route
+    try:
+        from .routes import tasks_update
+    except ImportError:
+        pass
     app.register_blueprint(ai_bp, url_prefix="/api/ai")
     app.register_blueprint(analytics_bp, url_prefix="/api/analytics")
     app.register_blueprint(dashboard_bp, url_prefix="/api/dashboard")

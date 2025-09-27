@@ -1,0 +1,222 @@
+/* Quiz Page Styles */
+
+/* Subject tag container with flexbox layout */
+.subjectTagContainer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  width: 100%;
+  max-width: 100%;
+}
+
+/* Individual subject tag/chip styles */
+.subjectTag {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  border-radius: 8px;
+  border: 1.5px solid;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+  user-select: none;
+  white-space: nowrap;
+  min-height: 40px;
+  flex-shrink: 0;
+}
+
+/* Default unselected state */
+.subjectTag.default {
+  background-color: #ffffff;
+  border-color: #e2e8f0;
+  color: #334155;
+}
+
+.subjectTag.default:hover {
+  background-color: #f8fafc;
+  border-color: #cbd5e1;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+/* Selected state with prominent styling */
+.subjectTag.selected {
+  background-color: #3b82f6;
+  border-color: #3b82f6;
+  color: #ffffff;
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.25);
+}
+
+.subjectTag.selected:hover {
+  background-color: #2563eb;
+  border-color: #2563eb;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.35);
+}
+
+/* Selected indicator checkmark */
+.subjectTag.selected::before {
+  content: '✓';
+  position: absolute;
+  left: 8px;
+  font-size: 12px;
+  font-weight: bold;
+  animation: checkIn 0.2s ease-in-out;
+}
+
+/* Today's scheduled topics special styling */
+.subjectTag.todaysTopic {
+  background-color: #fef3c7;
+  border-color: #fbbf24;
+  color: #92400e;
+  position: relative;
+}
+
+.subjectTag.todaysTopic:hover {
+  background-color: #fde68a;
+  border-color: #f59e0b;
+}
+
+.subjectTag.todaysTopic.selected {
+  background-color: #f59e0b;
+  border-color: #f59e0b;
+  color: #ffffff;
+}
+
+/* Dark mode support */
+.dark .subjectTag.default {
+  background-color: #1e293b;
+  border-color: #475569;
+  color: #cbd5e1;
+}
+
+.dark .subjectTag.default:hover {
+  background-color: #334155;
+  border-color: #64748b;
+}
+
+.dark .subjectTag.selected {
+  background-color: #3b82f6;
+  border-color: #3b82f6;
+  color: #ffffff;
+}
+
+.dark .subjectTag.selected:hover {
+  background-color: #2563eb;
+  border-color: #2563eb;
+}
+
+.dark .subjectTag.todaysTopic {
+  background-color: #451a03;
+  border-color: #92400e;
+  color: #fbbf24;
+}
+
+.dark .subjectTag.todaysTopic:hover {
+  background-color: #581c11;
+  border-color: #b45309;
+}
+
+/* Animation for checkmark */
+@keyframes checkIn {
+  0% {
+    opacity: 0;
+    transform: scale(0);
+  }
+  50% {
+    transform: scale(1.2);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Section headers */
+.sectionHeader {
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #64748b;
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.dark .sectionHeader {
+  color: #94a3b8;
+  border-bottom-color: #334155;
+}
+
+/* Selected count indicator */
+.selectedCount {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background-color: #f0f9ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  color: #1e40af;
+  font-size: 14px;
+  font-weight: 500;
+  margin-top: 1rem;
+  animation: slideIn 0.3s ease-out;
+}
+
+.dark .selectedCount {
+  background-color: #1e3a8a;
+  border-color: #3b82f6;
+  color: #bfdbfe;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Loading skeleton for topics */
+.topicSkeleton {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.topicSkeletonItem {
+  height: 40px;
+  border-radius: 8px;
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+.topicSkeletonItem:nth-child(1) { width: 120px; }
+.topicSkeletonItem:nth-child(2) { width: 140px; }
+.topicSkeletonItem:nth-child(3) { width: 100px; }
+.topicSkeletonItem:nth-child(4) { width: 160px; }
+.topicSkeletonItem:nth-child(5) { width: 130px; }
+.topicSkeletonItem:nth-child(6) { width: 110px; }
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.dark .topicSkeletonItem {
+  background: linear-gradient(90deg, #334155 25%, #475569 50%, #334155 75%);
+}
