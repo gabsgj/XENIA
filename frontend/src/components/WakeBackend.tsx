@@ -25,20 +25,22 @@ export default function WakeBackend() {
   useEffect(() => {
     let mounted = true;
 
-    (async () => {
+    const attempt = async (delayMs: number) => {
       try {
-        // Try once immediately, don't block UI
+        if (delayMs > 0) await new Promise(r => setTimeout(r, delayMs));
         await fetchWithTimeout(WAKE_URL, 5000);
-        if (mounted) {
-          // no-op, backend should be awake
-        }
-      } catch (err) {
-        // Swallow errors; this is a best-effort ping
+      } catch {
+        // ignore; warming is best-effort
       }
-    })();
+    };
+
+    // Fire-and-forget warmup attempts: immediately, then after 3s and 8s
+    attempt(0);
+    attempt(3000);
+    attempt(8000);
 
     return () => {
-      mounted = false;
+      mounted = false; // reserved if we add state later
     };
   }, []);
 
