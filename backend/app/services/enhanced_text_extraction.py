@@ -25,7 +25,7 @@ logger = logging.getLogger('xenia')
 class EnhancedTextExtractor:
     def __init__(self, gemini_api_key: str):
         genai.configure(api_key=gemini_api_key)
-        self.model = genai.GenerativeModel('gemini-2.0-flash-exp')
+        self.model = genai.GenerativeModel('gemini-2.5-flash')
         self.extraction_cache = {}
         self.thread_pool = concurrent.futures.ThreadPoolExecutor(max_workers=4)
         

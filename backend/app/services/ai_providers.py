@@ -282,7 +282,7 @@ Return ONLY valid JSON:
             genai.configure(api_key=gemini_key)
             
             logger.info("    Creating Gemini model...")
-            model = genai.GenerativeModel('gemini-1.5-flash')
+            model = genai.GenerativeModel('gemini-2.5-flash')
             
             logger.info("    Generating content...")
             response = model.generate_content(prompt)
