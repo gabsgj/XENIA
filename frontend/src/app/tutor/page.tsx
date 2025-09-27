@@ -321,14 +321,7 @@ if(!r.ok || (j && j.success === false)){
               <p className='text-muted-foreground'>Get instant help with your studies</p>
             </div>
           </div>
-          {tutorStatus && tutorStatus.service !== 'operational' && (
-            <div className='mt-4 p-3 border-l-4 border-yellow-500 bg-yellow-50 dark:bg-yellow-900/20 rounded'>
-              <div className='flex items-center gap-2 text-sm text-yellow-800 dark:text-yellow-200'>
-                <AlertTriangle className='w-4 h-4' />
-                <span>Service is currently degraded. I’ll still try to help using robust fallbacks.</span>
-              </div>
-            </div>
-          )}
+          {/* Tutor service status indicator intentionally removed to avoid redundant warnings */}
         </div>
 
         {/* Messages */}

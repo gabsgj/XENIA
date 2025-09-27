@@ -15,6 +15,7 @@ from .embeddings import embed_texts
 from .ai_providers import extract_topics_with_gemini, filter_syllabus_content
 from .resources import fetch_and_store_resources_for_topics
 from .planning import generate_plan  # for plan preview after topic ingestion
+from .user_util import ensure_user_record
 
 
 def _extract_text_from_pdf(pdf_bytes: bytes) -> str:
@@ -47,11 +48,16 @@ def _detect_mimetype(filename: str) -> str:
 
 
 def handle_upload(file_storage, user_id: str, artifact_type: str) -> Dict:
-    raw_user_id = user_id
-    norm_user_id = normalize_user_id(raw_user_id)
-    print(f"🔄 Processing upload for user {raw_user_id} -> normalized to {norm_user_id}")
-    supabase = get_supabase()
-    filename = file_storage.filename or f"upload-{uuid.uuid4().hex}"
+norm_user_id = normalize_user_id(raw_user_id)
+print(f"🔄 Processing upload for user {raw_user_id} -> normalized to {norm_user_id}")
+supabase = get_supabase()
+# Ensure user exists in app tables to satisfy any FK constraints
+try:
+    if is_valid_uuid(norm_user_id):
+        ensure_user_record(supabase, norm_user_id)
+except Exception:
+    pass
+filename = file_storage.filename or f"upload-{uuid.uuid4().hex}"
     data = file_storage.read()
     mime = _detect_mimetype(filename)
 

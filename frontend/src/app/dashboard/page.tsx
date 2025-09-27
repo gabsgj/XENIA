@@ -170,10 +170,16 @@ export default function DashboardPage(){
   const next3Days = useMemo(() => {
     const start = new Date();
     start.setHours(0,0,0,0)
+    const toLocalYMD = (d: Date) => {
+      const y = d.getFullYear()
+      const m = String(d.getMonth()+1).padStart(2,'0')
+      const da = String(d.getDate()).padStart(2,'0')
+      return `${y}-${m}-${da}`
+    }
     const days = Array.from({ length: 3 }, (_, i) => {
       const d = new Date(start)
       d.setDate(start.getDate() + i)
-      return d.toISOString().slice(0,10)
+      return toLocalYMD(d)
     })
     const sessionsByDate: Record<string, any[]> = {}
     days.forEach(date => {
@@ -432,7 +438,7 @@ export default function DashboardPage(){
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   {next3Days.days.map((d) => {
-                    const dateObj = new Date(d)
+                    const dateObj = new Date(`${d}T00:00:00`)
                     const today = new Date(); today.setHours(0,0,0,0)
                     const diff = Math.round((dateObj.getTime()-today.getTime())/(1000*60*60*24))
                     const label = diff===0 ? 'Today' : diff===1 ? 'Tomorrow' : dateObj.toLocaleDateString('en-US',{ weekday:'short' })
@@ -637,7 +643,7 @@ export default function DashboardPage(){
               <CardHeader>
                 <CardTitle>Quick Actions</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-3">
+              <CardContent className="space-y-4">
                 <Link href="/tutor">
                   <Button variant="outline" className="w-full justify-start">
                     <BookOpen className="w-4 h-4 mr-2" />
@@ -738,52 +744,46 @@ export default function DashboardPage(){
           </CardContent>
         </Card>
 
-        {/* Study Progress Table */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Study Progress</CardTitle>
-            <CardDescription>Quizzes and topic mastery</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <div className="p-4 text-center text-muted-foreground">Loading progress data...</div>
-            ) : !progress || Object.keys(progress).length === 0 ? (
-              <div className="p-6">
-                <NoDataPlaceholder message="You haven't taken any quizzes or logged progress. Take a quiz to start tracking mastery." />
-                <div className="mt-4">
-                  <Link href="/quiz"><Button>Take Your First Quiz</Button></Link>
-                </div>
-              </div>
-            ) : (
-                <div className="max-w-xl mx-auto">
-                <table className="w-full border border-border">
-                  <thead>
-                    <tr className="bg-gray-100 dark:bg-gray-800">
-                      <th className="p-2 text-sm text-muted-foreground">Topic</th>
-                      <th className="p-2 text-sm text-muted-foreground">Quizzes Taken</th>
-                      <th className="p-2 text-sm text-muted-foreground">Correct</th>
-                      <th className="p-2 text-sm text-muted-foreground">Wrong</th>
-                      <th className="p-2 text-sm text-muted-foreground">Last Score</th>
-                      <th className="p-2 text-sm text-muted-foreground">Last Updated</th>
-                    </tr>
-                  </thead>
-                  <tbody>
+            {/* Study Progress (User-specific quizzes and mastery) */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Study Progress</CardTitle>
+                <CardDescription>Quizzes and topic mastery</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {loading ? (
+                  <div className="p-4 text-center text-muted-foreground">Loading progress data...</div>
+                ) : !progress || Object.keys(progress).length === 0 ? (
+                  <div className="p-6">
+                    <NoDataPlaceholder message="You haven't taken any quizzes or logged progress. Take a quiz to start tracking mastery." />
+                    <div className="mt-4">
+                      <Link href="/quiz"><Button>Take Your First Quiz</Button></Link>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="max-w-2xl mx-auto space-y-3">
                     {Object.entries(progress).map(([topic, stats]: any) => (
-                      <tr key={topic} className="odd:bg-white even:bg-muted/5 dark:odd:bg-transparent dark:even:bg-muted/10">
-                        <td className="p-2 font-semibold text-foreground dark:text-foreground">{topic}</td>
-                        <td className="p-2 text-sm text-muted-foreground">{stats.quizzes_taken}</td>
-                        <td className="p-2 text-sm text-muted-foreground">{stats.correct}</td>
-                        <td className="p-2 text-sm text-muted-foreground">{stats.wrong}</td>
-                        <td className="p-2 text-sm text-muted-foreground">{(stats.last_score * 100).toFixed(0)}%</td>
-<td className="p-2 text-sm text-muted-foreground">{stats.last_updated ? new Date(stats.last_updated).toLocaleString() : '—'}</td>
-                      </tr>
+                      <div key={topic} className="p-3 border rounded-lg bg-card">
+                        <div className="flex items-center justify-between gap-3 mb-2">
+                          <div className="font-semibold truncate max-w-[65%]" title={topic}>{topic}</div>
+                          <div className="text-xs text-muted-foreground">Quizzes: {stats.quizzes_taken}</div>
+                          <div className="text-xs font-medium px-2 py-1 bg-muted rounded">
+                            {Math.round((Number(stats.last_score || 0)) * 100)}%
+                          </div>
+                        </div>
+                        <div className="mb-2">
+                          <Progress value={Math.round((Number(stats.last_score || 0)) * 100)} className="h-2" />
+                        </div>
+                        <div className="flex items-center justify-between text-xs text-muted-foreground">
+                          <span>Correct: {stats.correct} • Wrong: {stats.wrong}</span>
+                          <span>{stats.last_updated ? new Date(stats.last_updated).toLocaleDateString() : '—'}</span>
+                        </div>
+                      </div>
                     ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
         </div>
       </MainLayout>
     </DashboardErrorBoundary>

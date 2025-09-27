@@ -212,12 +212,23 @@ export default function PlannerPage() {
       })()
       setPlan(optimisticPlan)
 
+      // Compute a safe new deadline for regeneration
+      const computedNewDeadline = (() => {
+        if (deadline) return deadline
+        try {
+          const dates = (plan?.sessions || []).map((s:any) => String(s.date)).filter(Boolean)
+          if (dates.length) return dates.sort().slice(-1)[0]
+        } catch {}
+        const d = new Date(); d.setDate(d.getDate() + 14)
+        return d.toISOString().split('T')[0]
+      })()
+
       // Call backend regenerate with computed topics
       const resp = await api('/api/plan/regenerate', {
         method:'POST',
         body: JSON.stringify({
           user_id: userId,
-          new_deadline: deadline || undefined,
+          new_deadline: computedNewDeadline,
           preserve_progress: true,
           excluded_topics: [],
           priority_adjustment: 'balanced',

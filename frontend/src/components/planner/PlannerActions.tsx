@@ -125,22 +125,25 @@ export function PlannerActions({ currentPlan, onRegenerate, className }: Planner
       // Get user feedback
       const feedback = await getUserFeedback();
       
-      // Prepare regeneration request
+      // Compute new deadline fallback (latest session date or +14 days)
+      const plannedLastDate = (() => {
+        try {
+          const dates = (currentPlan?.sessions || []).map((s:any) => String(s.date)).filter(Boolean)
+          return dates.length ? dates.sort().slice(-1)[0] : ''
+        } catch { return '' }
+      })()
+      const newDeadline = regenerateOptions.newDeadline || plannedLastDate || new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+
+      // Prepare regeneration request aligned with backend schema
       const request = {
         plan_id: currentPlan.id,
         user_id: getUserId(),
-        keep_completed_tasks: regenerateOptions.keepProgress,
-        new_deadline: regenerateOptions.newDeadline || undefined,
-        preferred_hours_per_day: regenerateOptions.preferredHours,
-        study_intensity: regenerateOptions.studyIntensity,
-        difficulty_adjustment: regenerateOptions.adjustDifficulty ? {
-          current_pace: pace,
-          adjustment_factor: pace === 'fast' ? 1.2 : pace === 'slow' ? 0.8 : 1.0
-        } : null,
-        focus_topics: regenerateOptions.focusAreas,
-        user_feedback: regenerateOptions.userFeedback || feedback,
-        regeneration_reason: 'user_requested',
-        preserve_learning_path: true
+        preserve_progress: regenerateOptions.keepProgress,
+        new_deadline: newDeadline,
+        hours_per_day: regenerateOptions.preferredHours,
+        learning_pace: regenerateOptions.studyIntensity,
+        excluded_topics: [],
+        priority_adjustment: 'balanced'
       };
       
       // Call regenerate API
@@ -232,7 +235,7 @@ export function PlannerActions({ currentPlan, onRegenerate, className }: Planner
           </div>
 
           {/* Quick Actions */}
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 gap-3">
             <Dialog open={showOptions} onOpenChange={setShowOptions}>
               <DialogTrigger asChild>
                 <Button 

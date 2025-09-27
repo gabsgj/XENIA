@@ -32,26 +32,7 @@ def frontend_to_db_status(frontend_status: str) -> str:
     }
     return mapping.get(frontend_status, frontend_status)
 
-
-def ensure_user_record(sb, user_id: str):
-    """Best-effort ensure a user row exists to satisfy FK constraints.
-
-    Attempts to upsert into both 'profiles' and 'users' tables with either
-    'user_id' or 'id' as the primary key, tolerating schema differences.
-    """
-    # Ensure profile exists (many parts of the app use 'profiles')
-    try:
-        sb.table("profiles").upsert({"user_id": user_id}).execute()
-    except Exception:
-        pass
-
-    # Ensure a row exists in 'users' with whichever PK/column name the schema uses
-    for col in ("user_id", "id"):
-        try:
-            sb.table("users").upsert({col: user_id}).execute()
-            break
-        except Exception:
-            continue
+from ..services.user_util import ensure_user_record
 
 @tasks_bp.get("/")
 def get_tasks():

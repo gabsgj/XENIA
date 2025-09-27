@@ -6,6 +6,7 @@ from .topic_store import get_topics as store_get_topics
 from ..utils import normalize_user_id, is_valid_uuid
 from ..supabase_client import get_supabase
 from .deadline_manager import DeadlineManager, StudyPlanOptimizer
+from .user_util import ensure_user_record
 import logging
 
 logger = logging.getLogger('xenia')
@@ -251,6 +252,11 @@ def generate_plan(
             try:
                 if is_valid_uuid(norm_user_id):
                     sb = get_supabase()
+                    # Ensure user exists so plan upsert doesn't fail on FK
+                    try:
+                        ensure_user_record(sb, norm_user_id)
+                    except Exception:
+                        pass
                     max_retries = 3
                     for attempt in range(max_retries):
                         try:
@@ -320,6 +326,11 @@ def generate_plan(
         try:
             if is_valid_uuid(norm_user_id):
                 sb = get_supabase()
+                # Ensure user exists so plan upsert doesn't fail on FK
+                try:
+                    ensure_user_record(sb, norm_user_id)
+                except Exception:
+                    pass
                 max_retries = 3
                 for attempt in range(max_retries):
                     try:
@@ -363,6 +374,11 @@ def generate_plan(
     try:
         if is_valid_uuid(norm_user_id):
             sb = get_supabase()
+            # Ensure user exists so plan upsert doesn't fail on FK
+            try:
+                ensure_user_record(sb, norm_user_id)
+            except Exception:
+                pass
             max_retries = 3
             for attempt in range(max_retries):
                 try:

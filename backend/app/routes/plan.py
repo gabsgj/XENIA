@@ -10,6 +10,7 @@ from ..supabase_client import get_supabase, supabase_call
 from ..schemas import PlanSchema
 from ..utils import is_valid_uuid
 from ..services.planning import _sync_plan_tasks
+from ..services.user_util import ensure_user_record
 
 logger = logging.getLogger('xenia')
 plan_bp = Blueprint("plan", __name__)
@@ -326,11 +327,8 @@ def regenerate():
         if nd <= date.today():
             raise ApiError('PLAN_400', 'Deadline must be in the future')
 
-        # Fetch current plan (by id or current user plan)
-        if plan_id:
-            current_plan = get_current_plan(uid, plan_id=plan_id)
-        else:
-            current_plan = get_current_plan(uid)
+# Fetch current plan for the user (plan_id unused in current implementation)
+        current_plan = get_current_plan(uid)
 
         if not current_plan:
             raise ApiError('PLAN_404', 'No current plan found')
@@ -381,6 +379,10 @@ def regenerate():
         try:
             if is_valid_uuid(uid):
                 sb = get_supabase()
+                try:
+                    ensure_user_record(sb, uid)
+                except Exception:
+                    pass
                 supabase_call(lambda: sb.table("plans").upsert({"user_id": uid, "plan": regenerated}).execute())
                 # Also sync sessions to tasks so /tasks reflects the new plan
                 try:
