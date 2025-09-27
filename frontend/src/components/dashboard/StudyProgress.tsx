@@ -52,7 +52,7 @@ export function StudyProgress({ className }: StudyProgressProps) {
         api(`/api/progress/user/${userId}`).catch(() => null)
       ]);
 
-      let progressData: ProgressData = {
+      const progressData: ProgressData = {
         total_tasks: 0,
         completed_tasks: 0,
         completion_percentage: 0,

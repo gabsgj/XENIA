@@ -32,6 +32,7 @@ export default function DashboardPage(){
   const [progress, setProgress] = useState<any>(null);
   const [weekly, setWeekly] = useState<any[]>([]);
   const { pushError } = useErrorContext();
+  const [dashSessionStatus, setDashSessionStatus] = useState<Record<string, 'pending' | 'in-progress' | 'completed'>>({})
   
   const fetchData = async () => {
     setLoading(true)
@@ -77,12 +78,21 @@ export default function DashboardPage(){
 
   const updateSessionStatus = async (date: string, topic: string, newStatus: 'pending' | 'in-progress' | 'completed') => {
     try {
+      const key = `${date}-${topic}`
+      // Optimistic local status update for instant UI feedback
+      setDashSessionStatus(prev => ({ ...prev, [key]: newStatus }))
+      setPlan(prev => {
+        if (!prev?.sessions) return prev
+        return {
+          ...prev,
+          sessions: prev.sessions.map((s: any) => s.date === date && s.topic === topic ? { ...s, status: newStatus } : s)
+        }
+      })
       const resp = await api('/api/resources/progress', {
         method: 'POST',
         body: JSON.stringify({ sessions: [{ date, topic, status: newStatus }] })
       })
       if (resp.ok) {
-        // If plan was returned, optimistically update; always refresh shortly after (batcher may queue updates)
         if ((resp as any).plan) setPlan((resp as any).plan)
         setTimeout(fetchData, 600)
       }
@@ -93,6 +103,16 @@ export default function DashboardPage(){
 
   const markSessionComplete = async (date: string, topic: string, actualTime: number) => {
     try {
+      const key = `${date}-${topic}`
+      // Optimistic local update
+      setDashSessionStatus(prev => ({ ...prev, [key]: 'completed' }))
+      setPlan(prev => {
+        if (!prev?.sessions) return prev
+        return {
+          ...prev,
+          sessions: prev.sessions.map((s: any) => s.date === date && s.topic === topic ? { ...s, status: 'completed', duration_min: actualTime } : s)
+        }
+      })
       // Update the session status to completed and adjust the duration
       const resp = await api('/api/resources/progress', {
         method: 'POST',
@@ -117,16 +137,20 @@ export default function DashboardPage(){
   const todaysTasks = useMemo(()=>{
     if(!plan) return []
     const today = new Date().toISOString().slice(0,10)
-    return (plan.sessions||[]).filter((s:any)=> s.date === today).map((s:any, idx:number)=> ({
-      id: idx+1,
-      subject: s.topic.split(':')[0] || s.topic,
-      topic: s.topic,
-      date: s.date,
-      duration: s.duration_min || 45,
-      progress: s.status==='completed'? 100 : s.status==='in-progress'? 50 : 0,
-      status: s.status||'pending'
-    }))
-  },[plan])
+    return (plan.sessions||[]).filter((s:any)=> s.date === today).map((s:any, idx:number)=> {
+      const key = `${s.date}-${s.topic}`
+      const effectiveStatus = dashSessionStatus[key] || s.status || 'pending'
+      return ({
+        id: idx+1,
+        subject: s.topic.split(':')[0] || s.topic,
+        topic: s.topic,
+        date: s.date,
+        duration: s.duration_min || 45,
+        progress: effectiveStatus==='completed'? 100 : effectiveStatus==='in-progress'? 50 : 0,
+        status: effectiveStatus
+      })
+    })
+  },[plan, dashSessionStatus])
 
   const upcomingSessions = useMemo(()=>{
     if(!plan) return []
@@ -163,9 +187,17 @@ export default function DashboardPage(){
     // Enhanced streak calculation using analytics profile data
     const streakDays = data?.profile?.streak_days || (completedPlanSessions.length > 0 ? 1 : 0)
     
-    // Calculate quiz performance from progress data
-    const totalQuizzes = Object.values(progress || {}).reduce((sum: number, topic: any) => sum + (topic.quizzes_taken || 0), 0)
-    const avgScore = Object.values(progress || {}).reduce((sum: number, topic: any) => sum + (topic.last_score || 0), 0) / Math.max(Object.keys(progress || {}).length, 1)
+    // Calculate quiz performance: prefer server-provided analytics (quizzesTaken) when available
+    const topicsWithQuizzes = Object.values(progress || {}).filter((topic: any) => (topic.quizzes_taken || 0) > 0)
+    const totalQuizzesFromProgress = topicsWithQuizzes.reduce((sum: number, topic: any) => sum + (topic.quizzes_taken || 0), 0)
+    const avgScoreFromProgress = topicsWithQuizzes.length > 0 
+      ? topicsWithQuizzes.reduce((sum: number, topic: any) => sum + (topic.last_score || 0), 0) / topicsWithQuizzes.length
+      : 0
+
+    // Server analytics may include an authoritative quizzesTaken count (dashboard API)
+    const serverQuizzes = (data && data.stats && typeof data.stats.quizzesTaken === 'number') ? data.stats.quizzesTaken : 0
+    const totalQuizzes = serverQuizzes > 0 ? serverQuizzes : totalQuizzesFromProgress
+    const avgScore = topicsWithQuizzes.length > 0 ? avgScoreFromProgress : 0
     
     return {
       sessionsCompleted,
@@ -304,16 +336,20 @@ export default function DashboardPage(){
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground">Quizzes Taken</p>
-                  <p className="text-3xl font-bold">{enhancedStats.totalQuizzes}</p>
+                  <p className="text-3xl font-bold">{enhancedStats.totalQuizzes > 0 ? enhancedStats.totalQuizzes : '—'}</p>
                 </div>
                 <div className="w-12 h-12 bg-indigo-100 dark:bg-indigo-900/20 rounded-full flex items-center justify-center">
                   <BookOpen className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
                 </div>
               </div>
-              {enhancedStats.avgScore > 0 && (
-                <div className="mt-4 text-xs text-muted-foreground">
-                  Avg Score: {enhancedStats.avgScore}%
-                </div>
+              {enhancedStats.totalQuizzes > 0 ? (
+                enhancedStats.avgScore > 0 && (
+                  <div className="mt-4 text-xs text-muted-foreground">
+                    Avg Score: {enhancedStats.avgScore}%
+                  </div>
+                )
+              ) : (
+                <div className="mt-4 text-xs text-muted-foreground">No quizzes taken yet</div>
               )}
             </CardContent>
           </Card>
@@ -627,7 +663,12 @@ export default function DashboardPage(){
             {loading ? (
               <div className="p-4 text-center text-muted-foreground">Loading progress data...</div>
             ) : !progress || Object.keys(progress).length === 0 ? (
-              <div className="p-4 text-center text-muted-foreground">No progress data yet.</div>
+              <div className="p-6">
+                <NoDataPlaceholder message="You haven't taken any quizzes or logged progress. Take a quiz to start tracking mastery." />
+                <div className="mt-4">
+                  <Link href="/quiz"><Button>Take Your First Quiz</Button></Link>
+                </div>
+              </div>
             ) : (
                 <div className="max-w-xl mx-auto">
                 <table className="w-full border border-border">

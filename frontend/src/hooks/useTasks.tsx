@@ -133,14 +133,18 @@ export function useTasks(){
       })
       
       if (response?.task) {
+        const respTask: any = response.task || {}
+  const fallbackDuration = (taskData as any).duration ?? (taskData as any).duration_minutes ?? (taskData as any).estimatedMinutes
+  const estimated = Number(respTask.estimatedMinutes ?? respTask.duration_minutes ?? respTask.duration ?? fallbackDuration ?? 30)
+        const due = respTask.dueDate ?? respTask.due_date ?? taskData.dueDate
         const normalized = {
-          ...response.task,
-          id: String(response.task.id ?? response.task.task_id ?? response.task.uuid ?? Date.now()),
-          estimatedMinutes: response.task.estimatedMinutes ?? response.task.duration_minutes ?? response.task.duration ?? taskData.duration,
-          dueDate: response.task.dueDate ?? response.task.due_date ?? taskData.dueDate,
-          status: response.task.status ?? 'pending',
-          completed: Boolean(response.task.completed ?? false),
-          progress: typeof response.task.progress === 'number' ? response.task.progress : 0,
+          ...respTask,
+          id: String(respTask.id ?? respTask.task_id ?? respTask.uuid ?? Date.now()),
+          estimatedMinutes: estimated,
+          dueDate: due,
+          status: respTask.status ?? 'pending',
+          completed: Boolean(respTask.completed ?? false),
+          progress: typeof respTask.progress === 'number' ? respTask.progress : 0,
         }
         setState(prev => ({
           ...prev,

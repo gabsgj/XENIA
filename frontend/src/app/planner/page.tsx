@@ -476,18 +476,8 @@ export default function PlannerPage() {
                             </div>
                           ))}
 
-                          <div className="flex items-center justify-between">
+                          <div className="flex items-center justify-end">
                             <span className='text-xs text-muted-foreground'>{s.duration_min} min</span>
-                            <div className="flex gap-1">
-                              {resources.filter((r:any) => matchesTopic(r, s.topic)).length > 0 && (
-                                <Button size="sm" variant="ghost" className="h-6 px-2 text-xs" onClick={() => {
-                                  const topicResources = resources.filter((r:any) => matchesTopic(r, s.topic))
-                                  alert(`Resources for ${s.topic}:\n\n${topicResources.map(r => `${r.source.toUpperCase()}: ${r.title}\n${r.url}`).join('\n\n')}`)
-                                }}>
-                                  📚
-                                </Button>
-                              )}
-                            </div>
                           </div>
                         </div>
                       ))}
@@ -630,12 +620,12 @@ export default function PlannerPage() {
                             </span>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <Button size="sm" variant="outline" onClick={()=> markSession(s.date, s.topic, s.status==='completed'?'pending':'completed')}>
+                          <div className="flex items-center gap-2">
+                          <Button size="sm" variant="outline" className="h-8 px-3 text-xs md:text-sm" onClick={()=> markSession(s.date, s.topic, s.status==='completed'?'pending':'completed')}>
                             <Play className="w-3 h-3 mr-1" />
                             {s.status==='completed'? 'Undo' : 'Complete'}
                           </Button>
-                          <Button size="sm" variant="ghost">
+                          <Button size="sm" variant="ghost" className="h-8 px-3 text-xs md:text-sm">
                             <MoreHorizontal className="w-4 h-4" />
                           </Button>
                         </div>
@@ -682,7 +672,7 @@ export default function PlannerPage() {
               {/* Smart Recommendations (reuses the tasks panel) */}
               {(() => {
                 try {
-                  const planTopicsForRecs = Array.from(new Set((plan?.sessions || []).map((s:any) => s.topic).filter(Boolean)))
+                  const planTopicsForRecs = Array.from(new Set((plan?.sessions || []).map((s:any) => s.topic).filter(Boolean))) as string[]
                   return (
                     <div className="mb-6">
                       <h4 className="text-sm font-semibold mb-2">AI-powered Recommendations</h4>

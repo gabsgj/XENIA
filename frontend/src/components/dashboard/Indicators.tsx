@@ -47,7 +47,7 @@ export function Indicators({ className }: IndicatorsProps) {
         api('/api/plan/current').catch(() => null)
       ]);
 
-      let indicatorData: IndicatorData = {
+      const indicatorData: IndicatorData = {
         study_streak: 0,
         total_xp: 0,
         tasks_completed_today: 0,

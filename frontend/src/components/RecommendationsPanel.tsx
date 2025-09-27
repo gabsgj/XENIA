@@ -128,13 +128,14 @@ export default function RecommendationsPanel({
             
             const typeInfo = typeMapping[source] || { label: 'Resource', icon: FileText, color: 'bg-gray-100 text-gray-700' }
             
+            const isYouTubeSource = ['youtube', 'youtube_videos', 'youtube_fallback', 'youtube_search'].includes(source?.toString?.().toLowerCase?.() || '')
             return {
               type: typeInfo.label,
               title: item.title || item.name || 'Untitled Resource',
               url: item.url || item.link || '#',
               duration: item.duration || item.metadata?.videoDuration || (source.includes('youtube') ? 15 : 10),
               difficulty: item.metadata?.difficulty || item.difficulty || 'intermediate',
-              relevanceScore: score + (source.includes('youtube') ? 3 : 0), // Prefer video content
+              relevanceScore: score + (isYouTubeSource ? 6 : 0), // Prefer video content more strongly
               topic,
               description: item.description || item.metadata?.description || '',
               source,
@@ -273,9 +274,10 @@ export default function RecommendationsPanel({
 
   const RecommendationCard = ({ item, index }: { item: Recommendation & { icon?: any; colorClass?: string }, index: number }) => {
     const Icon = item.icon || FileText
+    const isYoutube = (item.source || '').toString().toLowerCase().includes('youtube') || (item.type || '').toString().toLowerCase().includes('youtube')
     
     return (
-      <Card key={index} className="hover:shadow-md transition-all duration-200 cursor-pointer group" 
+      <Card key={index} className={cn("hover:shadow-md transition-all duration-200 cursor-pointer group", isYoutube && 'border-l-4 border-l-red-500')} 
             onClick={() => window.open(item.url, '_blank')}>
         <CardContent className="p-4">
           <div className="flex items-start gap-3">
@@ -327,6 +329,14 @@ export default function RecommendationsPanel({
               </div>
             </div>
           </div>
+          {isYoutube && (
+            <div className="mt-3">
+              <Button size="sm" className="w-full bg-red-600 hover:bg-red-700 text-white" onClick={() => window.open(item.url, '_blank')}>
+                <Play className="w-3 h-3 mr-1" />
+                Watch on YouTube
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
     )
