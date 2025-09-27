@@ -386,11 +386,11 @@ export function EnhancedStudyTimer({
         </div>
 
         {/* Control Buttons */}
-        <div className="flex gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {!timerState.isRunning ? (
             <Button 
               onClick={handleStart}
-              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-medium"
+              className="w-full sm:flex-1 bg-blue-600 hover:bg-blue-700 text-white font-medium"
               size="lg"
             >
               <Play className="w-4 h-4 mr-2" />
@@ -400,7 +400,7 @@ export function EnhancedStudyTimer({
             <Button 
               onClick={handlePause}
               variant="outline"
-              className="flex-1"
+              className="w-full sm:flex-1"
               size="lg"
             >
               <Pause className="w-4 h-4 mr-2" />
@@ -412,14 +412,14 @@ export function EnhancedStudyTimer({
             onClick={handleReset}
             variant="outline"
             size="lg"
-            className="px-4"
+            className="w-1/2 sm:w-auto px-4"
           >
             <RotateCcw className="w-4 h-4" />
           </Button>
 
           <Button
             onClick={handleComplete}
-            className="px-4 bg-green-600 hover:bg-green-700 text-white"
+            className="w-1/2 sm:w-auto px-4 bg-green-600 hover:bg-green-700 text-white"
             size="lg"
           >
             <CheckCircle className="w-4 h-4" />

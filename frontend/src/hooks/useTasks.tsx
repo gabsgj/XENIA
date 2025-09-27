@@ -79,13 +79,31 @@ export function useTasks(){
         responses[type] = await api(endpoints[type])
       }
       
-      const normalize = (resp: any) => Array.isArray(resp) ? resp : (resp?.tasks ?? [])
+      const rawToArray = (resp: any) => Array.isArray(resp) ? resp : (resp?.tasks ?? [])
+      const normalizeTasks = (resp: any) => rawToArray(resp).map((t: any, i: number) => {
+        const id = String(t.id ?? t.task_id ?? t.uuid ?? t._id ?? `${t.title || 'task'}-${t.dueDate || t.due_date || ''}-${i}`)
+        const status = (t.status === 'in-progress' || t.status === 'completed' || t.status === 'pending')
+          ? t.status
+          : (t.completed ? 'completed' : 'pending')
+        return {
+          // Preserve everything but ensure critical fields exist in expected format
+          ...t,
+          id,
+          title: t.title ?? t.name ?? 'Untitled Task',
+          subject: t.subject ?? t.category ?? 'General',
+          estimatedMinutes: t.estimatedMinutes ?? t.duration_minutes ?? t.duration ?? 30,
+          dueDate: t.dueDate ?? t.due_date ?? new Date().toISOString().split('T')[0],
+          status,
+          completed: Boolean(t.completed ?? (t.status === 'completed')),
+          progress: typeof t.progress === 'number' ? t.progress : (status === 'completed' ? 100 : 0)
+        } as Task
+      })
 
       setState(prev => ({
         ...prev,
-        today: Object.prototype.hasOwnProperty.call(responses, 'today') ? normalize(responses.today) : prev.today,
-        upcoming: Object.prototype.hasOwnProperty.call(responses, 'upcoming') ? normalize(responses.upcoming) : prev.upcoming,
-        all: Object.prototype.hasOwnProperty.call(responses, 'all') ? normalize(responses.all) : prev.all,
+        today: Object.prototype.hasOwnProperty.call(responses, 'today') ? normalizeTasks(responses.today) : prev.today,
+        upcoming: Object.prototype.hasOwnProperty.call(responses, 'upcoming') ? normalizeTasks(responses.upcoming) : prev.upcoming,
+        all: Object.prototype.hasOwnProperty.call(responses, 'all') ? normalizeTasks(responses.all) : prev.all,
         loading: false,
         lastFetch: new Date()
       }))
@@ -115,15 +133,23 @@ export function useTasks(){
       })
       
       if (response?.task) {
+        const normalized = {
+          ...response.task,
+          id: String(response.task.id ?? response.task.task_id ?? response.task.uuid ?? Date.now()),
+          estimatedMinutes: response.task.estimatedMinutes ?? response.task.duration_minutes ?? response.task.duration ?? taskData.duration,n          dueDate: response.task.dueDate ?? response.task.due_date ?? taskData.dueDate,
+          status: response.task.status ?? 'pending',
+          completed: Boolean(response.task.completed ?? false),
+          progress: typeof response.task.progress === 'number' ? response.task.progress : 0,
+        }
         setState(prev => ({
           ...prev,
           today: taskData.dueDate === new Date().toISOString().split('T')[0] 
-            ? [...prev.today, response.task] 
+            ? [...prev.today, normalized] 
             : prev.today,
           upcoming: taskData.dueDate > new Date().toISOString().split('T')[0]
-            ? [...prev.upcoming, response.task]
+            ? [...prev.upcoming, normalized]
             : prev.upcoming,
-          all: [...prev.all, response.task],
+          all: [...prev.all, normalized],
           loading: false
         }))
       }

@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { LoadingButton, LoadingOverlay, SkeletonCard } from '@/components/ui/loading'
 import MinimalTimer from '@/components/ui/minimal-timer'
 import EnhancedRecommendationsPanel from '@/components/EnhancedRecommendationsPanel'
+import { toast } from 'sonner'
 
 import { MainLayout } from '@/components/navigation'
 import { PlannerErrorBoundary } from '@/components/planner/PlannerErrorBoundary'
@@ -171,6 +172,19 @@ export default function PlannerPage() {
   }, [])
 
   async function regen(){
+    // Pre-check: require syllabus topics before generating
+    const syllabusTopics = (initialTopics.length > 0 ? initialTopics : topics)
+      .map((t: any) => (typeof t === 'string' ? t : t?.topic))
+      .filter(Boolean)
+
+    if (syllabusTopics.length === 0) {
+      toast.warning('Please upload your syllabus first', {
+        description: 'We need topics to generate a plan. Upload your syllabus, then try again.',
+        action: { label: 'Go to Upload', onClick: () => { window.location.href = '/upload' } }
+      })
+      return
+    }
+
     setLoading(true)
     // Start optimistic UI
     setPrevPlan(plan)
@@ -198,11 +212,7 @@ export default function PlannerPage() {
       })()
       setPlan(optimisticPlan)
 
-      // Prepare optional topics list if available (backend primarily uses stored/current topics)
-      const syllabusTopics = (initialTopics.length > 0 ? initialTopics : topics)
-        .map((t: any) => (typeof t === 'string' ? t : t?.topic))
-        .filter(Boolean)
-
+      // Call backend regenerate with computed topics
       const resp = await api('/api/plan/regenerate', {
         method:'POST',
         body: JSON.stringify({
@@ -477,9 +487,6 @@ export default function PlannerPage() {
                                   📚
                                 </Button>
                               )}
-                              <Button size="sm" variant="ghost" className="h-6 px-2" onClick={()=> markSession(s.date, s.topic, 'completed')}>
-                                <span className="text-xs">Done</span>
-                              </Button>
                             </div>
                           </div>
                         </div>
@@ -679,7 +686,7 @@ export default function PlannerPage() {
                   return (
                     <div className="mb-6">
                       <h4 className="text-sm font-semibold mb-2">AI-powered Recommendations</h4>
-                      <EnhancedRecommendationsPanel topics={planTopicsForRecs} maxItems={12} compact={true} />
+                      <EnhancedRecommendationsPanel topics={planTopicsForRecs} maxItems={24} compact={true} />
                     </div>
                   )
                 } catch {
@@ -710,7 +717,7 @@ export default function PlannerPage() {
                           Featured Videos
                         </h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                          {videoResources.slice(0, showAllResources ? videoResources.length : 12).map((resource:any, idx:number) => (
+                          {videoResources.slice(0, showAllResources ? videoResources.length : 24).map((resource:any, idx:number) => (
                             <Card key={`video-${idx}`} className="hover:shadow-lg transition-all border-l-4 border-l-red-500 bg-white dark:bg-slate-800">
                               <CardContent className="p-4">
                                 <div className="flex items-start gap-3">
@@ -752,7 +759,7 @@ export default function PlannerPage() {
                           Additional Resources
                         </h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                          {otherResources.slice(0, showAllResources ? otherResources.length : 12).map((resource:any, idx:number) => (
+                          {otherResources.slice(0, showAllResources ? otherResources.length : 18).map((resource:any, idx:number) => (
                             <div key={`other-${idx}`} className="border rounded-lg p-4 hover:shadow-md transition-all">
                               <div className="flex items-start gap-3">
                                 <span className="text-2xl">
@@ -787,7 +794,7 @@ export default function PlannerPage() {
                     )}
 
                     {/* Show More/Less Button */}
-                    {(videoResources.length > 12 || otherResources.length > 12) && (
+                    {(videoResources.length > 24 || otherResources.length > 18) && (
                       <div className="text-center mt-6">
                         <Button
                           variant="outline"
