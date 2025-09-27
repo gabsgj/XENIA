@@ -23,25 +23,19 @@ function fetchWithTimeout(url: string, timeout = 5000) {
 
 export default function WakeBackend() {
   useEffect(() => {
-    let mounted = true;
-
-    const attempt = async (delayMs: number) => {
+    // Wake backend only once when the app loads
+    const wakeBackend = async () => {
       try {
-        if (delayMs > 0) await new Promise(r => setTimeout(r, delayMs));
         await fetchWithTimeout(WAKE_URL, 5000);
-      } catch {
-        // ignore; warming is best-effort
+        console.log('Backend wake call successful');
+      } catch (error) {
+        // Silently ignore errors - warming is best-effort
+        console.log('Backend wake call failed (non-critical):', error);
       }
     };
 
-    // Fire-and-forget warmup attempts: immediately, then after 3s and 8s
-    attempt(0);
-    attempt(3000);
-    attempt(8000);
-
-    return () => {
-      mounted = false; // reserved if we add state later
-    };
+    // Call once immediately when component mounts
+    wakeBackend();
   }, []);
 
   return null;
