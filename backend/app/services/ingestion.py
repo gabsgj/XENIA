@@ -48,16 +48,17 @@ def _detect_mimetype(filename: str) -> str:
 
 
 def handle_upload(file_storage, user_id: str, artifact_type: str) -> Dict:
-norm_user_id = normalize_user_id(raw_user_id)
-print(f"🔄 Processing upload for user {raw_user_id} -> normalized to {norm_user_id}")
-supabase = get_supabase()
-# Ensure user exists in app tables to satisfy any FK constraints
-try:
-    if is_valid_uuid(norm_user_id):
-        ensure_user_record(supabase, norm_user_id)
-except Exception:
-    pass
-filename = file_storage.filename or f"upload-{uuid.uuid4().hex}"
+    raw_user_id = user_id
+    norm_user_id = normalize_user_id(raw_user_id)
+    print(f"🔄 Processing upload for user {raw_user_id} -> normalized to {norm_user_id}")
+    supabase = get_supabase()
+    # Ensure user exists in app tables to satisfy any FK constraints
+    try:
+        if is_valid_uuid(norm_user_id):
+            ensure_user_record(supabase, norm_user_id)
+    except Exception:
+        pass
+    filename = file_storage.filename or f"upload-{uuid.uuid4().hex}"
     data = file_storage.read()
     mime = _detect_mimetype(filename)
 
