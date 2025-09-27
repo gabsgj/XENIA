@@ -268,6 +268,9 @@ def solve_question(
         except Exception as e:
             logger.warning(f"generate_advanced_solution raised an exception, falling back: {e}")
 
+        # Initialize answer variable
+        answer = "Here are the steps to solve the problem."
+        
         # If advanced AI produced usable steps, use them; otherwise fall back to remediation steps
         if advanced_steps:
             steps = advanced_steps
