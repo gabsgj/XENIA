@@ -67,7 +67,7 @@ def create_app() -> Flask:
         logger.info(f"🚀 REQUEST: {request.method} {request.path}")
         logger.info(f"   Headers: {dict(request.headers)}")
         if request.is_json:
-            logger.info(f"   JSON Body: {request.get_json()}")
+            logger.info(f"   JSON Body: {request.get_json(silent=True)}")
         elif request.form:
             logger.info(f"   Form Data: {dict(request.form)}")
         elif request.args:

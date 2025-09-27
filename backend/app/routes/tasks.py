@@ -3,26 +3,31 @@ from flask import Blueprint, request
 from ..errors import ApiError
 from ..supabase_client import get_supabase
 from datetime import datetime, timezone
+import uuid
 
 logger = logging.getLogger('xenia')
 tasks_bp = Blueprint("tasks", __name__)
 
 # Status mapping between database and frontend
+# Database values per schema: 'todo', 'doing', 'done'
+# Frontend values: 'pending', 'in-progress', 'completed'
+
 def db_to_frontend_status(db_status: str) -> str:
     """Map database status to frontend expected status."""
     mapping = {
         'todo': 'pending',
-        'in_progress': 'in-progress',
+        'doing': 'in-progress',
         'done': 'completed',
-        'completed': 'completed'
+        'completed': 'completed'  # tolerate legacy value
     }
     return mapping.get(db_status, db_status)
+
 
 def frontend_to_db_status(frontend_status: str) -> str:
     """Map frontend status to database status."""
     mapping = {
         'pending': 'todo',
-        'in-progress': 'in_progress',
+        'in-progress': 'doing',
         'completed': 'done'
     }
     return mapping.get(frontend_status, frontend_status)
@@ -262,7 +267,7 @@ def start_session():
         }
         sb.table('sessions').insert(record).execute()
         # mark task as in-progress
-        sb.table('tasks').update({'status': 'in_progress'}).eq('id', task_id).execute()
+        sb.table('tasks').update({'status': 'doing'}).eq('id', task_id).execute()
         return {'ok': True, 'session': record}
     except Exception as e:
         logger.warning(f'   Failed to start session: {e}')
@@ -325,8 +330,6 @@ def update_task(task_id):
             update_data["status"] = frontend_to_db_status(data["status"])
         if "completed" in data and data["completed"]:
             update_data["status"] = "done"
-        
-        update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
         
         resp = sb.table("tasks").update(update_data).eq("id", task_id).execute()
         
@@ -432,8 +435,9 @@ def create_task():
                 "user_id": db_task.get("user_id")
             }
         else:
-            # Fallback if no response data
+            # Fallback if no response data (e.g., mock client)
             task = {
+                "id": str(uuid.uuid4()),
                 "title": title,
                 "subject": subject,
                 "due_date": due_date,
@@ -441,14 +445,16 @@ def create_task():
                 "duration_minutes": duration_minutes,
                 "estimatedMinutes": duration_minutes,
                 "priority": priority,
-                "status": "pending"
+                "status": "pending",
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "user_id": norm_user_id,
             }
         
         logger.info(f"   Created task: {title}")
         return {"task": task}
     except Exception as e:
         logger.warning(f"   Failed to create task: {e}")
-        raise ApiError("DB_WRITE_FAIL", "Unable to create task")
+        raise ApiError("DB_WRITE_FAIL", "Unable to create task", details={"cause": str(e)})
 
 
 @tasks_bp.delete("/<task_id>")
