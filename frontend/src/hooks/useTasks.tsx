@@ -136,15 +136,16 @@ export function useTasks(){
         const normalized = {
           ...response.task,
           id: String(response.task.id ?? response.task.task_id ?? response.task.uuid ?? Date.now()),
-          estimatedMinutes: response.task.estimatedMinutes ?? response.task.duration_minutes ?? response.task.duration ?? taskData.duration,n          dueDate: response.task.dueDate ?? response.task.due_date ?? taskData.dueDate,
+          estimatedMinutes: response.task.estimatedMinutes ?? response.task.duration_minutes ?? response.task.duration ?? taskData.duration,
+          dueDate: response.task.dueDate ?? response.task.due_date ?? taskData.dueDate,
           status: response.task.status ?? 'pending',
           completed: Boolean(response.task.completed ?? false),
           progress: typeof response.task.progress === 'number' ? response.task.progress : 0,
         }
         setState(prev => ({
           ...prev,
-          today: taskData.dueDate === new Date().toISOString().split('T')[0] 
-            ? [...prev.today, normalized] 
+          today: taskData.dueDate === new Date().toISOString().split('T')[0]
+            ? [...prev.today, normalized]
             : prev.today,
           upcoming: taskData.dueDate > new Date().toISOString().split('T')[0]
             ? [...prev.upcoming, normalized]
@@ -153,7 +154,6 @@ export function useTasks(){
           loading: false
         }))
       }
-      
       return response?.task
     } catch (e: any) {
       const errorMsg = e?.errorMessage || 'Failed to create task'
