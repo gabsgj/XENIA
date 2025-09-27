@@ -83,7 +83,7 @@ export function useStudySession(){
     }))
   }, [])
 
-  // Session management
+// Session management
   const startSession = useCallback(async ({ 
     taskId, 
     durationMin = 25, 
@@ -98,33 +98,26 @@ export function useStudySession(){
     try {
       setState(prev => ({ ...prev, loading: true, error: null }))
       
-      const sessionData = {
+      // Create a local session object without hitting the server to avoid schema mismatches
+      const localSession: StudySession = {
+        id: `${Date.now()}`,
         task_id: taskId,
         user_id: getUserId(),
-        planned_duration: durationMin,
         topic: topic || 'General Study',
         subject: subject || 'General',
-        status: 'in-progress' as const,
-        start_time: new Date().toISOString()
+        status: 'in-progress',
+        planned_duration: durationMin,
+        created_at: new Date().toISOString(),
       }
       
-      const response = await api('/api/tasks/session/start', {
-        method: 'POST',
-        body: JSON.stringify(sessionData)
-      })
+      setState(prev => ({
+        ...prev,
+        activeSession: localSession,
+        loading: false
+      }))
       
-      if (response?.session) {
-        setState(prev => ({
-          ...prev,
-          activeSession: response.session,
-          loading: false
-        }))
-        
-        startTimer()
-        return response.session
-      }
-      
-      throw new Error('No session returned from API')
+      startTimer()
+      return localSession
       
     } catch (e: any) {
       const errorMsg = e?.errorMessage || e?.message || 'Failed to start session'
@@ -138,28 +131,16 @@ export function useStudySession(){
     }
   }, [startTimer, pushError])
 
-  const updateSession = useCallback(async (updates: Partial<StudySession>) => {
+const updateSession = useCallback(async (updates: Partial<StudySession>) => {
     if (!state.activeSession) return null
     
     try {
+      // Local-only update; backend endpoint for partial session updates is not available
       setState(prev => ({
         ...prev,
         activeSession: prev.activeSession ? { ...prev.activeSession, ...updates } : null
       }))
-      
-      const response = await api(`/api/tasks/session/${state.activeSession.id}`, {
-        method: 'PUT',
-        body: JSON.stringify({ ...updates, user_id: getUserId() })
-      })
-      
-      if (response?.session) {
-        setState(prev => ({
-          ...prev,
-          activeSession: response.session
-        }))
-      }
-      
-      return response?.session
+      return state.activeSession
     } catch (e: any) {
       const errorMsg = e?.errorMessage || 'Failed to update session'
       pushError({
@@ -171,7 +152,7 @@ export function useStudySession(){
     }
   }, [state.activeSession, pushError])
 
-  const endSession = useCallback(async ({
+const endSession = useCallback(async ({
     sessionId,
     taskId,
     actualMinutes,
@@ -193,17 +174,19 @@ export function useStudySession(){
       // Calculate actual duration if not provided
       const finalActualMinutes = actualMinutes || Math.max(1, Math.floor(state.elapsedTime / 60))
       
-      const response = await api('/api/tasks/session/end', {
-        method: 'PUT',
-        body: JSON.stringify({
-          session_id: activeSessionId,
-          task_id: taskId || state.activeSession?.task_id,
-          actual_minutes: finalActualMinutes,
-          completed,
-          user_id: getUserId(),
-          end_time: new Date().toISOString()
+      // Record the completed study time using the track endpoint
+      try {
+        await api('/api/tasks/track', {
+          method: 'POST',
+          body: JSON.stringify({
+            user_id: getUserId(),
+            topic: state.activeSession?.topic || 'General Study',
+            duration_min: finalActualMinutes
+          })
         })
-      })
+      } catch (trackErr) {
+        console.warn('Failed to record session via track endpoint', trackErr)
+      }
       
       // Stop timer and update state
       pauseTimer()
@@ -218,7 +201,7 @@ export function useStudySession(){
         loading: false
       }))
       
-      return response
+      return { ok: true }
       
     } catch (e: any) {
       const errorMsg = e?.errorMessage || e?.message || 'Failed to end session'
@@ -246,14 +229,24 @@ export function useStudySession(){
     return updateSession({ status: 'in-progress' })
   }, [state.activeSession, startTimer, updateSession])
 
-  const fetchRecentSessions = useCallback(async () => {
+const fetchRecentSessions = useCallback(async () => {
     try {
-      const response = await api(`/api/tasks/sessions?user_id=${getUserId()}&limit=10`)
+      const response = await api(`/api/tasks/sessions?limit=20`)
       
       if (response?.sessions) {
+        // Normalize into StudySession shape
+        const normalized = response.sessions.map((s: any) => ({
+          id: s.id,
+          user_id: getUserId(),
+          topic: s.topic || 'General',
+          status: 'completed',
+          planned_duration: s.duration_min || 0,
+          actual_duration: s.duration_min || 0,
+          created_at: s.created_at
+        }))
         setState(prev => ({
           ...prev,
-          recentSessions: response.sessions
+          recentSessions: normalized
         }))
       }
     } catch (e: any) {
@@ -262,14 +255,14 @@ export function useStudySession(){
   }, [])
 
   // Get session stats
-  const getSessionStats = useCallback(() => {
+const getSessionStats = useCallback(() => {
     const today = new Date().toISOString().split('T')[0]
     const todaySessions = state.recentSessions.filter(s => 
       s.created_at?.startsWith(today)
     )
     
     const totalTimeToday = todaySessions.reduce((sum, session) => 
-      sum + (session.actual_duration || 0), 0
+      sum + (session.actual_duration || (session as any).duration_min || session.planned_duration || 0), 0
     )
     
     const currentStreak = calculateStreak(state.recentSessions)
@@ -280,7 +273,7 @@ export function useStudySession(){
       currentStreak,
       totalSessions: state.recentSessions.length,
       averageSessionTime: state.recentSessions.length > 0 
-        ? Math.round(state.recentSessions.reduce((sum, s) => sum + (s.actual_duration || 0), 0) / state.recentSessions.length)
+        ? Math.round(state.recentSessions.reduce((sum, s) => sum + (s.actual_duration || (s as any).duration_min || s.planned_duration || 0), 0) / state.recentSessions.length)
         : 0
     }
   }, [state.recentSessions])

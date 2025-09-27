@@ -93,6 +93,7 @@ export default function TasksPage(){
   // Component state
   const [showCreateTaskDialog, setShowCreateTaskDialog] = useState(false)
   const [editingTask, setEditingTask] = useState<any | null>(null)
+  const [showEditTaskDialog, setShowEditTaskDialog] = useState(false)
   const [selectedFilter, setSelectedFilter] = useState<'all' | 'pending' | 'in-progress' | 'completed'>('all')
   const [selectedSubject, setSelectedSubject] = useState<string>('all')
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null)
@@ -533,6 +534,53 @@ setTaskFormData({
     setFormErrors({})
   }
 
+  // Edit form state
+  const [editFormData, setEditFormData] = useState<TaskFormData | null>(null)
+
+  useEffect(() => {
+    if (editingTask) {
+      setEditFormData({
+        title: editingTask.title || '',
+        subject: editingTask.subject || 'General',
+        dueDate: (editingTask.dueDate || editingTask.due_date) ?? new Date().toISOString().split('T')[0],
+        duration: Number(editingTask.estimatedMinutes || editingTask.duration_minutes || 30),
+        difficulty: (editingTask.difficulty || 'Medium') as TaskFormData['difficulty'],
+        priority: (editingTask.priority || 'Medium') as TaskFormData['priority'],
+        status: (editingTask.status || 'pending') as TaskFormData['status'],
+        description: editingTask.description || ''
+      })
+    } else {
+      setEditFormData(null)
+    }
+  }, [editingTask])
+
+  const validateAndUpdateTask = async () => {
+    if (!editingTask || !editFormData) return
+    const errors: Record<string, string> = {}
+    if (!editFormData.title.trim()) errors.title = 'Task title cannot be empty'
+    if (!editFormData.subject.trim()) errors.subject = 'Subject is required'
+    if (!editFormData.dueDate) errors.dueDate = 'Due date is required'
+    setFormErrors(errors)
+    if (Object.keys(errors).length === 0) {
+      try {
+        await updateTask(editingTask.id, {
+          title: editFormData.title,
+          subject: editFormData.subject,
+          dueDate: editFormData.dueDate,
+          estimatedMinutes: editFormData.duration,
+          difficulty: editFormData.difficulty,
+          priority: editFormData.priority,
+          status: editFormData.status,
+          description: editFormData.description
+        } as any)
+        setShowEditTaskDialog(false)
+        setEditingTask(null)
+      } catch (e) {
+        // error surfaced by error context
+      }
+    }
+  }
+
   return (
     <TaskErrorBoundary>
       <MainLayout>
@@ -805,6 +853,184 @@ setTaskFormData({
           </>
         )}
 
+        {/* Edit Task Modal */}
+        {showEditTaskDialog && editingTask && editFormData && (
+          <>
+            <div
+              className="fixed inset-0 bg-black/50 z-40 animate-in fade-in duration-200"
+              onClick={() => {
+                setShowEditTaskDialog(false)
+                setEditingTask(null)
+              }}
+            />
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-in fade-in zoom-in-95 duration-200">
+              <div
+                className="bg-background border rounded-lg shadow-2xl w-full max-w-[600px] max-h-[90vh] overflow-y-auto"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="sticky top-0 bg-background border-b px-6 py-4">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <h2 className="text-2xl font-semibold">Edit Task</h2>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Update your task details.
+                      </p>
+                    </div>
+                    <button
+                      aria-label="Close"
+                      className="text-muted-foreground hover:text-foreground transition-colors p-1"
+                      onClick={() => {
+                        setShowEditTaskDialog(false)
+                        setEditingTask(null)
+                      }}
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+                <div className="space-y-6 px-6 py-6">
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-title" className="text-sm font-medium">
+                      Task Title *
+                    </Label>
+                    <Input
+                      id="edit-title"
+                      placeholder="Enter the name of your task"
+                      value={editFormData.title}
+                      onChange={(e) => {
+                        setEditFormData(prev => prev ? ({ ...prev, title: e.target.value }) : prev)
+                        if (formErrors.title) setFormErrors(prev => ({ ...prev, title: '' }))
+                      }}
+                      className={cn(
+                        "transition-all",
+                        formErrors.title && "border-red-500 focus:ring-red-500"
+                      )}
+                    />
+                    {formErrors.title && (
+                      <p className="text-sm text-red-500 mt-2">{formErrors.title}</p>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="edit-subject" className="text-sm font-medium">
+                        Subject *
+                      </Label>
+                      <Input
+                        id="edit-subject"
+                        value={editFormData.subject}
+                        onChange={(e) => {
+                          setEditFormData(prev => prev ? ({ ...prev, subject: e.target.value }) : prev)
+                          if (formErrors.subject) setFormErrors(prev => ({ ...prev, subject: '' }))
+                        }}
+                        className={cn(
+                          "transition-all",
+                          formErrors.subject && "border-red-500 focus:ring-red-500"
+                        )}
+                      />
+                      {formErrors.subject && (
+                        <p className="text-sm text-red-500 mt-2">{formErrors.subject}</p>
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="edit-dueDate" className="text-sm font-medium">
+                        Due Date *
+                      </Label>
+                      <Input
+                        id="edit-dueDate"
+                        type="date"
+                        value={editFormData.dueDate}
+                        onChange={(e) => {
+                          setEditFormData(prev => prev ? ({ ...prev, dueDate: e.target.value }) : prev)
+                          if (formErrors.dueDate) setFormErrors(prev => ({ ...prev, dueDate: '' }))
+                        }}
+                        className={cn(
+                          "transition-all",
+                          formErrors.dueDate && "border-red-500 focus:ring-red-500"
+                        )}
+                      />
+                      {formErrors.dueDate && (
+                        <p className="text-sm text-red-500 mt-2">{formErrors.dueDate}</p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium">Priority</Label>
+                      <Select
+                        value={editFormData.priority}
+                        onValueChange={(value: 'High' | 'Medium' | 'Low') => setEditFormData(prev => prev ? ({ ...prev, priority: value }) : prev)}
+                      >
+                        <SelectTrigger className="transition-all">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="High">High</SelectItem>
+                          <SelectItem value="Medium">Medium</SelectItem>
+                          <SelectItem value="Low">Low</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium">Status</Label>
+                      <Select
+                        value={editFormData.status}
+                        onValueChange={(value: 'pending' | 'in-progress' | 'completed') => setEditFormData(prev => prev ? ({ ...prev, status: value }) : prev)}
+                      >
+                        <SelectTrigger className="transition-all">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="pending">Pending</SelectItem>
+                          <SelectItem value="in-progress">In Progress</SelectItem>
+                          <SelectItem value="completed">Completed</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">Estimated Duration (minutes)</Label>
+                    <Input
+                      type="number"
+                      min="5"
+                      max="240"
+                      value={editFormData.duration}
+                      onChange={(e) => setEditFormData(prev => prev ? ({ ...prev, duration: parseInt(e.target.value) || 30 }) : prev)}
+                      className="transition-all"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">Description</Label>
+                    <Textarea
+                      rows={4}
+                      value={editFormData.description}
+                      onChange={(e) => setEditFormData(prev => prev ? ({ ...prev, description: e.target.value }) : prev)}
+                      className="resize-y transition-all"
+                    />
+                  </div>
+                </div>
+                <div className="sticky bottom-0 bg-background border-t px-6 py-4 flex justify-end gap-3">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setShowEditTaskDialog(false)
+                      setEditingTask(null)
+                    }}
+                    className="transition-all"
+                  >
+                    Cancel
+                  </Button>
+                  <Button onClick={validateAndUpdateTask} className="transition-all">
+                    Save Changes
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
+
         {/* Summary Stats Cards - Cleaner design */}
         <div className="grid grid-cols-3 gap-6 mb-8">
 <Card className="border hover:shadow-sm transition-all cursor-pointer" onClick={() => setSelectedFilter('all')}>
@@ -1036,7 +1262,7 @@ setTaskFormData({
                                         <DropdownMenuItem 
                                           onClick={() => {
                                             setEditingTask(task)
-                                            // Open edit dialog
+                                            setShowEditTaskDialog(true)
                                           }}
                                           className="cursor-pointer"
                                         >
@@ -1231,7 +1457,7 @@ setTaskFormData({
                                   <DropdownMenuItem 
                                     onClick={() => {
                                       setEditingTask(task)
-                                      // TODO: open edit modal
+                                      setShowEditTaskDialog(true)
                                     }}
                                     className="cursor-pointer"
                                   >

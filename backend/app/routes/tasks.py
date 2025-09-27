@@ -117,6 +117,33 @@ def track_session():
         raise ApiError("DB_WRITE_FAIL", "Unable to store session")
 
 
+@tasks_bp.get("/sessions")
+def list_sessions():
+    """Return recent study sessions for the authenticated user.
+    Accepts optional query parameter `limit` (default 20).
+    Returns fields compatible with frontend expectations: id, topic, duration_min, created_at.
+    """
+    logger.info("📚 List sessions endpoint called")
+    sb = get_supabase()
+    user_id = request.headers.get("X-User-Id") or request.args.get("user_id")
+    if not user_id:
+        raise ApiError("AUTH_401", "Missing user_id")
+
+    try:
+        limit = int(request.args.get("limit", 20))
+    except Exception:
+        limit = 20
+
+    try:
+        resp = sb.table("sessions").select("id, topic, duration_min, created_at").eq("user_id", user_id).order("created_at", desc=True).limit(limit).execute()
+        sessions = resp.data or []
+        logger.info(f"   Retrieved {len(sessions)} sessions for user")
+        return {"sessions": sessions}
+    except Exception as e:
+        logger.warning(f"   Failed to fetch sessions: {e}")
+        raise ApiError("DB_READ_FAIL", "Unable to fetch sessions")
+
+
 @tasks_bp.post("/complete")
 def complete_task():
     logger.info("✅ Complete task endpoint called")
