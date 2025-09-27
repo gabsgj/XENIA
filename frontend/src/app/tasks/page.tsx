@@ -834,7 +834,7 @@ setTaskFormData({
             <div className="space-y-6">
               {/* Today's Focus - Featured Task with enhanced styling */}
               {filteredTasks.length > 0 && filteredTasks.filter(t => !t.completed && t.status !== 'completed').length > 0 && (
-                <Card className="border-2 border-primary/30 bg-gradient-to-br from-primary/5 via-transparent to-transparent shadow-sm">
+                <Card className="border shadow-sm">
                   <CardHeader className="pb-4">
                     <CardTitle className="text-lg flex items-center gap-2">
                       <Target className="w-5 h-5 text-primary" />

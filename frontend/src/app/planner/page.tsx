@@ -634,7 +634,7 @@ export default function PlannerPage() {
                             </span>
                           </div>
                         </div>
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 pl-3 ml-2">
                           <Button size="sm" variant="outline" className="h-8 px-3 text-xs md:text-sm" onClick={()=> markSession(s.date, s.topic, s.status==='completed'?'pending':'completed')}>
                             <Play className="w-3 h-3 mr-1" />
                             {s.status==='completed'? 'Undo' : 'Complete'}

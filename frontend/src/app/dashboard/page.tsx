@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { NoDataPlaceholder } from "@/components/ui/no-data-placeholder";
 import MinimalTimer from "@/components/ui/minimal-timer";
+import EnhancedRecommendationsPanel from "@/components/EnhancedRecommendationsPanel";
 import { DashboardErrorBoundary } from "@/components/dashboard/DashboardErrorBoundary";
 import Link from "next/link";
 import { 
@@ -164,6 +165,57 @@ export default function DashboardPage(){
       .sort((a:any,b:any)=> a.date.localeCompare(b.date))
       .slice(0,9)
   },[plan])
+
+  // Next 3 days plan grouped by date
+  const next3Days = useMemo(() => {
+    const start = new Date();
+    start.setHours(0,0,0,0)
+    const days = Array.from({ length: 3 }, (_, i) => {
+      const d = new Date(start)
+      d.setDate(start.getDate() + i)
+      return d.toISOString().slice(0,10)
+    })
+    const sessionsByDate: Record<string, any[]> = {}
+    days.forEach(date => {
+      sessionsByDate[date] = (plan?.sessions || []).filter((s:any) => s.date === date)
+    })
+    return { days, sessionsByDate }
+  }, [plan])
+
+  // Low-data fallbacks for charts
+  const fallbackStudy7 = useMemo(() => {
+    const end = new Date(); end.setHours(0,0,0,0)
+    const items = Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(end); d.setDate(end.getDate() - (6 - i))
+      const key = d.toISOString().slice(0,10)
+      const analyticsMins = (data?.sessions || [])
+        .filter((s:any) => (s.created_at || '').slice(0,10) === key)
+        .reduce((sum:number, s:any) => sum + Number(s.duration_min || 0), 0)
+      const planMins = (plan?.sessions || [])
+        .filter((s:any) => s.date === key)
+        .reduce((sum:number, s:any) => sum + Number(s.duration_min || 0), 0)
+      const minutes = Math.max(analyticsMins, planMins)
+      return { date: key, minutes }
+    })
+    const max = Math.max(1, ...items.map(x => x.minutes))
+    const total = items.reduce((a,b)=> a + b.minutes, 0)
+    return { items, max, total }
+  }, [data, plan])
+
+  const subjectFallback = useMemo(() => {
+    const combined = [...(plan?.sessions || []), ...(data?.sessions || [])]
+    const bySubject: Record<string, number> = {}
+    combined.forEach((s:any) => {
+      const subject = (s.topic || 'General').toString().split(':')[0]
+      const minutes = Number(s.duration_min || 0)
+      bySubject[subject] = (bySubject[subject] || 0) + minutes
+    })
+    return Object.entries(bySubject).sort((a,b)=> b[1]-a[1]).slice(0,5)
+  }, [plan, data])
+
+  const planTopicsForRecs = useMemo(() => {
+    return Array.from(new Set((plan?.sessions || []).map((s:any) => s.topic).filter(Boolean))) as string[]
+  }, [plan])
 
   const topicStatusCounts = useMemo(()=>{
     const counts: Record<string, number> = { pending:0, 'in-progress':0, completed:0 }
@@ -369,6 +421,52 @@ export default function DashboardPage(){
                   <div>
                     <CardTitle className="flex items-center gap-2">
                       <Calendar className="w-5 h-5" />
+                      3-Day Study Plan
+                    </CardTitle>
+                    <CardDescription>
+                      Today and the next two days at a glance
+                    </CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {next3Days.days.map((d) => {
+                    const dateObj = new Date(d)
+                    const today = new Date(); today.setHours(0,0,0,0)
+                    const diff = Math.round((dateObj.getTime()-today.getTime())/(1000*60*60*24))
+                    const label = diff===0 ? 'Today' : diff===1 ? 'Tomorrow' : dateObj.toLocaleDateString('en-US',{ weekday:'short' })
+                    const items = next3Days.sessionsByDate[d] || []
+                    return (
+                      <div key={d} className="border rounded-lg p-3 bg-muted/30">
+                        <div className="font-semibold text-sm mb-2 flex items-center justify-between">
+                          <span>{label}</span>
+                          <Badge variant="outline">{items.length} task{items.length!==1?'s':''}</Badge>
+                        </div>
+                        <div className="space-y-2">
+                          {items.length ? items.slice(0,4).map((s:any, idx:number) => (
+                            <div key={idx} className="flex items-center justify-between text-xs p-2 rounded bg-background border">
+                              <span className="truncate mr-2" title={s.topic}>{s.topic.split(':')[0]}</span>
+                              <span className="text-muted-foreground">{s.duration_min}m</span>
+                            </div>
+                          )) : (
+                            <div className="text-xs text-muted-foreground p-2">No sessions</div>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Today's Study Plan */}
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <Calendar className="w-5 h-5" />
                       Today's Study Plan
                     </CardTitle>
                     <CardDescription>
@@ -443,7 +541,14 @@ export default function DashboardPage(){
                       </AreaChart>
                     </ResponsiveContainer>
                   ) : (
-                    <NoDataPlaceholder message="Not enough data yet — complete a few study sessions to see your trend" />
+                    <div className="flex flex-col justify-end h-full">
+                      <div className="flex items-end gap-1 h-40 px-2">
+                        {fallbackStudy7.items.map(item => (
+                          <div key={item.date} className="flex-1 bg-primary/20 rounded" style={{ height: `${Math.max(4, (item.minutes / fallbackStudy7.max) * 100)}%` }} title={`${item.date}: ${item.minutes}m`} />
+                        ))}
+                      </div>
+                      <div className="text-xs text-muted-foreground text-center mt-2">{fallbackStudy7.total} minutes over last 7 days</div>
+                    </div>
                   )}
                 </div>
               </CardContent>
@@ -474,7 +579,11 @@ export default function DashboardPage(){
                       </AreaChart>
                     </ResponsiveContainer>
                   ) : (
-                    <NoDataPlaceholder message="More data required — come back after a few days of activity" />
+                    <div className="flex items-end gap-1 h-full px-2">
+                      {fallbackStudy7.items.map(item => (
+                        <div key={item.date} className="flex-1 bg-blue-300/40 dark:bg-blue-400/30 rounded" style={{ height: `${Math.max(6, (item.minutes / fallbackStudy7.max) * 100)}%` }} title={`${item.date}: ${item.minutes}m`} />
+                      ))}
+                    </div>
                   )}
                 </div>
               </CardContent>
@@ -505,7 +614,20 @@ export default function DashboardPage(){
                       </BarChart>
                     </ResponsiveContainer>
                   ) : (
-                    <NoDataPlaceholder message="No subject performance yet — take quizzes or complete tasks to populate this" />
+                    <div className="space-y-3">
+                      {subjectFallback.map(([subject, minutes]) => (
+                        <div key={subject} className="flex items-center gap-2">
+                          <div className="w-24 text-xs text-muted-foreground truncate">{subject}</div>
+                          <div className="flex-1 h-2 bg-muted rounded">
+                            <div className="h-2 bg-emerald-500 rounded" style={{ width: `${Math.min(100, (Number(minutes) / Math.max(1, Number(subjectFallback[0]?.[1] || 1))) * 100)}%` }} />
+                          </div>
+                          <div className="w-10 text-right text-xs text-muted-foreground">{minutes}m</div>
+                        </div>
+                      ))}
+                      {subjectFallback.length === 0 && (
+                        <div className="text-xs text-muted-foreground">No subject data yet.</div>
+                      )}
+                    </div>
                   )}
                 </div>
               </CardContent>
@@ -558,47 +680,14 @@ export default function DashboardPage(){
               </CardContent>
             </Card>
 
-            {/* Subject Distribution */}
+            {/* Content Recommendations */}
             <Card>
               <CardHeader>
-                <CardTitle>Subject Distribution</CardTitle>
-                <CardDescription>Time spent by subject this week</CardDescription>
+                <CardTitle>Recommended Resources</CardTitle>
+                <CardDescription>Based on your current plan</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="h-48">
-                  {loading ? (
-                    <div className="flex items-center justify-center h-full">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                    </div>
-                  ) : (data?.sessions || []).length > 0 ? (
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie
-                          data={Object.values((data?.sessions||[]).reduce((acc:any, s:any)=> { const k = s.topic||'General'; acc[k] = acc[k]||{ name:k, value:0, color: chartColors[Object.keys(acc).length % chartColors.length] }; acc[k].value += s.duration_min||0; return acc; }, {})) as any}
-                          cx="50%"
-                          cy="50%"
-                          innerRadius={30}
-                          outerRadius={70}
-                          dataKey="value"
-                        >
-                          {(Object.values((data?.sessions||[]).reduce((acc:any, s:any)=> { const k = s.topic||'General'; acc[k] = acc[k]||{ name:k, value:0, color: chartColors[Object.keys(acc).length % chartColors.length] }; acc[k].value += s.duration_min||0; return acc; }, {})) as any).map((entry:any, index:number) => (<Cell key={`cell-${index}`} fill={entry.color} />))}
-                        </Pie>
-                        <Tooltip />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  ) : (
-<NoDataPlaceholder message="No data yet — start a study session or take a quiz to see progress here" />
-                  )}
-                </div>
-                <div className="grid grid-cols-2 gap-2 mt-4">
-                  {(Object.values((data?.sessions||[]).reduce((acc:any, s:any)=> { const k = s.topic||'General'; acc[k] = acc[k]||{ name:k, value:0, color: chartColors[Object.keys(acc).length % chartColors.length] }; acc[k].value += s.duration_min||0; return acc; }, {})) as any).map((item:any) => (
-                    <div key={item.name} className="flex items-center gap-2">
-                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }}></div>
-                      <span className="text-sm">{item.name}</span>
-                      <span className="text-sm text-muted-foreground ml-auto">{item.value}m</span>
-                    </div>
-                  ))}
-                </div>
+                <EnhancedRecommendationsPanel topics={planTopicsForRecs.slice(0,6)} maxItems={6} compact={true} />
               </CardContent>
             </Card>
           </div>
