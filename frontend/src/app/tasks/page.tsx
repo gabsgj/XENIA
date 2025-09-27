@@ -542,32 +542,60 @@ setTaskFormData({
           </div>
           
           <div className="flex items-center gap-3">
-            <Dialog open={showCreateTaskDialog} onOpenChange={(open: boolean) => {
-              setShowCreateTaskDialog(open)
-              if (!open) resetForm()
-            }}>
-              <DialogTrigger asChild>
-                  <Button size="lg" className="bg-primary hover:bg-primary/90 shadow-sm">
-                    <Plus className="w-5 h-5 mr-2" />
-                    New Task
-                  </Button>
-                </DialogTrigger>
-              <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
-                <DialogHeader className="pb-4 border-b relative">
-                    <DialogTitle className="text-2xl">Create a New Task</DialogTitle>
-                    <DialogDescription>
-                      Add a new study task to your schedule. Fields marked with * are required.
-                    </DialogDescription>
-                    {/* X close button top-right */}
-                    <DialogClose asChild>
-                      <button aria-label="Close" className="absolute right-3 top-3 text-muted-foreground hover:text-foreground">
-                        <span className="sr-only">Close</span>
-                        ✕
-                      </button>
-                    </DialogClose>
-                  </DialogHeader>
+            <Button 
+              size="lg" 
+              className="bg-primary hover:bg-primary/90 shadow-sm"
+              onClick={() => setShowCreateTaskDialog(true)}
+            >
+              <Plus className="w-5 h-5 mr-2" />
+              New Task
+            </Button>
+          </div>
+        </div>
+
+        {/* Floating Modal for Task Creation */}
+        {showCreateTaskDialog && (
+          <>
+            {/* Backdrop */}
+            <div 
+              className="fixed inset-0 bg-black/50 z-40 animate-in fade-in duration-200"
+              onClick={() => {
+                setShowCreateTaskDialog(false)
+                resetForm()
+              }}
+            />
+            
+            {/* Modal */}
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-in fade-in zoom-in-95 duration-200">
+              <div 
+                className="bg-background border rounded-lg shadow-2xl w-full max-w-[600px] max-h-[90vh] overflow-y-auto"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="sticky top-0 bg-background border-b px-6 py-4">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <h2 className="text-2xl font-semibold">Create a New Task</h2>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Add a new study task to your schedule. Fields marked with * are required.
+                      </p>
+                    </div>
+                    <button 
+                      aria-label="Close" 
+                      className="text-muted-foreground hover:text-foreground transition-colors p-1"
+                      onClick={() => {
+                        setShowCreateTaskDialog(false)
+                        resetForm()
+                      }}
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                      </svg>
+                    </button>
+                  </div>
+                </div>
                 
-                <div className="space-y-6 py-6">
+                <div className="space-y-6 px-6 py-6">
                   {/* Task Title - Full Width */}
                   <div className="space-y-2">
                     <Label htmlFor="title" className="text-sm font-medium">
@@ -721,27 +749,28 @@ setTaskFormData({
                   </div>
                 </div>
                 
-                <DialogFooter className="pt-4 border-t gap-2 sm:gap-0">
-                  <DialogClose asChild>
-                    <Button 
-                      variant="outline" 
-                      onClick={resetForm}
-                      className="transition-all"
-                    >
-                      Cancel
-                    </Button>
-                  </DialogClose>
+                <div className="sticky bottom-0 bg-background border-t px-6 py-4 flex justify-end gap-3">
+                  <Button 
+                    variant="outline" 
+                    onClick={() => {
+                      setShowCreateTaskDialog(false)
+                      resetForm()
+                    }}
+                    className="transition-all"
+                  >
+                    Cancel
+                  </Button>
                   <Button 
                     onClick={validateAndCreateTask}
                     className="transition-all bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
                   >
                     Create Task
                   </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
-          </div>
-        </div>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
 
         {/* Summary Stats Cards - Cleaner design */}
         <div className="grid grid-cols-3 gap-6 mb-8">
