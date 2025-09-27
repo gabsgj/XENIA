@@ -1,0 +1,245 @@
+/* Timer Component Styles */
+
+/* Container for timer in kanban cards */
+.timerContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+  background: rgba(248, 250, 252, 0.5);
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  border-radius: 8px;
+  width: 100%;
+}
+
+.dark .timerContainer {
+  background: rgba(30, 41, 59, 0.5);
+  border-color: rgba(71, 85, 105, 0.8);
+}
+
+/* Timer display row */
+.timerDisplay {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.timerTime {
+  font-family: 'Courier New', monospace;
+  font-size: 13px;
+  font-weight: 600;
+  color: #475569;
+  min-width: 48px;
+}
+
+.dark .timerTime {
+  color: #cbd5e1;
+}
+
+/* Progress bar */
+.progressBar {
+  flex: 1;
+  height: 6px;
+  background: #e2e8f0;
+  border-radius: 3px;
+  overflow: hidden;
+  position: relative;
+}
+
+.dark .progressBar {
+  background: #334155;
+}
+
+.progressFill {
+  height: 100%;
+  background: linear-gradient(90deg, #3b82f6, #2563eb);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.dark .progressFill {
+  background: linear-gradient(90deg, #60a5fa, #3b82f6);
+}
+
+/* Control buttons row */
+.controlButtons {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  width: 100%;
+}
+
+.buttonGroup {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Individual button styles */
+.timerButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: white;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.dark .timerButton {
+  background: #1e293b;
+}
+
+.timerButton:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.dark .timerButton:hover {
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+/* Start button */
+.startButton {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+  color: #1e40af;
+}
+
+.startButton:hover {
+  background: #dbeafe;
+  border-color: #93c5fd;
+}
+
+.dark .startButton {
+  border-color: #1e3a8a;
+  background: #1e3a8a;
+  color: #93c5fd;
+}
+
+.dark .startButton:hover {
+  background: #1e40af;
+  border-color: #2563eb;
+}
+
+/* Pause button */
+.pauseButton {
+  border-color: #fed7aa;
+  background: #fff7ed;
+  color: #c2410c;
+}
+
+.pauseButton:hover {
+  background: #fed7aa;
+  border-color: #fb923c;
+}
+
+.dark .pauseButton {
+  border-color: #7c2d12;
+  background: #7c2d12;
+  color: #fb923c;
+}
+
+.dark .pauseButton:hover {
+  background: #9a3412;
+  border-color: #ea580c;
+}
+
+/* Reset button */
+.resetButton {
+  border-color: #e5e7eb;
+  background: #f9fafb;
+  color: #6b7280;
+}
+
+.resetButton:hover {
+  background: #f3f4f6;
+  border-color: #d1d5db;
+}
+
+.dark .resetButton {
+  border-color: #4b5563;
+  background: #374151;
+  color: #9ca3af;
+}
+
+.dark .resetButton:hover {
+  background: #4b5563;
+  border-color: #6b7280;
+}
+
+/* Complete/Done button - Most prominent */
+.completeButton {
+  border-color: #86efac;
+  background: linear-gradient(135deg, #dcfce7, #bbf7d0);
+  color: #14532d;
+  padding: 4px 12px;
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(34, 197, 94, 0.2);
+}
+
+.completeButton:hover {
+  background: linear-gradient(135deg, #bbf7d0, #86efac);
+  border-color: #4ade80;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 6px rgba(34, 197, 94, 0.3);
+}
+
+.dark .completeButton {
+  border-color: #166534;
+  background: linear-gradient(135deg, #166534, #14532d);
+  color: #86efac;
+  box-shadow: 0 1px 3px rgba(34, 197, 94, 0.4);
+}
+
+.dark .completeButton:hover {
+  background: linear-gradient(135deg, #15803d, #166534);
+  border-color: #22c55e;
+  box-shadow: 0 4px 6px rgba(34, 197, 94, 0.5);
+}
+
+/* Completed state */
+.completedBadge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: linear-gradient(135deg, #dcfce7, #d1fae5);
+  border: 1.5px solid #86efac;
+  border-radius: 8px;
+  color: #14532d;
+  font-size: 13px;
+  font-weight: 600;
+  width: 100%;
+  justify-content: center;
+}
+
+.dark .completedBadge {
+  background: linear-gradient(135deg, #064e3b, #065f46);
+  border-color: #10b981;
+  color: #6ee7b7;
+}
+
+/* Mobile responsive adjustments */
+@media (max-width: 640px) {
+  .timerContainer {
+    padding: 6px;
+  }
+  
+  .timerButton {
+    padding: 6px;
+    min-width: 32px;
+    min-height: 32px;
+  }
+  
+  .completeButton {
+    padding: 6px 10px;
+    font-size: 11px;
+  }
+}

@@ -147,46 +147,78 @@ export function MinimalTimer({
 
   if (status === 'completed') {
     return (
-      <div className={`${className} flex items-center gap-1.5 px-2 py-1 bg-green-50 dark:bg-green-900/20 rounded border border-green-200 dark:border-green-800`}>
-        <CheckCircle className="w-3 h-3 text-green-600" />
-        <span className="text-xs font-medium text-green-700 dark:text-green-300">Done</span>
+      <div className={`${className} flex items-center justify-center gap-2 px-3 py-2 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/30 dark:to-emerald-900/30 rounded-lg border border-green-300 dark:border-green-700 shadow-sm`}>
+        <CheckCircle className="w-4 h-4 text-green-600 dark:text-green-400" />
+        <span className="text-sm font-semibold text-green-700 dark:text-green-300">Completed</span>
       </div>
     )
   }
 
   return (
-    <div className={`${className} relative flex flex-wrap sm:flex-nowrap items-center gap-2 px-2 py-1 bg-background rounded border w-full max-w-full overflow-hidden min-w-0` }>
-      <div className="text-xs font-mono min-w-[2.75rem] text-muted-foreground">{formatTime(remaining)}</div>
-      <div className="flex-1 bg-muted/30 rounded-full h-1 overflow-hidden min-w-[2rem]">
-        <div
-          className="h-1 bg-primary rounded-full transition-all duration-300"
-          style={{ width: `${progressPercent}%` }}
-        />
+    <div className={`${className} relative flex flex-col gap-2 px-2 py-2 bg-background rounded border w-full max-w-full min-w-0` }>
+      {/* Timer display and progress bar */}
+      <div className="flex items-center gap-2 w-full">
+        <div className="text-xs font-mono min-w-[3rem] text-muted-foreground">{formatTime(remaining)}</div>
+        <div className="flex-1 bg-muted/30 rounded-full h-1.5 overflow-hidden">
+          <div
+            className="h-1.5 bg-primary rounded-full transition-all duration-300"
+            style={{ width: `${progressPercent}%` }}
+          />
+        </div>
       </div>
-      <div className="flex items-center gap-1 shrink-0 ml-auto max-w-full">
+      {/* Control buttons */}
+      <div className="flex items-center gap-1 justify-end w-full">
         {/* Start button - visible when not running and not completed */}
         {!isRunning && (
-          <Button size="sm" variant="ghost" onClick={start} className="h-6 w-6 p-0 hover:bg-muted/50" aria-label="Start" title="Start">
-            <Play className="w-3 h-3" />
+          <Button 
+            size="sm" 
+            variant="ghost" 
+            onClick={start} 
+            className="h-7 w-7 p-0 hover:bg-blue-100 dark:hover:bg-blue-900/30 hover:text-blue-700 dark:hover:text-blue-300" 
+            aria-label="Start" 
+            title="Start Timer"
+          >
+            <Play className="w-3.5 h-3.5" />
           </Button>
         )}
 
         {/* Pause button - visible when running */}
         {isRunning && (
-          <Button size="sm" variant="ghost" onClick={pause} className="h-6 w-6 p-0 hover:bg-muted/50" aria-label="Pause" title="Pause">
-            <Pause className="w-3 h-3" />
+          <Button 
+            size="sm" 
+            variant="ghost" 
+            onClick={pause} 
+            className="h-7 w-7 p-0 hover:bg-orange-100 dark:hover:bg-orange-900/30 hover:text-orange-700 dark:hover:text-orange-300" 
+            aria-label="Pause" 
+            title="Pause Timer"
+          >
+            <Pause className="w-3.5 h-3.5" />
           </Button>
         )}
 
         {/* Reset button - always visible */}
-        <Button size="sm" variant="ghost" onClick={reset} className="h-6 w-6 p-0 hover:bg-muted/50" aria-label="Reset" title="Reset">
-          <RotateCcw className="w-3 h-3" />
+        <Button 
+          size="sm" 
+          variant="ghost" 
+          onClick={reset} 
+          className="h-7 w-7 p-0 hover:bg-gray-100 dark:hover:bg-gray-900/30 hover:text-gray-700 dark:hover:text-gray-300" 
+          aria-label="Reset" 
+          title="Reset Timer"
+        >
+          <RotateCcw className="w-3.5 h-3.5" />
         </Button>
 
-        {/* Complete button - visible when not completed; make it obvious in kanban */}
-        <Button size="sm" variant="outline" onClick={complete} className="h-6 px-2 py-0 hover:bg-muted/50 whitespace-nowrap" aria-label="Complete" title="Complete">
-          <CheckCircle className="w-3 h-3 mr-1" />
-          <span className="hidden sm:inline text-xs">Complete</span>
+        {/* Complete button - prominent green button always visible */}
+        <Button 
+          size="sm" 
+          variant="default" 
+          onClick={complete} 
+          className="h-7 px-3 py-0 bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-600 text-white border-0 shadow-sm hover:shadow-md transition-all whitespace-nowrap font-medium" 
+          aria-label="Mark as Complete" 
+          title="Mark as Complete"
+        >
+          <CheckCircle className="w-3.5 h-3.5 mr-1" />
+          <span className="text-xs">Done</span>
         </Button>
       </div>
     </div>
