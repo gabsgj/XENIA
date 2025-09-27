@@ -53,6 +53,7 @@ def setup_logging(app: Flask):
 
 def create_app() -> Flask:
     app = Flask(__name__)
+    app.url_map.strict_slashes = False  # Make Flask treat /path and /path/ as the same
     CORS(app, supports_credentials=True)
     load_config(app)
     

@@ -7,6 +7,26 @@ from datetime import datetime, timezone
 logger = logging.getLogger('xenia')
 tasks_bp = Blueprint("tasks", __name__)
 
+# Status mapping between database and frontend
+def db_to_frontend_status(db_status: str) -> str:
+    """Map database status to frontend expected status."""
+    mapping = {
+        'todo': 'pending',
+        'in_progress': 'in-progress',
+        'done': 'completed',
+        'completed': 'completed'
+    }
+    return mapping.get(db_status, db_status)
+
+def frontend_to_db_status(frontend_status: str) -> str:
+    """Map frontend status to database status."""
+    mapping = {
+        'pending': 'todo',
+        'in-progress': 'in_progress',
+        'completed': 'done'
+    }
+    return mapping.get(frontend_status, frontend_status)
+
 
 @tasks_bp.get("/")
 def get_tasks():
@@ -22,7 +42,26 @@ def get_tasks():
     # Return ALL tasks for this user, not just today's
     try:
         resp = sb.table("tasks").select("*").eq("user_id", norm_user_id).execute()
-        tasks = resp.data or []
+        db_tasks = resp.data or []
+        
+        # Map database schema to frontend expected format
+        tasks = []
+        for db_task in db_tasks:
+            tasks.append({
+                "id": db_task.get("id"),
+                "title": db_task.get("topic", "Untitled"),  # Map 'topic' to 'title'
+                "subject": "General",  # Default since not in DB
+                "due_date": db_task.get("due_date"),
+                "dueDate": db_task.get("due_date"),  # Provide both formats
+                "duration_minutes": 30,  # Default since not in DB
+                "estimatedMinutes": 30,  # Provide both formats
+                "priority": "Medium",  # Default since not in DB
+                "status": db_to_frontend_status(db_task.get("status", "todo")),
+                "completed": db_task.get("status") in ["done", "completed"],
+                "created_at": db_task.get("created_at"),
+                "user_id": db_task.get("user_id")
+            })
+        
         logger.info(f"   Retrieved {len(tasks)} tasks")
         return {"tasks": tasks}
     except Exception as e:
@@ -89,8 +128,8 @@ def complete_task():
         raise ApiError("PLAN_400", "Missing task_id")
     
     try:
-        logger.info("   Updating task status to 'completed'...")
-        sb.table("tasks").update({"status": "completed"}).eq("id", task_id).execute()
+        logger.info("   Updating task status to 'done'...")
+        sb.table("tasks").update({"status": "done"}).eq("id", task_id).execute()
         logger.info("   Task status updated successfully")
         
         if user_id:
@@ -124,7 +163,26 @@ def get_daily_tasks():
     today = datetime.now(timezone.utc).date().isoformat()
     try:
         resp = sb.table("tasks").select("*").eq("user_id", norm_user_id).eq("due_date", today).execute()
-        tasks = resp.data or []
+        db_tasks = resp.data or []
+        
+        # Map database schema to frontend expected format
+        tasks = []
+        for db_task in db_tasks:
+            tasks.append({
+                "id": db_task.get("id"),
+                "title": db_task.get("topic", "Untitled"),  # Map 'topic' to 'title'
+                "subject": "General",  # Default since not in DB
+                "due_date": db_task.get("due_date"),
+                "dueDate": db_task.get("due_date"),  # Provide both formats
+                "duration_minutes": 30,  # Default since not in DB
+                "estimatedMinutes": 30,  # Provide both formats
+                "priority": "Medium",  # Default since not in DB
+                "status": db_to_frontend_status(db_task.get("status", "todo")),
+                "completed": db_task.get("status") in ["done", "completed"],
+                "created_at": db_task.get("created_at"),
+                "user_id": db_task.get("user_id")
+            })
+        
         logger.info(f"   Retrieved {len(tasks)} tasks for today")
         return {"tasks": tasks}
     except Exception as e:
@@ -149,15 +207,29 @@ def get_upcoming_tasks():
         resp = sb.table('tasks').select('*').eq('user_id', norm_user_id).execute()
         rows = resp.data or []
         upcoming = []
-        for r in rows:
-            due = r.get('due_date')
+        for db_task in rows:
+            due = db_task.get('due_date')
             if not due:
                 continue
             try:
                 from datetime import date
                 d = date.fromisoformat(due)
                 if today <= d <= (today + timedelta(days=7)):
-                    upcoming.append(r)
+                    # Map database schema to frontend expected format
+                    upcoming.append({
+                        "id": db_task.get("id"),
+                        "title": db_task.get("topic", "Untitled"),  # Map 'topic' to 'title'
+                        "subject": "General",  # Default since not in DB
+                        "due_date": db_task.get("due_date"),
+                        "dueDate": db_task.get("due_date"),  # Provide both formats
+                        "duration_minutes": 30,  # Default since not in DB
+                        "estimatedMinutes": 30,  # Provide both formats
+                        "priority": "Medium",  # Default since not in DB
+                        "status": db_to_frontend_status(db_task.get("status", "todo")),
+                        "completed": db_task.get("status") in ["done", "completed"],
+                        "created_at": db_task.get("created_at"),
+                        "user_id": db_task.get("user_id")
+                    })
             except Exception:
                 continue
         return {'tasks': upcoming}
@@ -190,7 +262,7 @@ def start_session():
         }
         sb.table('sessions').insert(record).execute()
         # mark task as in-progress
-        sb.table('tasks').update({'status': 'in-progress'}).eq('id', task_id).execute()
+        sb.table('tasks').update({'status': 'in_progress'}).eq('id', task_id).execute()
         return {'ok': True, 'session': record}
     except Exception as e:
         logger.warning(f'   Failed to start session: {e}')
@@ -212,7 +284,7 @@ def end_session():
         if session_id:
             sb.table('sessions').update({'status': 'completed'}).eq('id', session_id).execute()
         if task_id:
-            sb.table('tasks').update({'status': 'completed'}).eq('id', task_id).execute()
+            sb.table('tasks').update({'status': 'done'}).eq('id', task_id).execute()
             if user_id:
                 sb.rpc('add_xp', {'p_user_id': user_id, 'p_xp': 20}).execute()
         return {'ok': True}
@@ -241,31 +313,41 @@ def update_task(task_id):
         if not resp.data:
             raise ApiError("TASK_404", "Task not found", status=404)
         
-        # Prepare update data (only include fields that were provided)
+        # Prepare update data - map to actual database schema
         update_data = {}
         if "title" in data:
-            update_data["title"] = data["title"]
-        if "subject" in data:
-            update_data["subject"] = data["subject"]
+            update_data["topic"] = data["title"]  # Map 'title' to 'topic'
         if "due_date" in data:
             update_data["due_date"] = data["due_date"]
         if "dueDate" in data:
             update_data["due_date"] = data["dueDate"]
-        if "duration_minutes" in data:
-            update_data["duration_minutes"] = data["duration_minutes"]
-        if "estimatedMinutes" in data:
-            update_data["duration_minutes"] = data["estimatedMinutes"]
         if "status" in data:
-            update_data["status"] = data["status"]
-        if "priority" in data:
-            update_data["priority"] = data["priority"]
+            update_data["status"] = frontend_to_db_status(data["status"])
         if "completed" in data and data["completed"]:
-            update_data["status"] = "completed"
+            update_data["status"] = "done"
         
         update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
         
         resp = sb.table("tasks").update(update_data).eq("id", task_id).execute()
-        task = resp.data[0] if resp.data else update_data
+        
+        # Map response back to frontend format
+        if resp.data and len(resp.data) > 0:
+            db_task = resp.data[0]
+            task = {
+                "id": db_task.get("id"),
+                "title": db_task.get("topic", "Untitled"),  # Map 'topic' back to 'title'
+                "subject": data.get("subject", "General"),  # Preserve from request
+                "due_date": db_task.get("due_date"),
+                "dueDate": db_task.get("due_date"),
+                "duration_minutes": data.get("duration_minutes", data.get("estimatedMinutes", 30)),
+                "estimatedMinutes": data.get("estimatedMinutes", data.get("duration_minutes", 30)),
+                "priority": data.get("priority", "Medium"),
+                "status": db_to_frontend_status(db_task.get("status", "todo")),
+                "completed": db_task.get("status") in ["done", "completed"],
+                "user_id": db_task.get("user_id")
+            }
+        else:
+            task = update_data
         
         logger.info(f"   Updated task {task_id}")
         return {"task": task}
@@ -311,7 +393,6 @@ def create_task():
     duration_minutes = data.get("duration_minutes", data.get("estimatedMinutes", 30))
     subject = data.get("subject", "General")
     priority = data.get("priority", "Medium")
-    difficulty = data.get("difficulty", "Medium")
     
     if not user_id:
         raise ApiError("AUTH_401", "Missing user_id")
@@ -323,20 +404,45 @@ def create_task():
     
     try:
         from datetime import datetime, timezone
+        # Map to actual database schema
         task_data = {
             "user_id": norm_user_id,
-            "title": title,
-            "subject": subject,
+            "topic": title,  # Database uses 'topic' instead of 'title'
+            "status": "todo",  # Database uses 'todo' instead of 'pending'
             "due_date": due_date,
-            "duration_minutes": duration_minutes,
-            "priority": priority,
-            "difficulty": difficulty,
-            "status": "pending",
             "created_at": datetime.now(timezone.utc).isoformat()
         }
         
         resp = sb.table("tasks").insert(task_data).execute()
-        task = resp.data[0] if resp.data else task_data
+        
+        # Map database response back to expected format
+        if resp.data and len(resp.data) > 0:
+            db_task = resp.data[0]
+            task = {
+                "id": db_task.get("id"),
+                "title": db_task.get("topic", title),  # Map 'topic' back to 'title'
+                "subject": subject,
+                "due_date": db_task.get("due_date"),
+                "dueDate": db_task.get("due_date"),  # Provide both formats
+                "duration_minutes": duration_minutes,
+                "estimatedMinutes": duration_minutes,  # Provide both formats
+                "priority": priority,
+                "status": db_to_frontend_status(db_task.get("status", "todo")),
+                "created_at": db_task.get("created_at"),
+                "user_id": db_task.get("user_id")
+            }
+        else:
+            # Fallback if no response data
+            task = {
+                "title": title,
+                "subject": subject,
+                "due_date": due_date,
+                "dueDate": due_date,
+                "duration_minutes": duration_minutes,
+                "estimatedMinutes": duration_minutes,
+                "priority": priority,
+                "status": "pending"
+            }
         
         logger.info(f"   Created task: {title}")
         return {"task": task}
