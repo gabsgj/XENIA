@@ -197,41 +197,42 @@ export default function TaskItem({ task, activeTaskId, processingIds, onStart, o
                   </>
                 )}
 
-                {/* More menu aligned with actions */}
+                {/* Inline compact action menu for consistency: Edit | Complete | Delete */}
                 {!task.fromPlan && (
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button 
+                  <div className="hidden sm:flex items-center gap-1">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      aria-label="Edit task"
+                      onClick={() => { try { onEdit(task as Task) } catch {} }}
+                    >
+                      <Edit className="w-4 h-4 mr-1" />
+                      Edit
+                    </Button>
+                    {!isCompleted && (
+                      <Button
                         type="button"
-                        variant="ghost" 
-                        size="icon"
-                        className="h-9 w-9"
-                        aria-label="Task actions"
+                        size="sm"
+                        variant="outline"
+                        aria-label="Mark as complete"
+                        onClick={() => { Promise.resolve(onComplete(task as Task)).catch(() => {}) }}
                       >
-                        <MoreVertical className="h-4 w-4" />
+                        <CheckCircle2 className="w-4 h-4 mr-1" />
+                        Mark as Complete
                       </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-48">
-                      <DropdownMenuItem onClick={() => { try { onEdit(task as Task) } catch {} }} className="cursor-pointer">
-                        <Edit className="mr-2 h-4 w-4" />
-                        Edit
-                      </DropdownMenuItem>
-                      {!isCompleted && (
-                        <DropdownMenuItem onClick={() => { Promise.resolve(onComplete(task as Task)).catch(() => {}) }} className="cursor-pointer">
-                          <CheckCircle2 className="mr-2 h-4 w-4" />
-                          Mark as Complete
-                        </DropdownMenuItem>
-                      )}
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem 
-                        onClick={() => { Promise.resolve(onDelete(task as Task)).catch(() => {}) }} 
-                        className="cursor-pointer text-red-600 dark:text-red-400"
-                      >
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        Delete
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                    )}
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="destructive"
+                      aria-label="Delete task"
+                      onClick={() => { Promise.resolve(onDelete(task as Task)).catch(() => {}) }}
+                    >
+                      <Trash2 className="w-4 h-4 mr-1" />
+                      Delete
+                    </Button>
+                  </div>
                 )}
               </div>
             </div>

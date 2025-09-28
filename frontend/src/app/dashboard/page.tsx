@@ -249,9 +249,8 @@ export default function DashboardPage(){
 
   const percentComplete = ((): number => {
     const fromDash = dash?.stats?.sessionPercent
-    if (typeof fromDash === 'number' && !isNaN(fromDash) && fromDash > 0) return Math.round(fromDash)
-    const analyticsCount = Array.isArray(data?.sessions) ? data.sessions.length : 0
-    if (analyticsCount > 0) return 100
+    if (typeof fromDash === 'number' && !isNaN(fromDash)) return Math.max(0, Math.min(100, Math.round(fromDash)))
+    // Compute from plan sessions only; avoid defaulting to 100% when analytics exists
     const s = plan?.sessions || []
     const c = s.filter((x: any) => x.status === 'completed').length
     return s.length ? Math.round((c / s.length) * 100) : 0
@@ -641,12 +640,13 @@ export default function DashboardPage(){
                     </div>
                   ) : weeklyChartData.length > 1 ? (
                     <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart data={weeklyChartData}>
+                      <BarChart data={weeklyChartData}>
                         <XAxis dataKey="week" />
                         <YAxis />
                         <Tooltip />
-                        <Area type="monotone" dataKey="study_time" stroke="#8884d8" fill="#8884d8" />
-                      </AreaChart>
+                        <Bar dataKey="study_time" name="Study Time (min)" fill="hsl(var(--primary))" radius={[4,4,0,0]} />
+                        <Bar dataKey="sessions" name="Sessions" fill="hsl(var(--primary) / 0.4)" radius={[4,4,0,0]} />
+                      </BarChart>
                     </ResponsiveContainer>
                   ) : (
                     <div className="flex items-end gap-1 h-full px-2">
@@ -679,8 +679,8 @@ export default function DashboardPage(){
                       }))}>
                         <XAxis dataKey="subject" hide={false} interval={0} angle={-30} textAnchor="end" height={60} />
                         <YAxis domain={[0, 100]} />
-                        <Tooltip />
-                        <Bar dataKey="completion" fill="#82ca9d" />
+                        <Tooltip formatter={(v:any)=> [`${v}%`, 'Completion']} />
+                        <Bar dataKey="completion" fill="hsl(var(--primary))" radius={[4,4,0,0]} />
                       </BarChart>
                     </ResponsiveContainer>
                   ) : (

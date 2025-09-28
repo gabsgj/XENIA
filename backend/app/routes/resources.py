@@ -160,6 +160,10 @@ def update_progress():
                     if "duration_min" in upd:
                         session_map[key]["duration_min"] = upd["duration_min"]
 
+                    # Determine target DB task status for consistency
+                    db_status = "done" if new_status == "completed" else ("doing" if new_status == "in-progress" else "todo")
+
+                    # Apply analytics capture when transitioning to completed
                     if old_status != "completed" and new_status == "completed":
                         session_data = session_map[key]
                         completed_sessions.append({
@@ -170,15 +174,15 @@ def update_progress():
                             "created_at": f"{upd.get('date')}T12:00:00Z"
                         })
 
-                        # Also mark corresponding task as done (match by user_id + topic + due_date)
-                        try:
-                            supabase_call(lambda: sb.table("tasks").update({"status": "done"})
-                                .eq("user_id", user_id)
-                                .eq("topic", session_data.get("topic"))
-                                .eq("due_date", upd.get("date"))
-                                .execute())
-                        except Exception as te:
-                            logger.warning(f"Failed to mark task as done for {session_data.get('topic')} on {upd.get('date')}: {te}")
+                    # Persist matching task status change (match by user_id + topic + due_date)
+                    try:
+                        supabase_call(lambda: sb.table("tasks").update({"status": db_status})
+                            .eq("user_id", user_id)
+                            .eq("topic", session_map[key].get("topic"))
+                            .eq("due_date", upd.get("date"))
+                            .execute())
+                    except Exception as te:
+                        logger.warning(f"Failed to update task status to {db_status} for {session_map[key].get('topic')} on {upd.get('date')}: {te}")
 
             # Upsert updated plan back
             plan["sessions"] = list(session_map.values())
@@ -230,6 +234,9 @@ def update_progress():
                     if "duration_min" in upd:
                         session_map[key]["duration_min"] = upd["duration_min"]
 
+                    # Determine target DB task status for consistency
+                    db_status = "done" if new_status == "completed" else ("doing" if new_status == "in-progress" else "todo")
+
                     if old_status != "completed" and new_status == "completed":
                         session_data = session_map[key]
                         completed_sessions.append({
@@ -239,15 +246,15 @@ def update_progress():
                             "status": "completed",
                             "created_at": f"{upd.get('date')}T12:00:00Z"
                         })
-                        # Attempt to mark task as done in fallback path as well
-                        try:
-                            supabase_call(lambda: sb.table("tasks").update({"status": "done"})
-                                .eq("user_id", user_id)
-                                .eq("topic", session_data.get("topic"))
-                                .eq("due_date", upd.get("date"))
-                                .execute())
-                        except Exception as te:
-                            logger.warning(f"(fallback) Failed to mark task as done for {session_data.get('topic')} on {upd.get('date')}: {te}")
+                    # Update matching task status
+                    try:
+                        supabase_call(lambda: sb.table("tasks").update({"status": db_status})
+                            .eq("user_id", user_id)
+                            .eq("topic", session_map[key].get("topic"))
+                            .eq("due_date", upd.get("date"))
+                            .execute())
+                    except Exception as te:
+                        logger.warning(f"(fallback) Failed to update task to {db_status} for {session_map[key].get('topic')} on {upd.get('date')}: {te}")
 
             plan["sessions"] = list(session_map.values())
             supabase_call(lambda: sb.table("plans").upsert({"user_id": user_id, "plan": plan}).execute())

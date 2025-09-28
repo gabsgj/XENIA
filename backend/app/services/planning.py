@@ -15,7 +15,12 @@ logger = logging.getLogger('xenia')
 def _sync_plan_tasks(norm_user_id: str, plan: Dict) -> None:
     """Sync plan sessions into the tasks table so frontend sees tasks immediately.
 
-    Creates/upserts a task per session (due_date set from session.date).
+    Creates/updates a task per session (due_date set from session.date) using
+    normalized status values that match the database constraint:
+      - pending -> todo
+      - in-progress -> doing
+      - completed -> done
+
     Best-effort: logs and continues on failure.
     """
     try:
@@ -24,23 +29,46 @@ def _sync_plan_tasks(norm_user_id: str, plan: Dict) -> None:
             return
         sb = get_supabase()
         sessions = plan.get("sessions", []) or []
-        rows = []
+
+        def _to_db_status(sess_status: str) -> str:
+            m = {
+                'pending': 'todo',
+                'in-progress': 'doing',
+                'completed': 'done'
+            }
+            return m.get((sess_status or 'pending').strip(), 'todo')
+
         for s in sessions:
-            # Map session date to due_date; fallback to generated_at
-            due = s.get("date")
-            rows.append({
-                "user_id": norm_user_id,
-                "topic": s.get("topic"),
-                "status": s.get("status") or "todo",
-                "due_date": due,
-                "duration_minutes": s.get("duration_min", 45),
-            })
-        if rows:
             try:
-                sb.table("tasks").upsert(rows).execute()
-                logger.info(f"   Synced {len(rows)} plan sessions into tasks for user {norm_user_id}")
-            except Exception as e:
-                logger.warning(f"   Failed to upsert tasks for user {norm_user_id}: {e}")
+                due = s.get("date")
+                topic = s.get("topic")
+                db_status = _to_db_status(s.get("status") or 'pending')
+                if not topic or not due:
+                    continue
+                # First try update existing row by composite keys
+                try:
+                    upd = sb.table("tasks").update({
+                        "status": db_status,
+                        "due_date": due,
+                    }).eq("user_id", norm_user_id).eq("topic", topic).eq("due_date", due).select("id").execute()
+                    if getattr(upd, 'data', None):
+                        continue
+                except Exception:
+                    # proceed to insert path if update failed (e.g., no row)
+                    pass
+                # Insert new row with normalized status
+                try:
+                    sb.table("tasks").insert({
+                        "user_id": norm_user_id,
+                        "topic": topic,
+                        "status": db_status,
+                        "due_date": due,
+                    }).execute()
+                except Exception as ie:
+                    logger.warning(f"   Task insert failed for user {norm_user_id} topic '{topic}' on {due}: {ie}")
+            except Exception as row_err:
+                logger.warning(f"   Skipping task sync for a session due to error: {row_err}")
+        logger.info(f"   Task sync attempted for {len(sessions)} sessions for user {norm_user_id}")
     except Exception as e:
         logger.warning(f"   Task sync failed unexpectedly: {e}")
 

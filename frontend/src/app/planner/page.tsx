@@ -46,6 +46,7 @@ export default function PlannerPage() {
   const [plan, setPlan] = useState<any>(null)
   const [topics, setTopics] = useState<any[]>([])
   const [resources, setResources] = useState<any[]>([])
+  const [topicResources, setTopicResources] = useState<Record<string, any[]>>({})
   const [hoursPerDay, setHoursPerDay] = useState(1.5)
   const [deadline, setDeadline] = useState('')
   const [loading, setLoading] = useState(false)
@@ -93,7 +94,8 @@ export default function PlannerPage() {
         // Also fetch topic-specific resources for current plan topics
         if (p?.sessions?.length > 0) {
           const uniqueTopics = [...new Set(p.sessions.map((s:any) => s.topic))] as string[]
-          const topicResourcePromises = uniqueTopics.slice(0, 5).map(async (topic: string) => {
+          // Fetch more topics to reduce duplication across tasks
+          const topicResourcePromises = uniqueTopics.slice(0, 12).map(async (topic: string) => {
             try {
               const topicRes = await api(`/api/resources/recommendations/${encodeURIComponent(topic)}?learning_style=balanced&difficulty=intermediate&free_only=true`)
               return { topic, resources: topicRes.grouped_recommendations || {} }
@@ -105,30 +107,34 @@ export default function PlannerPage() {
           
           const topicResourcesResults = await Promise.allSettled(topicResourcePromises)
           const additionalResources: any[] = []
+          const byTopic: Record<string, any[]> = {}
           
           topicResourcesResults.forEach((result) => {
             if (result.status === 'fulfilled' && result.value?.resources) {
               const { topic, resources: topicRes } = result.value
+              const bucket: any[] = []
               
               // Extract different types of resources from grouped recommendations
               Object.entries(topicRes).forEach(([category, resourceList]: [string, any]) => {
                 if (Array.isArray(resourceList)) {
                   resourceList.forEach((resource: any) => {
-                    additionalResources.push({
+                    const normalized = {
                       ...resource,
                       topic: topic,
                       source: category === 'youtube_videos' ? 'youtube' : 
-                             category === 'ocw_courses' ? 'ocw' : 
                              category === 'documentation' ? 'docs' : 
                              category === 'ai_generated' ? 'ai' : 'general',
                       title: resource.title || resource.name || 'Untitled Resource',
                       url: resource.url || resource.link || `https://www.youtube.com/results?search_query=${encodeURIComponent(topic + ' tutorial')}`,
                       duration: resource.duration || resource.metadata?.videoDuration || 10,
                       quality_score: resource.quality_score || resource.recommendation_score || 5
-                    })
+                    }
+                    additionalResources.push(normalized)
+                    bucket.push(normalized)
                   })
                 }
               })
+              byTopic[topic] = bucket
             }
           })
           
@@ -138,6 +144,9 @@ export default function PlannerPage() {
             const newResources = additionalResources.filter(r => !existingUrls.has(r.url))
             return [...prev, ...newResources]
           })
+          // Set topic-specific buckets for precise per-task recommendations
+          setTopicResources(prev => ({ ...prev, ...byTopic }))
+        }
         }
       } catch(e:any){ 
         pushError({ 
@@ -480,8 +489,7 @@ export default function PlannerPage() {
                           <p className='text-xs text-muted-foreground mb-2'>{s.focus}</p>
                           
                           {/* Resource suggestions for this topic */}
-                          {resources
-                              .filter((r:any) => matchesTopic(r, s.topic))
+                          {(topicResources[s.topic] || [])
                               .sort((a:any,b:any)=> (b.source==='youtube'?1:0) - (a.source==='youtube'?1:0))
                               .slice(0, 5)
                               .map((resource:any, rIdx:number) => (
@@ -556,8 +564,7 @@ export default function PlannerPage() {
                               />
                             </td>
                             <td className='p-3'>
-                              {resources
-                                .filter((r:any) => matchesTopic(r, s.topic))
+                              {(topicResources[s.topic] || [])
                                 .sort((a:any,b:any)=> (b.source==='youtube'?1:0) - (a.source==='youtube'?1:0))
                                 .slice(0, 1)
                                 .map((resource:any, rIdx:number) => (
@@ -570,7 +577,7 @@ export default function PlannerPage() {
                                   )}
                                 </a>
                               ))}
-                              {resources.filter((r:any) => matchesTopic(r, s.topic)).length === 0 && (
+                              {(topicResources[s.topic] || []).length === 0 && (
                                 <span className="text-xs text-muted-foreground">No resources</span>
                               )}
                             </td>
@@ -609,11 +616,11 @@ export default function PlannerPage() {
                           <p className="text-muted-foreground text-sm mb-2">{s.focus}</p>
                           
                           {/* Resource suggestions */}
-                          {resources.filter((r:any) => matchesTopic(r, s.topic)).slice(0, 3).length > 0 && (
+                          {(topicResources[s.topic] || []).slice(0, 3).length > 0 && (
                             <div className="mb-3">
                               <h4 className="text-xs font-semibold text-slate-600 dark:text-slate-400 mb-2">📚 Recommended Resources:</h4>
                               <div className="grid gap-2">
-                                {resources.filter((r:any) => matchesTopic(r, s.topic)).slice(0, 3).map((resource:any, rIdx:number) => (
+                                {(topicResources[s.topic] || []).slice(0, 3).map((resource:any, rIdx:number) => (
                                   <div key={rIdx} className="flex items-center gap-2 p-2 bg-slate-50 dark:bg-slate-800/50 rounded border border-slate-200 dark:border-slate-700">
                                     <span className="text-xs">
                                       {resource.source === 'youtube' ? '🎥' : resource.source === 'ocw' ? '🎓' : '📖'}
