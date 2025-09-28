@@ -223,13 +223,15 @@ export default function PlannerPage() {
       // Compute a safe new deadline for regeneration
       const computedNewDeadline = (() => {
         if (deadline) return deadline
-        try {
-          const dates = (plan?.sessions || []).map((s:any) => String(s.date)).filter(Boolean)
-          if (dates.length) return dates.sort().slice(-1)[0]
-        } catch {}
-        const d = new Date(); d.setDate(d.getDate() + 14)
+        
+        // If no deadline specified, calculate based on available content
+        // Default to 2 weeks if nothing else is available
+        const d = new Date()
+        d.setDate(d.getDate() + 14)
         return d.toISOString().split('T')[0]
       })()
+
+      console.log(`Regenerating plan with deadline: ${computedNewDeadline}, hours/day: ${hoursPerDay}`)
 
       // Call backend regenerate with computed topics
       const resp = await api('/api/plan/regenerate', {
@@ -240,9 +242,9 @@ export default function PlannerPage() {
           preserve_progress: true,
           excluded_topics: [],
           priority_adjustment: 'balanced',
-          learning_pace: 'moderate',
+          learning_pace: hoursPerDay <= 1 ? 'relaxed' : hoursPerDay >= 3 ? 'intensive' : 'moderate',
           topics: syllabusTopics,
-          hours_per_day: hoursPerDay // pass hours/day as a secondary constraint
+          hours_per_day: hoursPerDay // Pass hours/day for proper daily capacity calculation
         })
       })
 

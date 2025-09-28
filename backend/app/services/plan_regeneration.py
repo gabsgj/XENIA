@@ -39,13 +39,17 @@ class PlanRegenerationService:
             'preserve_progress': preserve_progress
         }
 
-        # Respect hours/day as a secondary constraint via a per-day session cap (45m per session)
+        # Pass hours_per_day directly for the scheduler to use
         if hours_per_day is not None:
+            options['hours_per_day'] = float(hours_per_day)
+            # Also calculate max_sessions_per_day based on hours
             try:
-                max_sessions = max(1, int((float(hours_per_day) * 60) // 45))
+                avg_session_duration = 45  # minutes
+                max_sessions = max(1, int((float(hours_per_day) * 60) // avg_session_duration))
                 options['max_sessions_per_day'] = max_sessions
-            except Exception:
-                pass
+                logger.info(f'   Hours per day: {hours_per_day} -> Max sessions: {max_sessions}')
+            except Exception as e:
+                logger.warning(f'   Error calculating max sessions: {e}')
 
         logger.info('   Invoking SmartScheduler with options: %s', options)
         regenerated = self.scheduler.schedule(current_copy, new_deadline, preserve_progress=preserve_progress, options=options)

@@ -312,7 +312,10 @@ def regenerate():
         priority_adjustment = data.get('priority_adjustment')
         learning_pace = data.get('learning_pace')
         excluded_topics = data.get('excluded_topics', []) or []
-        hours_per_day = data.get('hours_per_day')  # optional; secondary to deadline
+        hours_per_day = data.get('hours_per_day')  # Used to calculate daily session capacity
+        
+        # Log the regeneration parameters
+        logger.info(f"   Regeneration parameters: deadline={new_deadline}, hours/day={hours_per_day}, pace={learning_pace}")
 
         if not new_deadline:
             raise ApiError('PLAN_400', 'new_deadline is required')
