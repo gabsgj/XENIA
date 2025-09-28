@@ -106,9 +106,10 @@ export default function TaskItem({ task, activeTaskId, processingIds, onStart, o
                     Timer Running
                   </Badge>
                   <Button 
+                    type="button"
                     size="sm" 
                     variant="outline"
-                    onClick={() => onComplete(task)}
+                    onClick={() => { Promise.resolve(onComplete(task)).catch(() => {}) }}
                     disabled={isProcessing}
                   >
                     Mark Complete
@@ -118,9 +119,10 @@ export default function TaskItem({ task, activeTaskId, processingIds, onStart, o
                 <>
                   {!isCompleted && (
                     <Button
+                      type="button"
                       size="sm"
                       variant="default"
-                      onClick={() => onStart(task)}
+                      onClick={() => { Promise.resolve(onStart(task)).catch(() => {}) }}
                       disabled={isProcessing || (Boolean(activeTaskId) && activeTaskId !== task.id)}
                     >
                       {isProcessing ? (
@@ -140,9 +142,10 @@ export default function TaskItem({ task, activeTaskId, processingIds, onStart, o
                     </span>
                   ) : (
                     <Button
+                      type="button"
                       size="sm"
                       variant="ghost"
-                      onClick={() => onComplete(task)}
+                      onClick={() => { Promise.resolve(onComplete(task)).catch(() => {}) }}
                       disabled={isProcessing}
                     >
                       {isProcessing ? (
@@ -163,6 +166,7 @@ export default function TaskItem({ task, activeTaskId, processingIds, onStart, o
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button 
+                      type="button"
                       variant="ghost" 
                       size="icon"
                       className="h-9 w-9"
@@ -172,19 +176,19 @@ export default function TaskItem({ task, activeTaskId, processingIds, onStart, o
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-48">
-                    <DropdownMenuItem onClick={() => onEdit(task as Task)} className="cursor-pointer">
+                    <DropdownMenuItem onClick={() => { try { onEdit(task as Task) } catch {} }} className="cursor-pointer">
                       <Edit className="mr-2 h-4 w-4" />
                       Edit
                     </DropdownMenuItem>
                     {!isCompleted && (
-                      <DropdownMenuItem onClick={() => onComplete(task as Task)} className="cursor-pointer">
+                      <DropdownMenuItem onClick={() => { Promise.resolve(onComplete(task as Task)).catch(() => {}) }} className="cursor-pointer">
                         <CheckCircle2 className="mr-2 h-4 w-4" />
                         Mark as Complete
                       </DropdownMenuItem>
                     )}
                     <DropdownMenuSeparator />
                     <DropdownMenuItem 
-                      onClick={() => onDelete(task as Task)} 
+                      onClick={() => { Promise.resolve(onDelete(task as Task)).catch(() => {}) }} 
                       className="cursor-pointer text-red-600 dark:text-red-400"
                     >
                       <Trash2 className="mr-2 h-4 w-4" />

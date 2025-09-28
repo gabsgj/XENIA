@@ -151,40 +151,59 @@ export default function TutorPage(){
 
     try {
       let response: any
-      if (file){
-        const form = new FormData()
-        form.append('file', file)
-        form.append('user_id', currentUserId)
-        const r = await fetch(`${API_BASE}/api/tutor/ask`, { 
-          method:'POST', 
-          body: form,
-          headers: { 'X-User-Id': currentUserId }
-        })
-        const j = await r.json().catch(()=> null)
-if(!r.ok || (j && j.success === false)){
-          pushError({ errorCode: 'TUTOR_API_DOWN', errorMessage: (j && (j.error || j.final_answer || j.message)) || 'Tutor failed', details: j })
-          return 
+
+      async function tryAskOnce(): Promise<any> {
+        if (file){
+          const form = new FormData()
+          form.append('file', file)
+          form.append('user_id', currentUserId)
+          const r = await fetch(`${API_BASE}/api/tutor/ask`, { 
+            method:'POST', 
+            body: form,
+            headers: { 'X-User-Id': currentUserId }
+          })
+          const j = await r.json().catch(()=> null)
+          if(!r.ok || (j && j.success === false)){
+            throw new Error((j && (j.error || j.final_answer || j.message)) || 'Tutor failed')
+          }
+          return (j && j.data) ? j.data : j
+        } else {
+          const r = await fetch(`${API_BASE}/api/tutor/ask`, { 
+            method:'POST', 
+            headers:{
+              'Content-Type':'application/json',
+              'X-User-Id': currentUserId
+            }, 
+            body: JSON.stringify({ question, user_id: currentUserId }) 
+          })
+          const j = await r.json().catch(()=> null)
+          if(!r.ok || (j && j.success === false)){
+            throw new Error((j && (j.error || j.final_answer || j.message)) || 'Tutor timed out')
+          }
+          return (j && j.data) ? j.data : j
         }
-        // APIResponseBuilder wraps payload in a { success, data, meta } envelope.
-        // prefer the inner data if present so we get { answer, steps, history }
-        response = (j && j.data) ? j.data : j
-      } else {
-        const r = await fetch(`${API_BASE}/api/tutor/ask`, { 
-          method:'POST', 
-          headers:{
-            'Content-Type':'application/json',
-            'X-User-Id': currentUserId
-          }, 
-          body: JSON.stringify({ question, user_id: currentUserId }) 
-        })
-        const j = await r.json().catch(()=> null)
-if(!r.ok || (j && j.success === false)){
-          pushError({ errorCode:'TUTOR_TIMEOUT', errorMessage: (j && (j.error || j.final_answer || j.message)) || 'Tutor timed out', details:j})
-          return 
+      }
+
+      // First attempt
+      try {
+        response = await tryAskOnce()
+      } catch (firstErr: any) {
+        // Check status and retry once as a fallback
+        try { await fetch(`${API_BASE}/api/tutor/status`).catch(() => null) } catch {}
+        await new Promise(res => setTimeout(res, 600))
+        try {
+          response = await tryAskOnce()
+        } catch (secondErr: any) {
+          pushError({ errorCode: 'TUTOR_API_DOWN', errorMessage: String(secondErr?.message || 'Tutor failed'), details: secondErr })
+          // Render a graceful AI message indicating degradation
+          setMessages(prev => [...prev, {
+            id: Date.now() + 1,
+            type: 'ai',
+            content: "I'm having trouble reaching the main AI provider right now. Please try again in a moment or rephrase your question.",
+            timestamp: new Date()
+          }])
+          return
         }
-        // APIResponseBuilder wraps payload in a { success, data, meta } envelope.
-        // prefer the inner data if present so we get { answer, steps, history }
-        response = (j && j.data) ? j.data : j
       }
 
       // Helper: try to extract steps and a clean textual answer without raw JSON

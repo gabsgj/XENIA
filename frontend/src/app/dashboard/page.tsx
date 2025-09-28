@@ -32,6 +32,7 @@ export default function DashboardPage(){
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState<any>(null);
   const [weekly, setWeekly] = useState<any[]>([]);
+  const [dash, setDash] = useState<any>(null);
   const { pushError } = useErrorContext();
   const [dashSessionStatus, setDashSessionStatus] = useState<Record<string, 'pending' | 'in-progress' | 'completed'>>({})
   
@@ -49,6 +50,7 @@ export default function DashboardPage(){
       if(currentPlan) setPlan(currentPlan)
       setTopics((topicResp as any)?.topics||[])
       setProgress((progressResp as any)?.progress||{})
+      setDash(dashboardResp || null)
       // Prefer weekly from dashboard, fallback to analytics
       const weeklyFromDash = (dashboardResp && (dashboardResp.weeklyProgress || dashboardResp.weekly_progress)) || []
       setWeekly(weeklyFromDash.length ? weeklyFromDash : (analytics?.weekly_progress || []))
@@ -134,6 +136,22 @@ export default function DashboardPage(){
         if ((resp as any).plan) setPlan((resp as any).plan)
         setTimeout(fetchData, 600)
       }
+      // Best-effort: also complete any matching task (title/date) to persist status across pages
+      try {
+        const tasksResp = await api('/api/tasks')
+        const list = Array.isArray((tasksResp as any).tasks) ? (tasksResp as any).tasks : []
+        const candidates = list.filter((t:any) => {
+          const title = (t.title || '').toString()
+          const normalizedTopic = (topic || '').toString()
+          const byExact = title === normalizedTopic
+          const bySubjectTitle = title === normalizedTopic.split(':').slice(1).join(':').trim()
+          const byDate = (t.dueDate || t.due_date) === date
+          return byDate && (byExact || bySubjectTitle)
+        })
+        for (const t of candidates) {
+          await api(`/api/tasks/${t.id}`, { method: 'PUT', body: JSON.stringify({ status: 'completed' }) })
+        }
+      } catch { /* ignore task sync errors */ }
     } catch(e:any){
       pushError({ errorCode: e?.errorCode||'PLAN_PROGRESS_FAIL', errorMessage: e?.errorMessage, details: e })
     }
@@ -229,36 +247,53 @@ export default function DashboardPage(){
     return counts
   },[topics])
 
-  const percentComplete = plan?.progress?.percent_complete ?? (()=>{ const s = plan?.sessions||[]; const c = s.filter((x:any)=> x.status==='completed').length; return s.length? Math.round(c/s.length*100):0 })()
+  const percentComplete = ((): number => {
+    const fromDash = dash?.stats?.sessionPercent
+    if (typeof fromDash === 'number' && !isNaN(fromDash) && fromDash > 0) return Math.round(fromDash)
+    const analyticsCount = Array.isArray(data?.sessions) ? data.sessions.length : 0
+    if (analyticsCount > 0) return 100
+    const s = plan?.sessions || []
+    const c = s.filter((x: any) => x.status === 'completed').length
+    return s.length ? Math.round((c / s.length) * 100) : 0
+  })()
 
   // Enhanced calculations using both plan and analytics data
   const enhancedStats = useMemo(()=>{
     const planSessions = plan?.sessions || []
     const completedPlanSessions = planSessions.filter((s:any) => s.status === 'completed')
     const analyticsSessions = data?.sessions || []
-    const analyticsTasks = data?.tasks || []
+
+    // Prefer dashboard stats, then analytics sessions count, then plan progress, then completed plan sessions
+    let sessionsCompleted = 0
+    if (dash?.stats && typeof dash.stats.sessionsCompleted === 'number') {
+      sessionsCompleted = dash.stats.sessionsCompleted
+    } else if (Array.isArray(analyticsSessions)) {
+      sessionsCompleted = analyticsSessions.length
+    } else if (plan?.progress && typeof plan.progress.sessions_completed === 'number') {
+      sessionsCompleted = plan.progress.sessions_completed
+    } else {
+      sessionsCompleted = completedPlanSessions.length
+    }
     
-    // Use plan data if available, fallback to analytics
-    const sessionsCompleted = plan?.progress?.sessions_completed ?? completedPlanSessions.length
-    
-    // Calculate total study time from completed plan sessions + analytics sessions
+    // Calculate total study time using the higher of plan-completed sum vs analytics total
     const planStudyTime = completedPlanSessions.reduce((total:number, session:any) => total + (session.duration_min || 0), 0)
-    const analyticsStudyTime = analyticsSessions.reduce((total:number, session:any) => total + (session.duration_min || 0), 0)
-    const totalStudyTime = Math.max(planStudyTime, analyticsStudyTime) // Use whichever is higher
+    const analyticsStudyTime = (data?.sessions || []).reduce((total:number, session:any) => total + (session.duration_min || 0), 0)
+    const totalStudyTime = Math.max(planStudyTime, analyticsStudyTime)
     
     // Enhanced streak calculation using analytics profile data
     const streakDays = data?.profile?.streak_days || (completedPlanSessions.length > 0 ? 1 : 0)
     
-    // Calculate quiz performance: prefer server-provided analytics (quizzesTaken) when available
+    // Calculate quiz performance: prefer server-provided analytics (dashboard API via analytics.student stats), fallback to progress
     const topicsWithQuizzes = Object.values(progress || {}).filter((topic: any) => (topic.quizzes_taken || 0) > 0)
     const totalQuizzesFromProgress = topicsWithQuizzes.reduce((sum: number, topic: any) => sum + (topic.quizzes_taken || 0), 0)
     const avgScoreFromProgress = topicsWithQuizzes.length > 0 
       ? topicsWithQuizzes.reduce((sum: number, topic: any) => sum + (topic.last_score || 0), 0) / topicsWithQuizzes.length
       : 0
 
-    // Server analytics may include an authoritative quizzesTaken count (dashboard API)
-    const serverQuizzes = (data && data.stats && typeof data.stats.quizzesTaken === 'number') ? data.stats.quizzesTaken : 0
-    const totalQuizzes = serverQuizzes > 0 ? serverQuizzes : totalQuizzesFromProgress
+    const dashQuizzes = (dash && dash.stats && typeof dash.stats.quizzesTaken === 'number') ? dash.stats.quizzesTaken : 0
+    const analyticsQuizzes = (data && data.stats && typeof data.stats.quizzesTaken === 'number') ? data.stats.quizzesTaken : 0
+    const chosenQuizzes = dashQuizzes > 0 ? dashQuizzes : analyticsQuizzes
+    const totalQuizzes = chosenQuizzes > 0 ? chosenQuizzes : totalQuizzesFromProgress
     const avgScore = topicsWithQuizzes.length > 0 ? avgScoreFromProgress : 0
     
     return {
@@ -268,17 +303,37 @@ export default function DashboardPage(){
       totalQuizzes: totalQuizzes || 0,
       avgScore: isNaN(avgScore) ? 0 : Math.round(avgScore * 100)
     }
-  }, [plan, data, progress])
+  }, [plan, data, progress, dash])
 
   // Normalize data for charts to ensure numeric fields and consistent keys
   const studyChartData = useMemo(() => {
-    const sessions = data?.sessions || [];
-    return sessions.map((s: any) => ({
-      date: (s.created_at || '').slice(0,10),
-      minutes: Number(s.duration_min || 0),
-      topic: s.topic || 'General'
-    }));
-  }, [data]);
+    // Prefer backend-provided timeline if available for consistent daily aggregation
+    const timeline = dash?.studyProgressTimeline || dash?.weeklyProgress
+    if (Array.isArray(timeline) && timeline.length) {
+      return timeline.map((item: any) => ({
+        date: item.date || item.week || '',
+        minutes: Number(item.minutes || item.study_time || 0)
+      }))
+    }
+
+    // Fallback: aggregate analytics sessions by day for the last 14 days
+    const sessions = Array.isArray(data?.sessions) ? data.sessions : []
+    const byDate: Record<string, number> = {}
+    sessions.forEach((s: any) => {
+      const d = (s.created_at || '').slice(0, 10)
+      if (!d) return
+      byDate[d] = (byDate[d] || 0) + Number(s.duration_min || 0)
+    })
+    // Ensure a continuous range
+    const out: { date: string; minutes: number }[] = []
+    const end = new Date(); end.setHours(0,0,0,0)
+    for (let i = 13; i >= 0; i--) {
+      const d = new Date(end); d.setDate(end.getDate() - i)
+      const key = d.toISOString().slice(0,10)
+      out.push({ date: key, minutes: Number(byDate[key] || 0) })
+    }
+    return out
+  }, [dash, data]);
 
   const weeklyChartData = useMemo(() => {
     // backend sends weekly_progress as [{week, study_time, completion, sessions}]
@@ -344,11 +399,10 @@ export default function DashboardPage(){
                   <Target className="w-6 h-6 text-green-600 dark:text-green-400" />
                 </div>
               </div>
-              {plan && (
-                <div className="mt-4 space-y-1">
-                  <Progress value={percentComplete} className="h-2" />
-                  <p className="text-xs text-muted-foreground">{percentComplete}% complete</p>
-                </div>) }
+              <div className="mt-4 space-y-1">
+                <Progress value={percentComplete} className="h-2" />
+                <p className="text-xs text-muted-foreground">{percentComplete}% complete</p>
+              </div>
             </CardContent>
           </Card>
 
@@ -467,7 +521,7 @@ export default function DashboardPage(){
             </Card>
 
             {/* Today's Study Plan */}
-            <Card>
+            <Card className="rounded-lg">
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <div>
@@ -520,7 +574,7 @@ export default function DashboardPage(){
             </Card>
 
             {/* Study Progress Chart */}
-            <Card>
+            <Card className="rounded-lg">
               <CardHeader>
                 <CardTitle>Study Progress</CardTitle>
                 <CardDescription>Your daily study minutes over time</CardDescription>
@@ -534,9 +588,19 @@ export default function DashboardPage(){
                   ) : studyChartData.length > 1 ? (
                     <ResponsiveContainer width="100%" height="100%">
                       <AreaChart data={studyChartData}>
-                        <XAxis dataKey='date' />
+                        <XAxis dataKey='date' tickFormatter={(val: string) => {
+                          try {
+                            const d = new Date(`${val}T00:00:00`)
+                            return d.toLocaleDateString(undefined, { weekday: 'short' })
+                          } catch { return val }
+                        }} tickMargin={8} />
                         <YAxis />
-                        <Tooltip />
+                        <Tooltip labelFormatter={(val: any) => {
+                          try {
+                            const d = new Date(`${val}T00:00:00`)
+                            return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', weekday: 'short' })
+                          } catch { return String(val) }
+                        }} />
                         <Area 
                           type='monotone' 
                           dataKey='minutes' 
@@ -564,7 +628,7 @@ export default function DashboardPage(){
           {/* Sidebar Content */}
           <div className="space-y-6">
             {/* Weekly Quizzes */}
-            <Card>
+            <Card className="rounded-lg">
               <CardHeader>
                 <CardTitle>Weekly Progress</CardTitle>
                 <CardDescription>Study time and completion over the last 4 weeks</CardDescription>
@@ -596,7 +660,7 @@ export default function DashboardPage(){
             </Card>
 
             {/* Topic Mastery */}
-            <Card>
+            <Card className="rounded-lg">
               <CardHeader>
                 <CardTitle>Subject Performance</CardTitle>
                 <CardDescription>Completion rates by subject</CardDescription>
@@ -639,25 +703,25 @@ export default function DashboardPage(){
               </CardContent>
             </Card>
             {/* Quick Actions */}
-            <Card>
+            <Card className="rounded-lg">
               <CardHeader>
                 <CardTitle>Quick Actions</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-2.5">
                 <Link href="/tutor">
-                  <Button variant="outline" className="w-full justify-start">
+                  <Button variant="outline" className="w-full justify-start h-11">
                     <BookOpen className="w-4 h-4 mr-2" />
                     Ask AI Tutor
                   </Button>
                 </Link>
                 <Link href="/upload">
-                  <Button variant="outline" className="w-full justify-start">
+                  <Button variant="outline" className="w-full justify-start h-11">
                     <Plus className="w-4 h-4 mr-2" />
                     Upload Materials
                   </Button>
                 </Link>
                 <Link href="/quiz">
-                  <Button variant="outline" className="w-full justify-start">
+                  <Button variant="outline" className="w-full justify-start h-11">
                     <BookOpen className="w-4 h-4 mr-2" />
                     Take a Quiz
                   </Button>
@@ -700,7 +764,7 @@ export default function DashboardPage(){
         </div>
 
         {/* Upcoming Sessions */}
-        <Card>
+        <Card className="rounded-lg">
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>

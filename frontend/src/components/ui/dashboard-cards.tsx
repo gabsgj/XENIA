@@ -175,12 +175,12 @@ export function QuickActionsCard({ onNewSession, onViewPlan, onAskTutor, onUploa
       <CardHeader>
         <CardTitle className="text-lg">Quick Actions</CardTitle>
       </CardHeader>
-      <CardContent className="space-y-3">
+      <CardContent className="space-y-2.5">
         {actions.map((action, index) => (
           <Button
             key={index}
             variant="outline"
-            className="w-full justify-start gap-3 h-12"
+            className="w-full justify-start gap-2.5 h-11"
             onClick={action.action}
           >
             <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center text-white", action.color)}>

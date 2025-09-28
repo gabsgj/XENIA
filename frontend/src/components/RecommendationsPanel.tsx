@@ -54,6 +54,7 @@ export default function RecommendationsPanel({
   const [error, setError] = useState<string | null>(null)
   const [selectedType, setSelectedType] = useState<string>('all')
   const [selectedDifficulty, setSelectedDifficulty] = useState<string>('all')
+  const [visibleCount, setVisibleCount] = useState<number>(Math.max(1, maxItems))
 
   const loadRecommendations = async (forceRefresh = false) => {
     if (!topics || topics.length === 0) return
@@ -63,7 +64,7 @@ export default function RecommendationsPanel({
     
     try {
       const results = await Promise.allSettled(
-        topics.slice(0, 3).map(async (topic) => {
+        topics.slice(0, 5).map(async (topic) => {
           const response = await api(
             `/api/resources/recommendations/${encodeURIComponent(topic)}?learning_style=balanced&difficulty=intermediate&free_only=true${
               forceRefresh ? '&refresh=true' : ''
@@ -156,12 +157,14 @@ export default function RecommendationsPanel({
           )
           
           if (!hasYouTube || allRecommendations.length === 0) {
-            topics.slice(0, 3).forEach(topic => {
+            topics.slice(0, 5).forEach(topic => {
               // Add multiple YouTube search fallbacks for better coverage
               const searchQueries = [
                 `${topic} tutorial`,
                 `${topic} explained`,
-                `learn ${topic}`
+                `learn ${topic}`,
+                `${topic} for beginners`,
+                `${topic} crash course`
               ]
               
               searchQueries.forEach((query, index) => {
@@ -184,7 +187,7 @@ export default function RecommendationsPanel({
           
           // Ensure we always have some fallback content
           if (allRecommendations.length === 0) {
-            topics.slice(0, 2).forEach(topic => {
+            topics.slice(0, 3).forEach(topic => {
               allRecommendations.push({
                 type: 'Web Search',
                 title: `Search for ${topic} Resources`,
@@ -213,7 +216,7 @@ export default function RecommendationsPanel({
       setError('Failed to load recommendations')
       
       // Fallback recommendations
-      const fallbackItems = topics.slice(0, 3).map((topic) => ({
+      const fallbackItems = topics.slice(0, 5).map((topic) => ({
         type: 'YouTube',
         title: `${topic} - Learn Online`,
         url: `https://www.youtube.com/results?search_query=${encodeURIComponent(topic + ' tutorial')}`,
@@ -260,8 +263,9 @@ export default function RecommendationsPanel({
   }, [items])
 
   useEffect(() => {
+    setVisibleCount(Math.max(1, maxItems))
     loadRecommendations()
-  }, [topics.join(',')])
+  }, [topics.join(','), maxItems])
 
   if (!topics || topics.length === 0) {
     return (
@@ -365,9 +369,16 @@ export default function RecommendationsPanel({
         
         {!loading && !error && (
           <div className="space-y-2">
-            {filteredItems.map((item, index) => (
+            {filteredItems.slice(0, visibleCount).map((item, index) => (
               <RecommendationCard key={index} item={item} index={index} />
             ))}
+            {filteredItems.length > visibleCount && (
+              <div className="pt-1">
+                <Button size="sm" variant="outline" onClick={() => setVisibleCount(c => c + Math.max(4, Math.floor(maxItems / 2)))} disabled={loading}>
+                  Show more
+                </Button>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -475,10 +486,19 @@ export default function RecommendationsPanel({
               <p className="text-sm text-muted-foreground">No recommendations found for the selected filters.</p>
             </div>
           ) : (
-            <div className="grid gap-3">
-              {filteredItems.map((item, index) => (
-                <RecommendationCard key={index} item={item} index={index} />
-              ))}
+            <div>
+              <div className="grid gap-3">
+                {filteredItems.slice(0, visibleCount).map((item, index) => (
+                  <RecommendationCard key={index} item={item} index={index} />
+                ))}
+              </div>
+              {filteredItems.length > visibleCount && (
+                <div className="pt-1">
+                  <Button size="sm" variant="outline" onClick={() => setVisibleCount(c => c + Math.max(6, Math.floor(maxItems / 2)))} disabled={loading}>
+                    Show more
+                  </Button>
+                </div>
+              )}
             </div>
           )}
         </div>

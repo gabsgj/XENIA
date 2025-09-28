@@ -1236,7 +1236,7 @@ setTaskFormData({
               />
 
               {/* Content Recommendations - YouTube Primary */}
-              <Card className="shadow-sm">
+              <Card className="shadow-sm rounded-lg">
                 <CardHeader className="pb-4">
                   <CardTitle className="text-lg flex items-center gap-2">
                     <PlayCircle className="w-5 h-5 text-red-600" />
@@ -1247,7 +1247,7 @@ setTaskFormData({
                 <CardContent>
                   <EnhancedRecommendationsPanel 
                     topics={todaysTopics} 
-                    maxItems={5}
+                    maxItems={16}
                     compact={true}
                   />
                 </CardContent>
