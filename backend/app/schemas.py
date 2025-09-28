@@ -31,6 +31,9 @@ except Exception:  # pragma: no cover - environment fallback
         def Raw(self, **kw):
             return _Field(**kw)
 
+        def Float(self, **kw):
+            return _Field(**kw)
+
     class Schema:  # pragma: no cover - lightweight stub
         def validate(self, data):
             """Basic validation: ensure required fields exist in provided data.
@@ -57,6 +60,8 @@ except Exception:  # pragma: no cover - environment fallback
             return errors
 
     fields = _Fields()
+    # Fallback EXCLUDE constant to mirror marshmallow API (value unused by our stub logic)
+    EXCLUDE = 'exclude'
 
 
 class PlanSchema(Schema):

@@ -88,15 +88,8 @@ def ask_tutor():
         )
         
     except ApiError as e:
-        # Handle our custom API errors with proper status codes
-        if e.error_code == "TUTOR_TIMEOUT":
-            return APIResponseBuilder.timeout_error(e.message)
-        elif e.error_code == "TUTOR_INVALID_INPUT":
-            return APIResponseBuilder.validation_error(e.message)
-        elif e.error_code == "TUTOR_AI_FAILED":
-            return APIResponseBuilder.external_service_error("AI Provider", e.message)
-        else:
-            return APIResponseBuilder.error(e.error_code, e.message, status_code=e.status_code)
+        # Return ApiError using its native response shape (tests expect root-level errorCode)
+        return e.to_response()
     
     except TimeoutError as e:
         return APIResponseBuilder.timeout_error("The AI request timed out. Please try again.")

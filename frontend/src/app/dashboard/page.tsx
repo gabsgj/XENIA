@@ -247,14 +247,33 @@ export default function DashboardPage(){
     return counts
   },[topics])
 
-  const percentComplete = ((): number => {
-    const fromDash = dash?.stats?.sessionPercent
-    if (typeof fromDash === 'number' && !isNaN(fromDash)) return Math.max(0, Math.min(100, Math.round(fromDash)))
-    // Compute from plan sessions only; avoid defaulting to 100% when analytics exists
-    const s = plan?.sessions || []
-    const c = s.filter((x: any) => x.status === 'completed').length
-    return s.length ? Math.round((c / s.length) * 100) : 0
-  })()
+  // Robust Topics Tracked count (ignore sample placeholders; fallback to plan topics)
+  const topicsTrackedCount = useMemo(() => {
+    try {
+      const arr = Array.isArray(topics) ? topics : []
+      // Exclude placeholder/sample topics returned by the API when no real topics exist
+      const real = arr.filter((t: any) => !String(t?.id || '').startsWith('sample-'))
+      if (real.length > 0) return real.length
+      // Fallback: unique subjects from plan sessions
+      const fromPlan = new Set(
+        (plan?.sessions || [])
+          .map((s: any) => String(s.topic || '').split(':')[0].trim())
+          .filter(Boolean)
+      )
+      return fromPlan.size
+    } catch {
+      return 0
+    }
+  }, [topics, plan])
+
+  const percentComplete = useMemo((): number => {
+    // Compute strictly from the current plan to avoid mismatches like "0 completed" with "100% complete".
+    // If no sessions in the plan, show 0%.
+    const s = Array.isArray(plan?.sessions) ? plan.sessions : []
+    if (!s.length) return 0
+    const c = s.filter((x: any) => x && x.status === 'completed').length
+    return Math.max(0, Math.min(100, Math.round((c / s.length) * 100)))
+  }, [plan])
 
   // Enhanced calculations using both plan and analytics data
   const enhancedStats = useMemo(()=>{
@@ -438,7 +457,7 @@ export default function DashboardPage(){
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground">Topics Tracked</p>
-                  <p className="text-3xl font-bold">{topics.length}</p>
+                  <p className="text-3xl font-bold">{topicsTrackedCount}</p>
                 </div>
                 <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900/20 rounded-full flex items-center justify-center">
                   <TrendingUp className="w-6 h-6 text-purple-600 dark:text-purple-400" />

@@ -210,12 +210,12 @@ def handle_api_exception(e: Exception) -> Response:
     from ..errors import ApiError
     
     if isinstance(e, ApiError):
-        # Handle our custom API errors
+        # Handle our custom API errors with the fields on ApiError
         return APIResponseBuilder.error(
             e.error_code,
-            e.message,
-            details=e.details,
-            status_code=e.status_code
+            getattr(e, 'error_message', str(e)),
+            details=getattr(e, 'details', None),
+            status_code=getattr(e, 'status', 500)
         )
     
     # Handle common exceptions

@@ -147,7 +147,6 @@ export default function PlannerPage() {
           // Set topic-specific buckets for precise per-task recommendations
           setTopicResources(prev => ({ ...prev, ...byTopic }))
         }
-        }
       } catch(e:any){ 
         pushError({ 
           errorCode: e?.errorCode||'PLAN_400', 
