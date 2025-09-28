@@ -129,11 +129,76 @@ def update_progress():
             if now - last_time < _CACHE_TTL:
                 return response
 
-        # Add sessions to batcher instead of immediate DB writes
+        # Add sessions to batcher for analytics (non-blocking)
         for session in session_updates:
             progress_batcher.add_update(user_id, session)
 
-        response = ({"ok": True, "queued": len(session_updates)})
+        # Persist session status changes directly into the stored plan so UI reflects on reload
+        try:
+            plan_resp = supabase_call(lambda: sb.table("plans").select("plan").eq("user_id", user_id).limit(1).execute())
+            if not plan_resp.data:
+                # No plan yet; return queued result
+                response = {"ok": True, "queued": len(session_updates)}
+                _request_cache[request_hash] = (now, response)
+                # cleanup old entries in-place
+                for k, v in list(_request_cache.items()):
+                    if now - v[0] >= _CACHE_TTL:
+                        _request_cache.pop(k, None)
+                return response
+
+            plan = plan_resp.data[0]["plan"]
+            session_map = {(s.get("date"), s.get("topic")): s for s in plan.get("sessions", [])}
+            completed_sessions = []
+
+            for upd in session_updates:
+                key = (upd.get("date"), upd.get("topic"))
+                if key in session_map:
+                    old_status = session_map[key].get("status", "pending")
+                    new_status = upd.get("status", "completed")
+                    session_map[key]["status"] = new_status
+
+                    if "duration_min" in upd:
+                        session_map[key]["duration_min"] = upd["duration_min"]
+
+                    if old_status != "completed" and new_status == "completed":
+                        session_data = session_map[key]
+                        completed_sessions.append({
+                            "user_id": user_id,
+                            "topic": session_data.get("topic"),
+                            "duration_min": session_data.get("duration_min", 45),
+                            "status": "completed",
+                            "created_at": f"{upd.get('date')}T12:00:00Z"
+                        })
+
+                        # Also mark corresponding task as done (match by user_id + topic + due_date)
+                        try:
+                            supabase_call(lambda: sb.table("tasks").update({"status": "done"})
+                                .eq("user_id", user_id)
+                                .eq("topic", session_data.get("topic"))
+                                .eq("due_date", upd.get("date"))
+                                .execute())
+                        except Exception as te:
+                            logger.warning(f"Failed to mark task as done for {session_data.get('topic')} on {upd.get('date')}: {te}")
+
+            # Upsert updated plan back
+            plan["sessions"] = list(session_map.values())
+            supabase_call(lambda: sb.table("plans").upsert({"user_id": user_id, "plan": plan}).execute())
+
+            # Record completed sessions (analytics)
+            if completed_sessions:
+                try:
+                    for session in completed_sessions:
+                        supabase_call(lambda s=session: sb.table("sessions").upsert(s).execute())
+                    logger.info(f"Recorded {len(completed_sessions)} completed sessions in analytics")
+                except Exception as ie:
+                    logger.warning(f"Failed to record sessions in analytics: {ie}")
+
+            response = {"ok": True, "plan": plan}
+        except Exception as persist_error:
+            # If persistence fails for any reason, return queued result but log
+            logger.warning(f"Failed to persist session status to plan: {persist_error}")
+            response = {"ok": True, "queued": len(session_updates)}
+
         _request_cache[request_hash] = (now, response)
         # cleanup old entries in-place
         for k, v in list(_request_cache.items()):
@@ -174,6 +239,15 @@ def update_progress():
                             "status": "completed",
                             "created_at": f"{upd.get('date')}T12:00:00Z"
                         })
+                        # Attempt to mark task as done in fallback path as well
+                        try:
+                            supabase_call(lambda: sb.table("tasks").update({"status": "done"})
+                                .eq("user_id", user_id)
+                                .eq("topic", session_data.get("topic"))
+                                .eq("due_date", upd.get("date"))
+                                .execute())
+                        except Exception as te:
+                            logger.warning(f"(fallback) Failed to mark task as done for {session_data.get('topic')} on {upd.get('date')}: {te}")
 
             plan["sessions"] = list(session_map.values())
             supabase_call(lambda: sb.table("plans").upsert({"user_id": user_id, "plan": plan}).execute())
