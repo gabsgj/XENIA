@@ -7,6 +7,12 @@
 [![Gemini](https://img.shields.io/badge/AI-Gemini%202.0%20Flash-orange.svg)](https://ai.google.dev)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-blue.svg)](https://typescriptlang.org)
 
+## 🌐 Live Demo
+
+🚀 **Try XENIA Live:**
+- **Frontend Application**: [https://xenia.onrender.com](https://xenia.onrender.com)
+- **Backend API**: [https://xenia-backend-1f0z.onrender.com](https://xenia-backend-1f0z.onrender.com)
+
 XENIA transforms how students learn by providing AI-powered personalized study plans, intelligent topic filtering, resource recommendations, and adaptive progress tracking. Upload any syllabus and get a structured learning path with actionable next steps.
 
 ## ✨ Key Features
@@ -105,10 +111,18 @@ npm run dev
 ```
 
 ### 🌐 **Access Points**
+
+#### Local Development
 - **Frontend**: http://localhost:3000
 - **Backend API**: http://localhost:8000
 - **Upload Interface**: http://localhost:3000/upload
 - **Study Planner**: http://localhost:3000/planner
+
+#### Production (Deployed on Render)
+- **Frontend**: https://xenia.onrender.com
+- **Backend API**: https://xenia-backend-1f0z.onrender.com
+- **Upload Interface**: https://xenia.onrender.com/upload
+- **Study Planner**: https://xenia.onrender.com/planner
 
 ## 📱 User Guide
 
@@ -185,7 +199,10 @@ EMBEDDING_MODEL=text-embedding-004
 ```bash
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+# For local development:
 NEXT_PUBLIC_API_URL=http://localhost:8000
+# For production:
+# NEXT_PUBLIC_API_URL=https://xenia-backend-1f0z.onrender.com
 ```
 
 ## 🧪 Testing & Quality
@@ -255,6 +272,11 @@ python test_ai_filtering_demo.py
 ```
 
 ## 🚀 Deployment Guide
+
+### **Live Deployment**
+The application is already deployed and accessible at:
+- **Frontend**: [https://xenia.onrender.com](https://xenia.onrender.com)
+- **Backend API**: [https://xenia-backend-1f0z.onrender.com](https://xenia-backend-1f0z.onrender.com)
 
 ### **Production Setup**
 
