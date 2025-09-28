@@ -1,6 +1,6 @@
 'use client'
 
-import React from 'react'
+import React, { useMemo } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { 
@@ -30,173 +30,210 @@ export default function TaskItem({ task, activeTaskId, processingIds, onStart, o
   const isCompleted = Boolean(task.completed || task.status === 'completed')
   const isProcessing = processingIds.has(task.id)
 
+  const dueStr = (task.dueDate || (task as any).due_date) as string | undefined
+  const dueLabel = useMemo(() => {
+    if (!dueStr) return null
+    try {
+      const d = new Date(dueStr)
+      const today = new Date()
+      const dayOnly = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime()
+      const deltaDays = Math.round((dayOnly(d) - dayOnly(today)) / (1000 * 60 * 60 * 24))
+      if (deltaDays === 0) return 'Due Today'
+      if (deltaDays === 1) return 'Due Tomorrow'
+      if (deltaDays < 0) return 'Overdue'
+      return `Due ${d.toLocaleDateString()}`
+    } catch {
+      return `Due ${dueStr}`
+    }
+  }, [dueStr])
+
+  const priorityAccent = useMemo(() => {
+    const p = (task.priority || 'Medium') as any
+    if (p === 'High') return 'border-l-4 border-l-red-500 bg-gradient-to-r from-red-500/10 to-transparent'
+    if (p === 'Low') return 'border-l-4 border-l-emerald-500 bg-gradient-to-r from-emerald-500/10 to-transparent'
+    return 'border-l-4 border-l-amber-500 bg-gradient-to-r from-amber-500/10 to-transparent'
+  }, [task.priority])
+
+  const statusBadge = () => {
+    const s = (task.status || (isCompleted ? 'completed' : 'pending')) as any
+    if (s === 'completed') return <Badge className="text-xs bg-green-600 text-white dark:bg-green-500">Completed</Badge>
+    if (s === 'in-progress') return <Badge className="text-xs bg-blue-600 text-white dark:bg-blue-500">In Progress</Badge>
+    return <Badge variant="secondary" className="text-xs">Pending</Badge>
+  }
+
   return (
     <div
       className={cn(
-        'group relative p-5 rounded-lg border bg-card hover:shadow-md transition-all duration-200',
-        isActive && 'ring-2 ring-primary border-primary',
-        isCompleted ? 'opacity-60' : ''
+        'group relative overflow-hidden rounded-xl border bg-card/80 backdrop-blur-sm hover:shadow-lg transition-all duration-200',
+        priorityAccent,
+        isActive && 'ring-2 ring-primary/70 border-primary/70',
+        isCompleted && 'opacity-80'
       )}
+      aria-live="polite"
     >
-      <div className="flex items-start gap-4">
-        <div className="flex-1 min-w-0">
-          {/* Header: title + subject */}
-          <div className="mb-3">
-            <div className="flex items-center justify-between">
-              <div className="flex-1 min-w-0">
-                <h4 className="font-semibold text-base leading-tight truncate">{task.title}</h4>
-                <p className="text-sm text-muted-foreground mt-1">{task.subject}</p>
+      {/* subtle hover sheen */}
+      <div className="pointer-events-none absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity bg-gradient-to-r from-primary/5 to-transparent" />
+      <div className="relative p-5">
+        <div className="flex items-start gap-4">
+          <div className="flex-1 min-w-0">
+            {/* Header: subject + status */}
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <Badge variant="outline" className="text-xs truncate max-w-[180px]">{task.subject || 'General'}</Badge>
+                {statusBadge()}
               </div>
               {isCompleted && (
-                <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400 ml-3" />
+                <div className="flex items-center gap-1 text-green-600 dark:text-green-400 text-xs">
+                  <CheckCircle2 className="w-4 h-4" />
+                  Done
+                </div>
               )}
             </div>
-          </div>
 
-          {/* Description (optional) */}
-          {(task as any).description && (
-            <p className="text-sm text-muted-foreground mb-3">
-              {(task as any).description}
-            </p>
-          )}
+            {/* Title */}
+            <h4 className="font-semibold text-lg leading-snug line-clamp-2">{task.title}</h4>
 
-          {/* Progress (optional) */}
-          {typeof task.progress === 'number' && task.progress > 0 && (
-            <div className="mb-3">
-              <div className="flex justify-between text-xs mb-2">
-                <span>Progress</span>
-                <span>{Math.round(task.progress)}%</span>
+            {/* Description (optional) */}
+            {(task as any).description && (
+              <p className="text-sm text-muted-foreground mt-2 line-clamp-2">{(task as any).description}</p>
+            )}
+
+            {/* Progress (optional) */}
+            {typeof task.progress === 'number' && task.progress > 0 && (
+              <div className="mt-3">
+                <div className="flex justify-between text-xs mb-1">
+                  <span>Progress</span>
+                  <span>{Math.round(task.progress)}%</span>
+                </div>
+                <Progress value={task.progress} className="h-2" />
               </div>
-              <Progress value={task.progress} className="h-2" />
-            </div>
-          )}
+            )}
 
-          {/* Baseline row: metadata (left) + actions (right) */}
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            {/* Metadata */}
-            <div className="flex items-center gap-4 flex-wrap text-sm text-muted-foreground">
-              {(task.dueDate || (task as any).due_date) && (
+            {/* Meta + Actions */}
+            <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              {/* Metadata */}
+              <div className="flex items-center gap-4 flex-wrap text-sm text-muted-foreground">
+                {dueStr && (
+                  <span className={cn('flex items-center gap-1.5', dueLabel === 'Overdue' && 'text-red-600 dark:text-red-400', dueLabel === 'Due Today' && 'text-amber-600 dark:text-amber-400')}>
+                    <Calendar className="w-3.5 h-3.5" />
+                    {dueLabel}
+                  </span>
+                )}
                 <span className="flex items-center gap-1.5">
-                  <Calendar className="w-3.5 h-3.5" />
-                  Due {new Date((task.dueDate || (task as any).due_date) as string).toLocaleDateString()}
+                  <Clock className="w-3.5 h-3.5" />
+                  {(task.estimatedMinutes || (task as any).duration_minutes || 30)} min
                 </span>
-              )}
-              <span className="flex items-center gap-1.5">
-                <Clock className="w-3.5 h-3.5" />
-                {(task.estimatedMinutes || (task as any).duration_minutes || 30)} min
-              </span>
-              {task.priority && (
-                <Badge className={cn(
-                  'text-xs',
-                  task.priority === 'High' && 'bg-red-100 text-red-700 dark:bg-red-900/20 dark:text-red-300',
-                  task.priority === 'Medium' && 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/20 dark:text-yellow-300',
-                  task.priority === 'Low' && 'bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-300'
-                )} variant="secondary">
-                  {task.priority} Priority
-                </Badge>
-              )}
-            </div>
-
-            {/* Actions */}
-            <div className="flex items-center gap-2 sm:justify-end">
-              {isActive ? (
-                <>
-                  <Badge variant="default" className="text-xs">
-                    <Timer className="w-3 h-3 mr-1" />
-                    Timer Running
+                {task.priority && (
+                  <Badge variant="secondary" className="text-xs">
+                    {task.priority} Priority
                   </Badge>
-                  <Button 
-                    type="button"
-                    size="sm" 
-                    variant="outline"
-                    onClick={() => { Promise.resolve(onComplete(task)).catch(() => {}) }}
-                    disabled={isProcessing}
-                  >
-                    Mark Complete
-                  </Button>
-                </>
-              ) : (
-                <>
-                  {!isCompleted && (
-                    <Button
+                )}
+              </div>
+
+              {/* Actions */}
+              <div className="flex items-center gap-2 sm:justify-end">
+                {isActive ? (
+                  <>
+                    <Badge variant="default" className="text-xs">
+                      <Timer className="w-3 h-3 mr-1" />
+                      Timer Running
+                    </Badge>
+                    <Button 
                       type="button"
-                      size="sm"
-                      variant="default"
-                      onClick={() => { Promise.resolve(onStart(task)).catch(() => {}) }}
-                      disabled={isProcessing || (Boolean(activeTaskId) && activeTaskId !== task.id)}
-                    >
-                      {isProcessing ? (
-                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      ) : (
-                        <>
-                          <PlayCircle className="w-4 h-4 mr-1" />
-                          Start
-                        </>
-                      )}
-                    </Button>
-                  )}
-                  {isCompleted ? (
-                    <span className="text-sm text-green-600 dark:text-green-400 flex items-center gap-1">
-                      <CheckCircle2 className="w-4 h-4" />
-                      Completed
-                    </span>
-                  ) : (
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="ghost"
+                      size="sm" 
+                      variant="outline"
+                      aria-label="Mark task complete"
                       onClick={() => { Promise.resolve(onComplete(task)).catch(() => {}) }}
                       disabled={isProcessing}
                     >
-                      {isProcessing ? (
-                        <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                      ) : (
-                        <>
-                          <CheckCircle2 className="w-4 h-4 mr-1" />
-                          Complete
-                        </>
-                      )}
+                      Mark Complete
                     </Button>
-                  )}
-                </>
-              )}
-
-              {/* More menu aligned with actions */}
-              {!task.fromPlan && (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button 
-                      type="button"
-                      variant="ghost" 
-                      size="icon"
-                      className="h-9 w-9"
-                      aria-label="Task actions"
-                    >
-                      <MoreVertical className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-48">
-                    <DropdownMenuItem onClick={() => { try { onEdit(task as Task) } catch {} }} className="cursor-pointer">
-                      <Edit className="mr-2 h-4 w-4" />
-                      Edit
-                    </DropdownMenuItem>
+                  </>
+                ) : (
+                  <>
                     {!isCompleted && (
-                      <DropdownMenuItem onClick={() => { Promise.resolve(onComplete(task as Task)).catch(() => {}) }} className="cursor-pointer">
-                        <CheckCircle2 className="mr-2 h-4 w-4" />
-                        Mark as Complete
-                      </DropdownMenuItem>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="default"
+                        aria-label="Start task"
+                        onClick={() => { Promise.resolve(onStart(task)).catch(() => {}) }}
+                        disabled={isProcessing || (Boolean(activeTaskId) && activeTaskId !== task.id)}
+                      >
+                        {isProcessing ? (
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <>
+                            <PlayCircle className="w-4 h-4 mr-1" />
+                            Start
+                          </>
+                        )}
+                      </Button>
                     )}
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem 
-                      onClick={() => { Promise.resolve(onDelete(task as Task)).catch(() => {}) }} 
-                      className="cursor-pointer text-red-600 dark:text-red-400"
-                    >
-                      <Trash2 className="mr-2 h-4 w-4" />
-                      Delete
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              )}
+                    {isCompleted ? (
+                      <span className="text-sm text-green-600 dark:text-green-400 flex items-center gap-1">
+                        <CheckCircle2 className="w-4 h-4" />
+                        Completed
+                      </span>
+                    ) : (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        aria-label="Complete task"
+                        onClick={() => { Promise.resolve(onComplete(task)).catch(() => {}) }}
+                        disabled={isProcessing}
+                      >
+                        {isProcessing ? (
+                          <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <>
+                            <CheckCircle2 className="w-4 h-4 mr-1" />
+                            Complete
+                          </>
+                        )}
+                      </Button>
+                    )}
+                  </>
+                )}
+
+                {/* More menu aligned with actions */}
+                {!task.fromPlan && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button 
+                        type="button"
+                        variant="ghost" 
+                        size="icon"
+                        className="h-9 w-9"
+                        aria-label="Task actions"
+                      >
+                        <MoreVertical className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-48">
+                      <DropdownMenuItem onClick={() => { try { onEdit(task as Task) } catch {} }} className="cursor-pointer">
+                        <Edit className="mr-2 h-4 w-4" />
+                        Edit
+                      </DropdownMenuItem>
+                      {!isCompleted && (
+                        <DropdownMenuItem onClick={() => { Promise.resolve(onComplete(task as Task)).catch(() => {}) }} className="cursor-pointer">
+                          <CheckCircle2 className="mr-2 h-4 w-4" />
+                          Mark as Complete
+                        </DropdownMenuItem>
+                      )}
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem 
+                        onClick={() => { Promise.resolve(onDelete(task as Task)).catch(() => {}) }} 
+                        className="cursor-pointer text-red-600 dark:text-red-400"
+                      >
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Delete
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
+              </div>
             </div>
           </div>
         </div>
