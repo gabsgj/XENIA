@@ -1,6 +1,6 @@
 # 🎯 XENIA AI Study Planner
 
-> **Intelligent Learning Companion powered by Gemini 2.0 Flash**
+> **Intelligent Learning Companion powered by Gemini 2.5 Flash**
 
 [![Python](https://img.shields.io/badge/Python-3.11+-blue.svg)](https://python.org)
 [![Next.js](https://img.shields.io/badge/Next.js-14-black.svg)](https://nextjs.org)
@@ -18,7 +18,7 @@ XENIA transforms how students learn by providing AI-powered personalized study p
 ## ✨ Key Features
 
 ### 🧠 **AI-Powered Topic Filtering**
-- **Smart Content Curation**: Gemini 2.0 Flash filters syllabus content, removing administrative noise
+- **Smart Content Curation**: Gemini 2.5 Flash filters syllabus content, removing administrative noise
 - **Learning Path Generation**: 4-phase structured progression (Foundation → Core → Advanced → Application)
 - **Prerequisite Analysis**: Intelligent topic sequencing based on dependencies
 - **Difficulty Assessment**: Automated complexity scoring and time estimation
@@ -47,7 +47,7 @@ XENIA transforms how students learn by providing AI-powered personalized study p
 - **Python 3.11+** with pip
 - **Node.js 18+** with npm
 - **Supabase account** (free tier available)
-- **Google AI API key** for Gemini 2.0 Flash
+- **Google AI API key** for Gemini 2.5 Flash
 
 ### 🛠️ Installation Guide
 
@@ -151,7 +151,7 @@ npm run dev
 
 ### **Backend Stack**
 - **Framework**: Flask with modern Python patterns
-- **AI Integration**: Gemini 2.0 Flash with multi-provider fallback
+- **AI Integration**: Gemini 2.5 Flash with multi-provider fallback
 - **Database**: Supabase (PostgreSQL) with RLS security
 - **Services**: Modular design for AI, planning, analytics
 - **Testing**: Pytest with comprehensive coverage
@@ -167,7 +167,7 @@ npm run dev
 ```
 Syllabus Upload → Topic Extraction → AI Filtering → Learning Path → Study Plan
      ↓              ↓                    ↓              ↓            ↓
-  File Parse    Heuristic Rules    Gemini 2.0 Flash  Sequencing   Scheduling
+  File Parse    Heuristic Rules    Gemini 2.5 Flash  Sequencing   Scheduling
 ```
 
 ## 🔧 Configuration
@@ -181,7 +181,7 @@ SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_ANON_KEY=your-anon-key
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 
-# AI Providers (Gemini 2.0 Flash primary)
+# AI Providers (Gemini 2.5 Flash primary)
 GEMINI_API_KEY=your-gemini-api-key
 OPENAI_API_KEY=your-openai-api-key  # Fallback
 ANTHROPIC_API_KEY=your-anthropic-api-key  # Fallback
@@ -416,7 +416,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🙏 Acknowledgments
 
-- **Google AI**: Gemini 2.0 Flash API
+- **Google AI**: Gemini 2.5 Flash API
 - **Supabase**: Backend-as-a-Service platform
 - **Next.js Team**: React framework
 - **OpenAI & Anthropic**: Fallback AI providers
