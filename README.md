@@ -18,24 +18,40 @@ XENIA transforms how students learn by providing AI-powered personalized study p
 ## ✨ Key Features
 
 ### 🧠 **AI-Powered Topic Filtering**
+<div align = "center">
+  <img src = "Media/upload.png"></img>
+</div>
+
 - **Smart Content Curation**: Gemini 2.5 Flash filters syllabus content, removing administrative noise
 - **Learning Path Generation**: 4-phase structured progression (Foundation → Core → Advanced → Application)
 - **Prerequisite Analysis**: Intelligent topic sequencing based on dependencies
 - **Difficulty Assessment**: Automated complexity scoring and time estimation
 
 ### 📚 **Comprehensive Study Planning**
+<div align = "center">
+  <img src = "Media/planner.png"></img>
+</div>
+
 - **Deadline Management**: User-specified deadlines with urgency-based scheduling
 - **Learning Style Adaptation**: Customizable preferences for visual, auditory, kinesthetic learners
 - **Resource Discovery**: Automatic YouTube video and learning material suggestions
 - **Progress Tracking**: Real-time completion monitoring with plan adjustments
 
-### 🎮 **Gamified Learning Experience**
+### 🎮 **Gamified Learning Experience with Quizes**
+<div align = "center">
+  <img src = "Media/quiz.png"></img>
+</div>
+
 - **XP System**: Earn points for task completion and streak maintenance
 - **Achievement Badges**: Unlock rewards for learning milestones
 - **Progress Analytics**: Visual dashboards for students, teachers, and parents
 - **Streak Tracking**: Build momentum with consecutive study days
 
 ### 🤖 **AI Tutoring & Support**
+<div align = "center">
+  <img src = "Media/ai%20tutor.png"></img>
+</div>
+
 - **OCR Question Parsing**: Upload handwritten or printed questions for instant help
 - **Step-by-Step Solutions**: Detailed problem breakdowns with explanations
 - **Weak Topic Detection**: Identify knowledge gaps through assessment analysis
