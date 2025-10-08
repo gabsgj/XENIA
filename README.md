@@ -69,7 +69,7 @@ XENIA transforms how students learn by providing AI-powered personalized study p
 
 #### 1. **Clone & Setup Environment**
 ```bash
-git clone https://github.com/your-username/XENIA.git
+git clone https://github.com/gabsgj/XENIA.git
 cd XENIA
 ```
 
