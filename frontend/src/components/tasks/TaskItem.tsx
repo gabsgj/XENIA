@@ -197,7 +197,7 @@ export default function TaskItem({ task, activeTaskId, processingIds, onStart, o
                   </>
                 )}
 
-                {/* Inline compact action menu for consistency: Edit | Complete | Delete */}
+                {/* Inline compact action menu for consistency: Edit | Delete */}
                 {!task.fromPlan && (
                   <div className="hidden sm:flex items-center gap-1">
                     <Button
@@ -210,18 +210,6 @@ export default function TaskItem({ task, activeTaskId, processingIds, onStart, o
                       <Edit className="w-4 h-4 mr-1" />
                       Edit
                     </Button>
-                    {!isCompleted && (
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        aria-label="Mark as complete"
-                        onClick={() => { Promise.resolve(onComplete(task as Task)).catch(() => {}) }}
-                      >
-                        <CheckCircle2 className="w-4 h-4 mr-1" />
-                        Mark as Complete
-                      </Button>
-                    )}
                     <Button
                       type="button"
                       size="sm"

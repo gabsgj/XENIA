@@ -603,7 +603,7 @@ export default function DashboardPage(){
                     <div className="flex items-center justify-center h-full">
                       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
                     </div>
-                  ) : studyChartData.length > 1 ? (
+                  ) : studyChartData.length > 0 ? (
                     <ResponsiveContainer width="100%" height="100%">
                       <AreaChart data={studyChartData}>
                         <XAxis dataKey='date' tickFormatter={(val: string) => {
@@ -657,7 +657,7 @@ export default function DashboardPage(){
                     <div className="flex items-center justify-center h-full">
                       <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
                     </div>
-                  ) : weeklyChartData.length > 1 ? (
+                  ) : weeklyChartData.length > 0 ? (
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={weeklyChartData}>
                         <XAxis dataKey="week" />
@@ -702,8 +702,9 @@ export default function DashboardPage(){
                         <Bar dataKey="completion" fill="hsl(var(--primary))" radius={[4,4,0,0]} />
                       </BarChart>
                     </ResponsiveContainer>
-                  ) : (
+                  ) : subjectFallback.length > 0 ? (
                     <div className="space-y-3">
+                      <div className="text-xs text-muted-foreground mb-2">Study time by subject (minutes)</div>
                       {subjectFallback.map(([subject, minutes]) => (
                         <div key={subject} className="flex items-center gap-2">
                           <div className="w-24 text-xs text-muted-foreground truncate">{subject}</div>
@@ -713,9 +714,10 @@ export default function DashboardPage(){
                           <div className="w-10 text-right text-xs text-muted-foreground">{minutes}m</div>
                         </div>
                       ))}
-                      {subjectFallback.length === 0 && (
-                        <div className="text-xs text-muted-foreground">No subject data yet.</div>
-                      )}
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
+                      No subject data yet. Start studying to see your performance!
                     </div>
                   )}
                 </div>

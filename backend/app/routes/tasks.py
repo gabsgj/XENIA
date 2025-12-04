@@ -171,8 +171,8 @@ def complete_task():
     
     try:
         # First check if task is already completed to prevent duplicate XP awards
-        existing = sb.table("tasks").select("status").eq("id", task_id).single().execute()
-        current_status = existing.data.get("status") if existing.data else None
+        existing = sb.table("tasks").select("status").eq("id", task_id).execute()
+        current_status = existing.data[0].get("status") if existing.data else None
         
         if current_status in ["done", "completed"]:
             logger.info(f"   Task {task_id} is already completed - skipping duplicate completion")
@@ -335,8 +335,8 @@ def end_session():
             sb.table('sessions').update({'status': 'completed'}).eq('id', session_id).execute()
         if task_id:
             # Check if task is already completed before awarding XP
-            existing = sb.table("tasks").select("status").eq("id", task_id).single().execute()
-            current_status = existing.data.get("status") if existing.data else None
+            existing = sb.table("tasks").select("status").eq("id", task_id).execute()
+            current_status = existing.data[0].get("status") if existing.data else None
             
             if current_status not in ["done", "completed"]:
                 sb.table('tasks').update({'status': 'done'}).eq('id', task_id).execute()
@@ -366,9 +366,13 @@ def update_task(task_id):
     
     try:
         # Verify task belongs to user before updating
-        resp = sb.table("tasks").select("id").eq("id", task_id).eq("user_id", norm_user_id).execute()
+        resp = sb.table("tasks").select("id, status, topic, due_date, user_id").eq("id", task_id).eq("user_id", norm_user_id).execute()
         if not resp.data:
+            logger.warning(f"   Task {task_id} not found for user {norm_user_id}")
             raise ApiError("TASK_404", "Task not found", status=404)
+        
+        existing_task = resp.data[0]
+        logger.info(f"   Found existing task: {existing_task}")
         
         # Prepare update data - map to actual database schema
         update_data = {}
@@ -383,26 +387,30 @@ def update_task(task_id):
         if "completed" in data and data["completed"]:
             update_data["status"] = "done"
         
-        resp = sb.table("tasks").update(update_data).eq("id", task_id).execute()
+        logger.info(f"   Update data: {update_data}")
+        
+        # Only update if there's something to update
+        if update_data:
+            resp = sb.table("tasks").update(update_data).eq("id", task_id).execute()
+            db_task = resp.data[0] if resp.data else existing_task
+        else:
+            # No changes, return existing task
+            db_task = existing_task
         
         # Map response back to frontend format
-        if resp.data and len(resp.data) > 0:
-            db_task = resp.data[0]
-            task = {
-                "id": db_task.get("id"),
-                "title": db_task.get("topic", "Untitled"),  # Map 'topic' back to 'title'
-                "subject": data.get("subject", "General"),  # Preserve from request
-                "due_date": db_task.get("due_date"),
-                "dueDate": db_task.get("due_date"),
-                "duration_minutes": data.get("duration_minutes", data.get("estimatedMinutes", 30)),
-                "estimatedMinutes": data.get("estimatedMinutes", data.get("duration_minutes", 30)),
-                "priority": data.get("priority", "Medium"),
-                "status": db_to_frontend_status(db_task.get("status", "todo")),
-                "completed": db_task.get("status") in ["done", "completed"],
-                "user_id": db_task.get("user_id")
-            }
-        else:
-            task = update_data
+        task = {
+            "id": db_task.get("id"),
+            "title": db_task.get("topic", "Untitled"),  # Map 'topic' back to 'title'
+            "subject": data.get("subject", "General"),  # Preserve from request
+            "due_date": db_task.get("due_date"),
+            "dueDate": db_task.get("due_date"),
+            "duration_minutes": data.get("duration_minutes", data.get("estimatedMinutes", 30)),
+            "estimatedMinutes": data.get("estimatedMinutes", data.get("duration_minutes", 30)),
+            "priority": data.get("priority", "Medium"),
+            "status": db_to_frontend_status(db_task.get("status", "todo")),
+            "completed": db_task.get("status") in ["done", "completed"],
+            "user_id": db_task.get("user_id")
+        }
         
         logger.info(f"   Updated task {task_id}")
         return {"task": task}
