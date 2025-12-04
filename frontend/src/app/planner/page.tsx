@@ -79,6 +79,7 @@ export default function PlannerPage() {
   useEffect(()=>{ 
     (async ()=>{ 
       try{ 
+        // Fetch core data in parallel for fast initial load
         const [p, t, r] = await Promise.all([
           api('/api/plan/current'),
           api('/api/resources/topics'),
@@ -91,61 +92,84 @@ export default function PlannerPage() {
           setInitialTopics(t.topics)
         }
         
-        // Also fetch topic-specific resources for current plan topics
+        // Defer resource fetching to not block initial render
+        // Only fetch resources for the first 4 topics initially (lazy load rest)
         if (p?.sessions?.length > 0) {
           const uniqueTopics = [...new Set(p.sessions.map((s:any) => s.topic))] as string[]
-          // Fetch more topics to reduce duplication across tasks
-          const topicResourcePromises = uniqueTopics.slice(0, 12).map(async (topic: string) => {
-            try {
-              const topicRes = await api(`/api/resources/recommendations/${encodeURIComponent(topic)}?learning_style=balanced&difficulty=intermediate&free_only=true`)
-              return { topic, resources: topicRes.grouped_recommendations || {} }
-            } catch (e) {
-              console.warn(`Failed to fetch resources for topic: ${topic}`, e)
-              return { topic, resources: {} }
-            }
-          })
           
-          const topicResourcesResults = await Promise.allSettled(topicResourcePromises)
-          const additionalResources: any[] = []
-          const byTopic: Record<string, any[]> = {}
+          // Fetch resources for first 4 topics immediately, rest lazily
+          const initialTopics = uniqueTopics.slice(0, 4)
+          const deferredTopics = uniqueTopics.slice(4, 8) // limit total to 8
           
-          topicResourcesResults.forEach((result) => {
-            if (result.status === 'fulfilled' && result.value?.resources) {
-              const { topic, resources: topicRes } = result.value
-              const bucket: any[] = []
-              
-              // Extract different types of resources from grouped recommendations
-              Object.entries(topicRes).forEach(([category, resourceList]: [string, any]) => {
-                if (Array.isArray(resourceList)) {
-                  resourceList.forEach((resource: any) => {
-                    const normalized = {
-                      ...resource,
-                      topic: topic,
-                      source: category === 'youtube_videos' ? 'youtube' : 
-                             category === 'documentation' ? 'docs' : 
-                             category === 'ai_generated' ? 'ai' : 'general',
-                      title: resource.title || resource.name || 'Untitled Resource',
-                      url: resource.url || resource.link || `https://www.youtube.com/results?search_query=${encodeURIComponent(topic + ' tutorial')}`,
-                      duration: resource.duration || resource.metadata?.videoDuration || 10,
-                      quality_score: resource.quality_score || resource.recommendation_score || 5
-                    }
-                    additionalResources.push(normalized)
-                    bucket.push(normalized)
-                  })
-                }
+          const fetchTopicResources = async (topicsToFetch: string[]) => {
+            const topicResourcePromises = topicsToFetch.map(async (topic: string) => {
+              try {
+                const topicRes = await api(`/api/resources/recommendations/${encodeURIComponent(topic)}?learning_style=balanced&difficulty=intermediate&free_only=true`)
+                return { topic, resources: topicRes.grouped_recommendations || {} }
+              } catch (e) {
+                console.warn(`Failed to fetch resources for topic: ${topic}`, e)
+                return { topic, resources: {} }
+              }
+            })
+            
+            const results = await Promise.allSettled(topicResourcePromises)
+            const additionalResources: any[] = []
+            const byTopic: Record<string, any[]> = {}
+            
+            results.forEach((result) => {
+              if (result.status === 'fulfilled' && result.value?.resources) {
+                const { topic, resources: topicRes } = result.value
+                const bucket: any[] = []
+                
+                Object.entries(topicRes).forEach(([category, resourceList]: [string, any]) => {
+                  if (Array.isArray(resourceList)) {
+                    resourceList.forEach((resource: any) => {
+                      const normalized = {
+                        ...resource,
+                        topic: topic,
+                        source: category === 'youtube_videos' ? 'youtube' : 
+                               category === 'documentation' ? 'docs' : 
+                               category === 'ai_generated' ? 'ai' : 'general',
+                        title: resource.title || resource.name || 'Untitled Resource',
+                        url: resource.url || resource.link || `https://www.youtube.com/results?search_query=${encodeURIComponent(topic + ' tutorial')}`,
+                        duration: resource.duration || resource.metadata?.videoDuration || 10,
+                        quality_score: resource.quality_score || resource.recommendation_score || 5
+                      }
+                      additionalResources.push(normalized)
+                      bucket.push(normalized)
+                    })
+                  }
+                })
+                byTopic[topic] = bucket
+              }
+            })
+            
+            return { additionalResources, byTopic }
+          }
+          
+          // Fetch initial topics immediately
+          if (initialTopics.length > 0) {
+            const { additionalResources, byTopic } = await fetchTopicResources(initialTopics)
+            setResources(prev => {
+              const existingUrls = new Set(prev.map(r => r.url))
+              const newResources = additionalResources.filter(r => !existingUrls.has(r.url))
+              return [...prev, ...newResources]
+            })
+            setTopicResources(prev => ({ ...prev, ...byTopic }))
+          }
+          
+          // Fetch deferred topics after a short delay (non-blocking)
+          if (deferredTopics.length > 0) {
+            setTimeout(async () => {
+              const { additionalResources, byTopic } = await fetchTopicResources(deferredTopics)
+              setResources(prev => {
+                const existingUrls = new Set(prev.map(r => r.url))
+                const newResources = additionalResources.filter(r => !existingUrls.has(r.url))
+                return [...prev, ...newResources]
               })
-              byTopic[topic] = bucket
-            }
-          })
-          
-          // Merge with existing resources, avoiding duplicates
-          setResources(prev => {
-            const existingUrls = new Set(prev.map(r => r.url))
-            const newResources = additionalResources.filter(r => !existingUrls.has(r.url))
-            return [...prev, ...newResources]
-          })
-          // Set topic-specific buckets for precise per-task recommendations
-          setTopicResources(prev => ({ ...prev, ...byTopic }))
+              setTopicResources(prev => ({ ...prev, ...byTopic }))
+            }, 500)
+          }
         }
       } catch(e:any){ 
         pushError({ 

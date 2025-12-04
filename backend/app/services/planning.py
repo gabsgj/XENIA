@@ -12,7 +12,7 @@ import logging
 logger = logging.getLogger('xenia')
 
 
-def _sync_plan_tasks(norm_user_id: str, plan: Dict) -> None:
+def _sync_plan_tasks(norm_user_id: str, plan: Dict, async_mode: bool = True) -> None:
     """Sync plan sessions into the tasks table so frontend sees tasks immediately.
 
     Creates/updates a task per session (due_date set from session.date) using
@@ -21,56 +21,80 @@ def _sync_plan_tasks(norm_user_id: str, plan: Dict) -> None:
       - in-progress -> doing
       - completed -> done
 
+    OPTIMIZED: Uses batch upsert instead of individual queries.
     Best-effort: logs and continues on failure.
     """
-    try:
-        if not is_valid_uuid(norm_user_id):
-            logger.info("   Not a valid UUID user - skipping task sync")
-            return
-        sb = get_supabase()
-        sessions = plan.get("sessions", []) or []
+    import threading
+    
+    def _do_sync():
+        try:
+            if not is_valid_uuid(norm_user_id):
+                logger.info("   Not a valid UUID user - skipping task sync")
+                return
+            sb = get_supabase()
+            sessions = plan.get("sessions", []) or []
 
-        def _to_db_status(sess_status: str) -> str:
-            m = {
-                'pending': 'todo',
-                'in-progress': 'doing',
-                'completed': 'done'
-            }
-            return m.get((sess_status or 'pending').strip(), 'todo')
+            def _to_db_status(sess_status: str) -> str:
+                m = {
+                    'pending': 'todo',
+                    'in-progress': 'doing',
+                    'completed': 'done'
+                }
+                return m.get((sess_status or 'pending').strip(), 'todo')
 
-        for s in sessions:
-            try:
+            # OPTIMIZATION: Batch prepare all tasks first
+            tasks_to_upsert = []
+            for s in sessions:
                 due = s.get("date")
                 topic = s.get("topic")
                 db_status = _to_db_status(s.get("status") or 'pending')
                 if not topic or not due:
                     continue
-                # First try update existing row by composite keys
-                try:
-                    upd = sb.table("tasks").update({
-                        "status": db_status,
-                        "due_date": due,
-                    }).eq("user_id", norm_user_id).eq("topic", topic).eq("due_date", due).select("id").execute()
-                    if getattr(upd, 'data', None):
-                        continue
-                except Exception:
-                    # proceed to insert path if update failed (e.g., no row)
-                    pass
-                # Insert new row with normalized status
-                try:
-                    sb.table("tasks").insert({
-                        "user_id": norm_user_id,
-                        "topic": topic,
-                        "status": db_status,
-                        "due_date": due,
-                    }).execute()
-                except Exception as ie:
-                    logger.warning(f"   Task insert failed for user {norm_user_id} topic '{topic}' on {due}: {ie}")
-            except Exception as row_err:
-                logger.warning(f"   Skipping task sync for a session due to error: {row_err}")
-        logger.info(f"   Task sync attempted for {len(sessions)} sessions for user {norm_user_id}")
-    except Exception as e:
-        logger.warning(f"   Task sync failed unexpectedly: {e}")
+                
+                tasks_to_upsert.append({
+                    "user_id": norm_user_id,
+                    "topic": topic,
+                    "status": db_status,
+                    "due_date": due,
+                })
+            
+            if not tasks_to_upsert:
+                logger.info("   No tasks to sync")
+                return
+            
+            # OPTIMIZATION: Single batch upsert instead of individual queries
+            # This reduces N*2 queries to just 1 query
+            try:
+                sb.table("tasks").upsert(
+                    tasks_to_upsert,
+                    on_conflict="user_id,topic,due_date"
+                ).execute()
+                logger.info(f"   ✅ Batch synced {len(tasks_to_upsert)} tasks for user {norm_user_id}")
+            except Exception as batch_err:
+                # Fallback to individual inserts if batch fails (e.g., constraint issues)
+                logger.warning(f"   Batch upsert failed ({batch_err}), falling back to individual inserts")
+                success_count = 0
+                for task in tasks_to_upsert:
+                    try:
+                        sb.table("tasks").upsert(
+                            task,
+                            on_conflict="user_id,topic,due_date"
+                        ).execute()
+                        success_count += 1
+                    except Exception:
+                        pass
+                logger.info(f"   Task sync completed: {success_count}/{len(tasks_to_upsert)} tasks")
+                
+        except Exception as e:
+            logger.warning(f"   Task sync failed unexpectedly: {e}")
+    
+    # Run sync in background thread to not block plan generation response
+    if async_mode:
+        thread = threading.Thread(target=_do_sync, daemon=True)
+        thread.start()
+        logger.info(f"   Task sync started in background thread")
+    else:
+        _do_sync()
 
 
 def _distribute_sessions(topics: List[Dict], days: int, hours_per_day: float) -> List[Dict]:
@@ -290,24 +314,15 @@ def generate_plan(
                         ensure_user_record(sb, norm_user_id)
                     except Exception:
                         pass
-                    max_retries = 3
-                    for attempt in range(max_retries):
-                        try:
-                            sb.table("plans").upsert({"user_id": norm_user_id, "plan": plan}).execute()
-                            logger.info(f"   Plan stored in database for user {norm_user_id}")
-                            # Also create tasks from plan sessions so UI shows tasks immediately
-                            try:
-                                _sync_plan_tasks(norm_user_id, plan)
-                            except Exception as e:
-                                logger.warning(f"   Task sync after plan upsert failed: {e}")
-                            break
-                        except Exception as e:
-                            if attempt < max_retries - 1:
-                                logger.warning(f"   Plan storage attempt {attempt + 1} failed: {e}, retrying...")
-                                continue
-                            else:
-                                logger.error(f"   Plan storage failed after {max_retries} attempts: {e}")
-                                break
+                    
+                    # OPTIMIZATION: Single attempt (no retry loop) and async task sync
+                    try:
+                        sb.table("plans").upsert({"user_id": norm_user_id, "plan": plan}).execute()
+                        logger.info(f"   Plan stored in database for user {norm_user_id}")
+                        # Task sync runs in background thread
+                        _sync_plan_tasks(norm_user_id, plan, async_mode=True)
+                    except Exception as e:
+                        logger.error(f"   Plan storage failed: {e}")
                 else:
                     logger.warning(f"   Invalid user ID {norm_user_id}, skipping database storage")
             except Exception as e:
@@ -364,23 +379,14 @@ def generate_plan(
                     ensure_user_record(sb, norm_user_id)
                 except Exception:
                     pass
-                max_retries = 3
-                for attempt in range(max_retries):
-                    try:
-                        sb.table("plans").upsert({"user_id": norm_user_id, "plan": plan}).execute()
-                        logger.info(f"   Advanced plan stored for user {norm_user_id}")
-                        try:
-                            _sync_plan_tasks(norm_user_id, plan)
-                        except Exception as e:
-                            logger.warning(f"   Task sync after advanced plan upsert failed: {e}")
-                        break
-                    except Exception as e:
-                        if attempt < max_retries - 1:
-                            logger.warning(f"   Advanced plan storage attempt {attempt + 1} failed: {e}, retrying...")
-                            continue
-                        else:
-                            logger.error(f"   Advanced plan storage failed after {max_retries} attempts: {e}")
-                            break
+                
+                # OPTIMIZATION: Single attempt and async task sync
+                try:
+                    sb.table("plans").upsert({"user_id": norm_user_id, "plan": plan}).execute()
+                    logger.info(f"   Advanced plan stored for user {norm_user_id}")
+                    _sync_plan_tasks(norm_user_id, plan, async_mode=True)
+                except Exception as e:
+                    logger.error(f"   Advanced plan storage failed: {e}")
             else:
                 logger.warning(f"   Invalid user ID {norm_user_id}, skipping advanced plan database storage")
         except Exception as e:
@@ -412,23 +418,14 @@ def generate_plan(
                 ensure_user_record(sb, norm_user_id)
             except Exception:
                 pass
-            max_retries = 3
-            for attempt in range(max_retries):
-                try:
-                    sb.table("plans").upsert({"user_id": norm_user_id, "plan": plan}).execute()
-                    logger.info(f"   Traditional plan stored for user {norm_user_id}")
-                    try:
-                        _sync_plan_tasks(norm_user_id, plan)
-                    except Exception as e:
-                        logger.warning(f"   Task sync after traditional plan upsert failed: {e}")
-                    break
-                except Exception as e:
-                    if attempt < max_retries - 1:
-                        logger.warning(f"   Traditional plan storage attempt {attempt + 1} failed: {e}, retrying...")
-                        continue
-                    else:
-                        logger.error(f"   Traditional plan storage failed after {max_retries} attempts: {e}")
-                        break
+            
+            # OPTIMIZATION: Single attempt and async task sync
+            try:
+                sb.table("plans").upsert({"user_id": norm_user_id, "plan": plan}).execute()
+                logger.info(f"   Traditional plan stored for user {norm_user_id}")
+                _sync_plan_tasks(norm_user_id, plan, async_mode=True)
+            except Exception as e:
+                logger.error(f"   Traditional plan storage failed: {e}")
         else:
             logger.warning(f"   Invalid user ID {norm_user_id}, skipping traditional plan database storage")
     except Exception:

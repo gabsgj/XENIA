@@ -12,6 +12,13 @@ import hashlib, json, time
 # Simple in-memory request cache for deduplication. In prod replace with Redis.
 _request_cache = {}
 _CACHE_TTL = int(__import__('os').getenv('PROGRESS_REQUEST_CACHE_TTL', '5'))
+
+# Cache for topics and resources (per user, short TTL for freshness)
+_topics_cache: dict = {}
+_resources_cache: dict = {}
+_TOPICS_CACHE_TTL = 15  # seconds
+_RESOURCES_CACHE_TTL = 30  # seconds - resources change less frequently
+
 from ..services.topic_store import get_topics as store_get_topics
 
 logger = logging.getLogger('xenia')
@@ -53,24 +60,52 @@ def _determine_topic_category(topic: str) -> str:
     return "general"
 
 
+def _get_cached_topics(user_id: str):
+    """Check for cached topics."""
+    if user_id in _topics_cache:
+        data, ts = _topics_cache[user_id]
+        if time.time() - ts < _TOPICS_CACHE_TTL:
+            return data
+    return None
+
+
+def _set_topics_cache(user_id: str, data):
+    """Cache topics for user."""
+    _topics_cache[user_id] = (data, time.time())
+    # Cleanup old entries
+    if len(_topics_cache) > 100:
+        oldest = sorted(_topics_cache.keys(), key=lambda k: _topics_cache[k][1])[:50]
+        for k in oldest:
+            _topics_cache.pop(k, None)
+
+
 @resources_bp.get("/topics")
 def list_topics():
     raw_user_id = request.args.get("user_id") or request.headers.get("X-User-Id") or ""
     if not raw_user_id:
         raise ApiError("AUTH_401", "Missing user_id")
     user_id = normalize_user_id(raw_user_id)
+    
+    # Check cache first
+    cached = _get_cached_topics(user_id)
+    if cached:
+        return cached
+    
     # If invalid UUID -> use in-memory store for development/testing
     if not is_valid_uuid(user_id):
         topics = store_get_topics(user_id)
-        return {"topics": [
+        result = {"topics": [
             {"id": f"mem-{idx}", "topic": t, "parent_topic": None, "order_index": idx, "status": "pending", "completed_at": None}
             for idx, t in enumerate(topics)
         ]}
+        _set_topics_cache(user_id, result)
+        return result
+        
     sb = get_supabase()
     try:
         resp = supabase_call(lambda: sb.table("syllabus_topics").select(
             "id, topic, parent_topic, order_index, status, completed_at"
-        ).eq("user_id", user_id).order("order_index").limit(500).execute())
+        ).eq("user_id", user_id).order("order_index").limit(200).execute())  # Reduced limit for speed
         
         # If no topics found, return sample topics to get started
         if not resp.data or len(resp.data) == 0:
@@ -82,9 +117,13 @@ def list_topics():
                 {"id": "sample-4", "topic": "Web Development", "parent_topic": None, "order_index": 4, "status": "pending", "completed_at": None},
                 {"id": "sample-5", "topic": "Database Design", "parent_topic": None, "order_index": 5, "status": "pending", "completed_at": None}
             ]
-            return {"topics": sample_topics}
+            result = {"topics": sample_topics}
+            _set_topics_cache(user_id, result)
+            return result
         
-        return {"topics": resp.data or []}
+        result = {"topics": resp.data or []}
+        _set_topics_cache(user_id, result)
+        return result
     except Exception as e:
         logger.error(f"Topic fetch failed: {e}")
         return {"topics": []}
@@ -175,12 +214,15 @@ def update_progress():
                         })
 
                     # Persist matching task status change (match by user_id + topic + due_date)
+                    # Find the task first, then update by ID to avoid updating duplicates
                     try:
-                        supabase_call(lambda: sb.table("tasks").update({"status": db_status})
-                            .eq("user_id", user_id)
-                            .eq("topic", session_map[key].get("topic"))
-                            .eq("due_date", upd.get("date"))
-                            .execute())
+                        topic_for_update = session_map[key].get("topic")
+                        date_for_update = upd.get("date")
+                        task_query = sb.table("tasks").select("id").eq("user_id", user_id).eq("topic", topic_for_update).eq("due_date", date_for_update).limit(1).execute()
+                        if task_query.data:
+                            task_id = task_query.data[0]["id"]
+                            supabase_call(lambda: sb.table("tasks").update({"status": db_status}).eq("id", task_id).execute())
+                            logger.info(f"Updated task {task_id} to status {db_status}")
                     except Exception as te:
                         logger.warning(f"Failed to update task status to {db_status} for {session_map[key].get('topic')} on {upd.get('date')}: {te}")
 
@@ -246,13 +288,14 @@ def update_progress():
                             "status": "completed",
                             "created_at": f"{upd.get('date')}T12:00:00Z"
                         })
-                    # Update matching task status
+                    # Update matching task status - find by ID first to avoid updating duplicates
                     try:
-                        supabase_call(lambda: sb.table("tasks").update({"status": db_status})
-                            .eq("user_id", user_id)
-                            .eq("topic", session_map[key].get("topic"))
-                            .eq("due_date", upd.get("date"))
-                            .execute())
+                        topic_for_update = session_map[key].get("topic")
+                        date_for_update = upd.get("date")
+                        task_query = sb.table("tasks").select("id").eq("user_id", user_id).eq("topic", topic_for_update).eq("due_date", date_for_update).limit(1).execute()
+                        if task_query.data:
+                            task_id = task_query.data[0]["id"]
+                            supabase_call(lambda: sb.table("tasks").update({"status": db_status}).eq("id", task_id).execute())
                     except Exception as te:
                         logger.warning(f"(fallback) Failed to update task to {db_status} for {session_map[key].get('topic')} on {upd.get('date')}: {te}")
 

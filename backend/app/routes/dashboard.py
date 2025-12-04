@@ -4,9 +4,15 @@ from ..errors import ApiError
 from ..supabase_client import get_supabase
 from ..utils import normalize_user_id
 import time
+from functools import lru_cache
+from datetime import datetime, timedelta
 
 logger = logging.getLogger('xenia')
 dashboard_bp = Blueprint('dashboard', __name__)
+
+# In-memory cache for dashboard data (per user, 10 second TTL)
+_dashboard_cache: dict = {}
+_DASHBOARD_CACHE_TTL = 10  # seconds
 
 
 def _safe_exec(fn, *args, **kwargs):
@@ -17,6 +23,26 @@ def _safe_exec(fn, *args, **kwargs):
         return None
 
 
+def _get_cached_dashboard(user_id: str):
+    """Check if we have a valid cached dashboard response."""
+    if user_id in _dashboard_cache:
+        cached_data, cached_time = _dashboard_cache[user_id]
+        if time.time() - cached_time < _DASHBOARD_CACHE_TTL:
+            return cached_data
+    return None
+
+
+def _set_dashboard_cache(user_id: str, data: dict):
+    """Cache dashboard data for user."""
+    _dashboard_cache[user_id] = (data, time.time())
+    # Cleanup old entries (keep last 100)
+    if len(_dashboard_cache) > 100:
+        oldest_users = sorted(_dashboard_cache.keys(), 
+                             key=lambda k: _dashboard_cache[k][1])[:50]
+        for u in oldest_users:
+            _dashboard_cache.pop(u, None)
+
+
 @dashboard_bp.get('/')
 def get_dashboard():
     """Return aggregated dashboard data for the authenticated user.
@@ -25,38 +51,45 @@ def get_dashboard():
     """
     start = time.time()
     raw_user_id = request.headers.get('X-User-Id') or ''
-    # Tests pass explicit user ids in header; keep the raw value to match test expectations
     user_id = raw_user_id if raw_user_id else ''
     logger.info(f"dashboard.get for user={user_id}")
     if not user_id:
         raise ApiError('AUTH_401', 'Missing user id')
 
+    # Check cache first for faster response
+    cached = _get_cached_dashboard(user_id)
+    if cached:
+        dur = time.time() - start
+        logger.info(f"dashboard.get completed for {user_id} in {dur:.3f}s (cache=true)")
+        return cached
+
     sb = get_supabase()
     # Use a single transaction-like set of reads (Supabase client is REST-like)
     try:
-        # Sessions: last 90 days
+        # Reduce limits for faster queries - most users don't need 1000 records
+        # Sessions: last 90 days (limit 200 for perf)
         sessions_resp = _safe_exec(lambda: sb.table('sessions')
                                   .select('id, duration_min, topic, created_at, status')
                                   .eq('user_id', user_id)
                                   .order('created_at', desc=True)
-                                  .limit(1000)
+                                  .limit(200)
                                   .execute())
         sessions = sessions_resp.data if sessions_resp and hasattr(sessions_resp, 'data') else []
 
-        # Tasks / plan sessions
+        # Tasks / plan sessions (limit 100)
         tasks_resp = _safe_exec(lambda: sb.table('sessions')
                                 .select('id, topic, date, duration_min, status, starts_at')
                                 .eq('user_id', user_id)
                                 .order('date', desc=False)
-                                .limit(1000)
+                                .limit(100)
                                 .execute())
         tasks = tasks_resp.data if tasks_resp and hasattr(tasks_resp, 'data') else []
 
-        # Quiz attempts
-        quizzes_resp = _safe_exec(lambda: sb.table('quiz_attempts')
-                                  .select('id, title, score, taken_at')
+        # Quiz attempts from user_progress_history table (this is where record_quiz_result stores data)
+        quizzes_resp = _safe_exec(lambda: sb.table('user_progress_history')
+                                  .select('id, topic, score, correct, wrong, created_at')
                                   .eq('user_id', user_id)
-                                  .order('taken_at', desc=True)
+                                  .order('created_at', desc=True)
                                   .limit(50)
                                   .execute())
         quizzes = quizzes_resp.data if quizzes_resp and hasattr(quizzes_resp, 'data') else []
@@ -118,9 +151,16 @@ def get_dashboard():
         except Exception:
             achievements = []
 
-        # Quizzes details
+        # Quizzes details - map from user_progress_history fields
         quizzes_details = [
-            {'id': q.get('id'), 'title': q.get('title'), 'score': q.get('score'), 'takenAt': q.get('taken_at')} for q in quizzes
+            {
+                'id': q.get('id'), 
+                'title': q.get('topic', 'Quiz'),  # topic as title
+                'score': q.get('score', 0), 
+                'correct': q.get('correct', 0),
+                'wrong': q.get('wrong', 0),
+                'takenAt': q.get('created_at')
+            } for q in quizzes
         ]
 
         payload = {
@@ -140,6 +180,9 @@ def get_dashboard():
             'recentAchievements': achievements,
             'quizzesTakenDetails': quizzes_details
         }
+
+        # Cache the result for subsequent requests
+        _set_dashboard_cache(user_id, payload)
 
         dur = time.time() - start
         logger.info(f"dashboard.get completed for {user_id} in {dur:.3f}s (cache=false)")

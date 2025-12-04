@@ -192,7 +192,8 @@ def handle_upload(file_storage, user_id: str, artifact_type: str) -> Dict:
                             })
                         if rows and is_valid_uuid(norm_user_id):
                             try:
-                                sb.table("syllabus_topics").upsert(rows).execute()
+                                # Use on_conflict to handle the unique constraint on (user_id, topic)
+                                sb.table("syllabus_topics").upsert(rows, on_conflict="user_id,topic").execute()
                                 print(f"📚 Persisted {len(rows)} topics to DB for user {norm_user_id}")
                             except Exception as e:
                                 print(f"⚠️ Failed to persist topics to DB: {e}")
@@ -219,7 +220,8 @@ def handle_upload(file_storage, user_id: str, artifact_type: str) -> Dict:
                             })
                         if rows and is_valid_uuid(norm_user_id):
                             try:
-                                sb.table("syllabus_topics").upsert(rows).execute()
+                                # Use on_conflict to handle the unique constraint on (user_id, topic)
+                                sb.table("syllabus_topics").upsert(rows, on_conflict="user_id,topic").execute()
                                 print(f"📚 Persisted {len(rows)} fallback topics to DB for user {norm_user_id}")
                             except Exception as e:
                                 print(f"⚠️ Failed to persist fallback topics to DB: {e}")
@@ -235,13 +237,25 @@ def handle_upload(file_storage, user_id: str, artifact_type: str) -> Dict:
     else:
         analysis = {}
 
+    # Return quickly with topics - plan generation can happen on demand
+    # This speeds up the upload response significantly
     plan_preview = None
-    try:
-        # Always build dynamic plan preview (objective B & C)
-        with _timer("generate_plan"):
-            plan_preview = generate_plan(norm_user_id)
-    except Exception:
-        plan_preview = None
+    # OPTIMIZATION: Skip full plan preview by default for faster uploads
+    # Frontend can request plan separately via /api/plan endpoint
+    skip_plan_preview = os.getenv("SKIP_PLAN_PREVIEW", "true").lower() == "true"
+    
+    if not skip_plan_preview and topics:
+        try:
+            # Generate plan preview only if we have topics
+            # Use a shorter timeout for faster response
+            with _timer("generate_plan"):
+                plan_preview = generate_plan(
+                    user_id=norm_user_id, 
+                    extracted_topics=topics if topics else None
+                )
+        except Exception as e:
+            print(f"⚠️ Plan preview generation failed: {e}")
+            plan_preview = None
 
     # Ensure topics are at the top level for frontend compatibility
     return {

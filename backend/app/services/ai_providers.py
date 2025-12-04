@@ -709,100 +709,44 @@ def generate_enhanced_study_plan_with_resources(topics: list, horizon_days: int 
                                               user_preferences: Dict[str, Any] = None,
                                               learning_style: Optional[str] = None,
                                               extracted_topics: Optional[list] = None) -> Dict[str, Any]:
-    """Generate enhanced study plan with resources using Gemini 2.0 Flash."""
+    """Generate enhanced study plan with resources using Gemini 2.0 Flash.
+    
+    OPTIMIZED: Uses a streamlined prompt for faster AI response.
+    """
     import logging
     from datetime import datetime, timedelta
     
     logger = logging.getLogger('xenia')
-    logger.info(f"🎯 Generating enhanced study plan with resources for {len(topics)} topics")
+    logger.info(f"🎯 Generating enhanced study plan for {len(topics)} topics (optimized)")
     
     preferences = user_preferences or {}
     preferred_hours = preferences.get("hours_per_day", 2.0)
     learning_style = preferences.get("learning_style", "balanced")
-    difficulty_preference = preferences.get("difficulty_preference", "gradual")
     
-    # Format topics for AI (include all provided topics)
-    topics_str = ""
-    for i, topic in enumerate(topics, 1):
+    # OPTIMIZATION: Simplified topic list (just names with priority)
+    topic_list = []
+    for i, topic in enumerate(topics[:20], 1):  # Cap at 20 topics for speed
         if isinstance(topic, dict):
-            topics_str += f"{i}. {topic.get('topic', 'Unknown Topic')} (Priority: {topic.get('priority', 'medium')}, Hours: {topic.get('estimated_hours', 3)})\n"
+            name = topic.get('topic', 'Topic')
+            priority = topic.get('priority', 'medium')
+            topic_list.append(f"{i}. {name} ({priority})")
         else:
-            topics_str += f"{i}. {topic}\n"
+            topic_list.append(f"{i}. {topic}")
+    topics_str = "\n".join(topic_list)
     
-    prompt = f"""You are an expert educational planner using learning science principles. Create a comprehensive study plan with resources.
-
-TOPICS TO COVER:
+    # Get today's date for realistic scheduling
+    today = datetime.now().date()
+    
+    # OPTIMIZATION: Much shorter, focused prompt for faster response
+    prompt = f"""Create a {horizon_days}-day study plan for these topics:
 {topics_str}
 
-PARAMETERS:
-- Study horizon: {horizon_days} days
-- Deadline: {deadline or 'Flexible'}
-- Preferred hours per day: {preferred_hours}
-- Learning style: {learning_style}
-- Difficulty preference: {difficulty_preference}
+Settings: {preferred_hours}h/day, deadline: {deadline or 'flexible'}, style: {learning_style}
 
-Generate a detailed study plan with the following structure:
-1. Optimal scheduling using spaced repetition
-2. Resource suggestions (YouTube videos, articles, practice sites)
-3. Progress milestones
-4. Adaptive adjustment guidelines
+Return JSON only:
+{{"study_sessions":[{{"date":"{today}","topic":"Topic Name","duration_hours":1.5,"priority":"high","focus":"practice"}}],"optimization_insights":{{"total_hours":{preferred_hours * horizon_days}}}}}
 
-Return ONLY valid JSON:
-{{
-  "study_sessions": [
-    {{
-      "date": "2025-09-05",
-      "topic": "Topic Name",
-      "duration_hours": 2.5,
-      "priority": "high",
-      "difficulty_level": 7,
-      "learning_objectives": ["Understand X", "Apply Y"],
-      "resources": {{
-        "youtube_videos": [
-          {{"title": "Video Title", "channel": "Channel Name", "url": "https://youtube.com/watch?v=...", "duration": "15 min"}},
-          {{"title": "Advanced Tutorial", "channel": "Expert Channel", "url": "https://youtube.com/watch?v=...", "duration": "25 min"}}
-        ],
-        "articles": [
-          {{"title": "Complete Guide", "source": "Educational Site", "url": "https://example.com/guide", "read_time": "10 min"}}
-        ],
-        "practice_sites": [
-          {{"name": "Practice Platform", "url": "https://practice.com", "type": "interactive exercises"}}
-        ],
-        "additional_resources": [
-          {{"type": "documentation", "title": "Official Docs", "url": "https://docs.example.com"}}
-        ]
-      }},
-      "prerequisites": ["Previous Topic"],
-      "expected_outcomes": ["Master concept X", "Solve problems Y"],
-      "assessment_method": "practice problems"
-    }}
-  ],
-  "optimization_insights": {{
-    "total_study_hours": {preferred_hours * horizon_days},
-    "coverage_percentage": 100,
-    "retention_strategy": "spaced_repetition",
-    "difficulty_curve": "{difficulty_preference}",
-    "personalization_notes": "Adapted for {learning_style} learning style"
-  }},
-  "progress_milestones": [
-    {{"date": "2025-09-08", "milestone": "Complete foundational topics", "completion_target": 40}},
-    {{"date": "2025-09-12", "milestone": "Advanced concepts mastery", "completion_target": 75}},
-    {{"date": "2025-09-16", "milestone": "Full curriculum completion", "completion_target": 100}}
-  ],
-  "adaptive_guidelines": {{
-    "if_ahead_of_schedule": "Add depth to current topics, explore advanced applications",
-    "if_behind_schedule": "Focus on core concepts, use active recall techniques",
-    "resource_alternatives": "Video learners: prioritize YouTube, Text learners: focus on articles",
-    "difficulty_adjustment": "Increase practice problems if concepts are grasped quickly"
-  }},
-  "deadline_management": {{
-    "target_date": "{deadline or 'flexible'}",
-    "urgency_level": "normal",
-    "critical_path_topics": ["Most important topics first"],
-    "buffer_time": "2 days for review and consolidation"
-  }}
-}}
-"""
+Generate {min(horizon_days * 2, len(topics) * 3)} sessions distributed across {horizon_days} days. Include all topics."""
     
     try:
         response = get_ai_response(prompt)
@@ -921,13 +865,14 @@ Return ONLY valid JSON:
                 "category": topic_metadata.get("category", "general")
             })
         
+        difficulty_pref = preferences.get("difficulty_preference", "gradual")
         return {
             "study_sessions": sessions,
             "optimization_insights": {
                 "total_study_hours": len(sessions) * preferred_hours,
                 "coverage_percentage": 100,
                 "retention_strategy": "spaced_repetition",
-                "difficulty_curve": difficulty_preference,
+                "difficulty_curve": difficulty_pref,
                 "personalization_notes": f"Adapted for {learning_style} learning style"
             },
             "progress_milestones": [

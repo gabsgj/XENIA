@@ -1,4 +1,5 @@
 import logging
+import time
 from flask import Blueprint, request
 from ..utils import get_user_id_from_request
 from ..errors import ApiError
@@ -14,6 +15,34 @@ from ..services.user_util import ensure_user_record
 
 logger = logging.getLogger('xenia')
 plan_bp = Blueprint("plan", __name__)
+
+# Cache for current plan (per user, short TTL)
+_plan_cache: dict = {}
+_PLAN_CACHE_TTL = 10  # seconds
+
+
+def _get_cached_plan(user_id: str):
+    """Check for cached plan."""
+    if user_id in _plan_cache:
+        data, ts = _plan_cache[user_id]
+        if time.time() - ts < _PLAN_CACHE_TTL:
+            return data
+    return None
+
+
+def _set_plan_cache(user_id: str, data):
+    """Cache plan for user."""
+    _plan_cache[user_id] = (data, time.time())
+    # Cleanup old entries
+    if len(_plan_cache) > 100:
+        oldest = sorted(_plan_cache.keys(), key=lambda k: _plan_cache[k][1])[:50]
+        for k in oldest:
+            _plan_cache.pop(k, None)
+
+
+def _invalidate_plan_cache(user_id: str):
+    """Invalidate cached plan for user."""
+    _plan_cache.pop(user_id, None)
 
 
 @plan_bp.post("/generate")
@@ -37,14 +66,15 @@ def generate():
             horizon = int(data.get("horizon_days", 14))
             preferred_hours = float(data.get("preferred_hours_per_day", 1.5))
             deadline = data.get("deadline")
-            learning_style = data.get("learning_style", "balanced")
+            # Accept both learning_style and learning_pace for backwards compatibility
+            learning_style = data.get("learning_style") or data.get("learning_pace", "balanced")
             topics = data.get("topics", [])  # Get extracted topics from frontend
             topic_details = data.get("topic_details", [])  # Get detailed topic metadata
         else:
             horizon = int(request.values.get("horizon_days", 14))
             preferred_hours = float(request.values.get("preferred_hours_per_day", 1.5))
             deadline = request.values.get("deadline")
-            learning_style = request.values.get("learning_style", "balanced")
+            learning_style = request.values.get("learning_style") or request.values.get("learning_pace", "balanced")
             topics = []
             topic_details = []
         
@@ -68,6 +98,8 @@ def generate():
         extracted_topics=topics,
         topic_details=topic_details
     )
+    # Invalidate cache after generating new plan
+    _invalidate_plan_cache(uid)
     logger.info(f"   Plan generated successfully for user {uid}")
     return plan, 200
 
@@ -81,6 +113,12 @@ def current():
         raise ApiError("PLAN_400", "Missing user_id")
     else:
         logger.info(f"   User ID: {uid}")
+    
+    # Check cache first for fast response
+    cached = _get_cached_plan(uid)
+    if cached:
+        logger.info(f"   Returning cached plan for user {uid}")
+        return cached, 200
     
     try:
         logger.info(f"   Retrieving current plan for user {uid}...")
@@ -107,6 +145,8 @@ def current():
             "completed_topics": list(user_progress.keys()),
             "weak_topics": weak_topics
         }
+        # Cache the result
+        _set_plan_cache(uid, plan)
         logger.info(f"   Current plan retrieved successfully for user {uid}")
         return plan, 200
     except Exception as e:

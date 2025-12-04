@@ -57,37 +57,31 @@ async function getAuthHeaders(): Promise<Record<string, string>> {
   }
 }
 
-export async function api<T = any>(path: string, opts: RequestInit = {}): Promise<T> {
-  // Simple in-memory dedupe cache (per session) to avoid fetch storms
-  // Key: method + path + body hash; TTL default 2s for GET only
-  const method = (opts.method || 'GET').toUpperCase();
-  const isGet = method === 'GET';
-  const dedupeKey = isGet ? `GET:${path}` : '';
-  const now = Date.now();
-  const g: any = globalThis as any;
-  if (isGet) {
-    g.__xeniaApiCache = g.__xeniaApiCache || new Map<string, { ts: number; data: any }>();
-    const hit = g.__xeniaApiCache.get(dedupeKey);
-    if (hit && now - hit.ts < 2000) {
-      return hit.data as T;
-    }
-  }
+// Cache TTL configuration (in ms)
+const CACHE_TTL = 5000; // 5 seconds for fresh data
+const STALE_TTL = 30000; // 30 seconds for stale-while-revalidate
+
+// Internal fetch function for cache revalidation
+async function doFetch<T>(path: string, opts: RequestInit = {}): Promise<T> {
   const authHeaders = await getAuthHeaders();
   const body = (opts as any).body;
   const isFormData = typeof FormData !== 'undefined' && body instanceof FormData;
   const hasBody = typeof body !== "undefined" && body !== null;
   const baseHeaders: Record<string, string> = { ...(opts.headers as any), ...authHeaders } as any;
-  // Don't set JSON Content-Type when sending FormData (browser will set proper multipart boundary)
+  
   if (hasBody && !isFormData && !("Content-Type" in baseHeaders)) {
     baseHeaders["Content-Type"] = "application/json";
   }
+  
   const res = await fetch(`${API_BASE}${path}`, {
     headers: baseHeaders,
     ...opts,
   });
+  
   const correlationId = res.headers.get("x-correlation-id");
   let json: any | null = null;
   let text = "";
+  
   try {
     const ct = res.headers.get("content-type") || "";
     if (ct.includes("application/json")) {
@@ -98,14 +92,61 @@ export async function api<T = any>(path: string, opts: RequestInit = {}): Promis
   } catch {
     // ignore
   }
+  
   if (!res.ok) {
     throw buildApiError(path, res.status, text, json, correlationId);
   }
-  const data = (json as T) ?? (JSON.parse(text || "{}") as T);
+  
+  return (json as T) ?? (JSON.parse(text || "{}") as T);
+}
+
+export async function api<T = any>(path: string, opts: RequestInit = {}): Promise<T> {
+  // In-memory dedupe cache with stale-while-revalidate pattern
+  const method = (opts.method || 'GET').toUpperCase();
+  const isGet = method === 'GET';
+  const dedupeKey = isGet ? `GET:${path}` : '';
+  const now = Date.now();
+  const g: any = globalThis as any;
+  
   if (isGet) {
-    try {
-      (globalThis as any).__xeniaApiCache.set(dedupeKey, { ts: now, data });
-    } catch {}
+    g.__xeniaApiCache = g.__xeniaApiCache || new Map<string, { ts: number; data: any; promise?: Promise<any> }>();
+    const hit = g.__xeniaApiCache.get(dedupeKey);
+    
+    // Return fresh cached data immediately
+    if (hit && now - hit.ts < CACHE_TTL) {
+      return hit.data as T;
+    }
+    
+    // Return stale data but trigger background refresh
+    if (hit && now - hit.ts < STALE_TTL) {
+      // Revalidate in background (don't await)
+      if (!hit.promise) {
+        hit.promise = doFetch<T>(path, opts).then(data => {
+          g.__xeniaApiCache.set(dedupeKey, { ts: Date.now(), data });
+          return data;
+        }).catch(() => hit.data).finally(() => {
+          const cached = g.__xeniaApiCache.get(dedupeKey);
+          if (cached) cached.promise = undefined;
+        });
+      }
+      return hit.data as T;
+    }
+    
+    // Dedupe concurrent requests for same resource
+    if (hit?.promise) {
+      return hit.promise as Promise<T>;
+    }
+    
+    // Create promise for this request to enable deduplication
+    const promise = doFetch<T>(path, opts).then(data => {
+      g.__xeniaApiCache.set(dedupeKey, { ts: Date.now(), data });
+      return data;
+    });
+    
+    g.__xeniaApiCache.set(dedupeKey, { ts: 0, data: null, promise });
+    return promise;
   }
-  return data;
+  
+  // Non-GET requests don't use cache
+  return doFetch<T>(path, opts);
 }

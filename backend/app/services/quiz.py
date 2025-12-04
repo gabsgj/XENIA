@@ -120,33 +120,39 @@ def generate_quiz(topics: List[str], num_questions: int, options_count: int = 4,
     if syllabus is None:
         syllabus = ""
     questions = []
+    
+    # Distribute questions across topics more evenly
+    topics_cycle = topics * ((num_questions // len(topics)) + 1) if topics else ["General Knowledge"]
+    
     for i in range(num_questions):
-        topic = random.choice(topics)
-        # Use AI to generate a question for the topic
-        prompt = f"""
-You are an AI quiz generator.  
-Your job is to create high-quality multiple-choice questions (MCQs) from study topics.  
+        topic = topics_cycle[i % len(topics_cycle)] if topics else "General Knowledge"
+        
+        # Use AI to generate a specific, educational question for the topic
+        prompt = f"""Generate ONE multiple-choice question about: "{topic}"
 
-⚠️ Rules:
-- Each question must be clear and grammatically correct.  
-- Provide exactly 4 options (A, B, C, D).  
-- Only one option should be correct.  
-- Do NOT include placeholders like "Correct concept" or "Wrong option".  
-- Do NOT repeat the question inside the options.  
-- Make the options concise but meaningful.  
-- If the topic is vague, reframe it into a useful question.  
+Requirements:
+- Ask about a SPECIFIC fact, concept, definition, or process related to this topic
+- The question should test actual knowledge, not just recognition
+- All 4 options must be plausible but only ONE is correct
+- Options should be specific terms, values, or concepts - NOT generic phrases
 
-🎯 Output format:
-Q: <question text>  
-A. <option 1>  
-B. <option 2>  
-C. <option 3>  
-D. <option 4>  
-Answer: <correct option letter>  
+Format your response EXACTLY like this:
+Q: [Your specific question here]
+A. [First option]
+B. [Second option]
+C. [Third option]
+D. [Fourth option]
+Answer: [A, B, C, or D]
 
-Generate a high-quality MCQ for the topic: '{topic}'
-{("User profile: " + str(user_profile)) if user_profile else ""}
-{("Syllabus context: " + syllabus) if syllabus else ""}
+Example for "JDBC":
+Q: Which interface in JDBC is used to execute parameterized SQL queries?
+A. Statement
+B. PreparedStatement
+C. CallableStatement
+D. ResultSet
+Answer: B
+
+Now generate a question for: "{topic}"
 """
         try:
             response = get_ai_response(prompt)
@@ -221,22 +227,106 @@ Generate a high-quality MCQ for the topic: '{topic}'
                     "topic": topic
                 })
             else:
-                # Generic fallback for unknown topics
+                # Generate more specific fallback based on topic keywords
+                # This creates better questions than generic "what is fundamental"
+                fallback = _generate_smart_fallback(topic, i)
                 questions.append({
-                    "question": f"What is a fundamental concept in {topic}?",
-                    "options": [
-                        f"The core principles of {topic}",
-                        f"Advanced applications of {topic}",
-                        f"Historical development of {topic}",
-                        f"Current research in {topic}"
-                    ],
-                    "correct_index": 0,
+                    "question": fallback["question"],
+                    "options": fallback["options"],
+                    "correct_index": fallback["correct_index"],
                     "topic": topic
                 })
     return {
         "quiz_id": random.randint(100000, 999999),
         "questions": questions
     }
+
+
+def _generate_smart_fallback(topic: str, question_index: int) -> Dict[str, Any]:
+    """Generate a more specific fallback question based on topic keywords."""
+    topic_lower = topic.lower()
+    
+    # Java/Programming related
+    if any(kw in topic_lower for kw in ['jdbc', 'database', 'sql', 'connection']):
+        questions = [
+            {"question": f"In {topic}, what is the primary purpose of a Connection object?",
+             "options": ["To establish a link to the database", "To execute SQL queries", "To store query results", "To manage transactions only"],
+             "correct_index": 0},
+            {"question": f"Which method is used to execute a SELECT query in JDBC?",
+             "options": ["executeQuery()", "executeUpdate()", "execute()", "runQuery()"],
+             "correct_index": 0},
+            {"question": f"What does JDBC stand for?",
+             "options": ["Java Database Connectivity", "Java Data Base Connection", "Java Database Controller", "Java Data Binding Component"],
+             "correct_index": 0},
+        ]
+        return random.choice(questions)
+    
+    if any(kw in topic_lower for kw in ['swing', 'awt', 'gui', 'component', 'container']):
+        questions = [
+            {"question": f"What is the main difference between AWT and Swing?",
+             "options": ["Swing is lightweight, AWT uses native components", "AWT is newer than Swing", "Swing is faster than AWT", "AWT supports more components"],
+             "correct_index": 0},
+            {"question": f"Which class is the top-level container in Swing?",
+             "options": ["JFrame", "JPanel", "JComponent", "JContainer"],
+             "correct_index": 0},
+            {"question": f"What design pattern does Swing's architecture follow?",
+             "options": ["Model-View-Controller (MVC)", "Singleton", "Factory", "Observer only"],
+             "correct_index": 0},
+        ]
+        return random.choice(questions)
+    
+    if any(kw in topic_lower for kw in ['java', 'class', 'object', 'method', 'interface']):
+        questions = [
+            {"question": f"What keyword is used to inherit from a class in Java?",
+             "options": ["extends", "implements", "inherits", "super"],
+             "correct_index": 0},
+            {"question": f"Which access modifier makes a member accessible only within the same class?",
+             "options": ["private", "protected", "public", "default"],
+             "correct_index": 0},
+            {"question": f"What is the purpose of the 'final' keyword in Java?",
+             "options": ["To prevent modification/inheritance", "To make code run faster", "To declare constants only", "To end a program"],
+             "correct_index": 0},
+        ]
+        return random.choice(questions)
+    
+    if any(kw in topic_lower for kw in ['exception', 'error', 'try', 'catch', 'throw']):
+        questions = [
+            {"question": f"Which block is always executed regardless of exceptions?",
+             "options": ["finally", "catch", "try", "throw"],
+             "correct_index": 0},
+            {"question": f"What is the difference between checked and unchecked exceptions?",
+             "options": ["Checked must be handled at compile time", "Unchecked are more severe", "Checked are runtime only", "There is no difference"],
+             "correct_index": 0},
+        ]
+        return random.choice(questions)
+    
+    if any(kw in topic_lower for kw in ['thread', 'concurrent', 'synchron', 'parallel']):
+        questions = [
+            {"question": f"What keyword is used to prevent race conditions in Java?",
+             "options": ["synchronized", "volatile", "atomic", "locked"],
+             "correct_index": 0},
+            {"question": f"Which method is used to start a thread in Java?",
+             "options": ["start()", "run()", "execute()", "begin()"],
+             "correct_index": 0},
+        ]
+        return random.choice(questions)
+    
+    # Generic but better fallback - ask about purpose/definition
+    question_templates = [
+        {"question": f"What is the primary purpose of {topic}?",
+         "options": [f"To provide specific functionality for {topic.split()[0] if topic.split() else 'the system'}", 
+                    "To handle unrelated system operations",
+                    "To replace existing functionality entirely",
+                    "To serve as a debugging tool only"],
+         "correct_index": 0},
+        {"question": f"Which statement best describes {topic}?",
+         "options": [f"A component/concept that handles {topic.split()[-1] if topic.split() else 'specific'} operations",
+                    "An obsolete feature no longer in use",
+                    "A testing framework only",
+                    "A user interface element"],
+         "correct_index": 0},
+    ]
+    return question_templates[question_index % len(question_templates)]
 
 def score_quiz(quiz: Dict[str, Any], user_answers: List[int]) -> Dict[str, Any]:
     """
