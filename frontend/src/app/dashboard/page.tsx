@@ -301,18 +301,26 @@ export default function DashboardPage(){
     // Enhanced streak calculation using analytics profile data
     const streakDays = data?.profile?.streak_days || (completedPlanSessions.length > 0 ? 1 : 0)
     
-    // Calculate quiz performance: prefer server-provided analytics (dashboard API via analytics.student stats), fallback to progress
+    // Calculate quiz performance: prefer dashboard quizzesTakenDetails, then progress data
+    const quizDetails = Array.isArray(dash?.quizzesTakenDetails) ? dash.quizzesTakenDetails : []
+    const dashQuizzes = (dash?.stats?.quizzesTaken) || quizDetails.length || 0
+    
+    // Calculate average score from quiz details if available
+    const quizScores = quizDetails.filter((q: any) => typeof q.score === 'number').map((q: any) => q.score)
+    const avgScoreFromDash = quizScores.length > 0 
+      ? quizScores.reduce((sum: number, score: number) => sum + score, 0) / quizScores.length
+      : 0
+    
+    // Fallback to progress data for quizzes
     const topicsWithQuizzes = Object.values(progress || {}).filter((topic: any) => (topic.quizzes_taken || 0) > 0)
     const totalQuizzesFromProgress = topicsWithQuizzes.reduce((sum: number, topic: any) => sum + (topic.quizzes_taken || 0), 0)
     const avgScoreFromProgress = topicsWithQuizzes.length > 0 
       ? topicsWithQuizzes.reduce((sum: number, topic: any) => sum + (topic.last_score || 0), 0) / topicsWithQuizzes.length
       : 0
 
-    const dashQuizzes = (dash && dash.stats && typeof dash.stats.quizzesTaken === 'number') ? dash.stats.quizzesTaken : 0
-    const analyticsQuizzes = (data && data.stats && typeof data.stats.quizzesTaken === 'number') ? data.stats.quizzesTaken : 0
-    const chosenQuizzes = dashQuizzes > 0 ? dashQuizzes : analyticsQuizzes
-    const totalQuizzes = chosenQuizzes > 0 ? chosenQuizzes : totalQuizzesFromProgress
-    const avgScore = topicsWithQuizzes.length > 0 ? avgScoreFromProgress : 0
+    // Choose best available quiz data
+    const totalQuizzes = dashQuizzes > 0 ? dashQuizzes : totalQuizzesFromProgress
+    const avgScore = avgScoreFromDash > 0 ? avgScoreFromDash : (topicsWithQuizzes.length > 0 ? avgScoreFromProgress : 0)
     
     return {
       sessionsCompleted,
@@ -477,11 +485,9 @@ export default function DashboardPage(){
                 </div>
               </div>
               {enhancedStats.totalQuizzes > 0 ? (
-                enhancedStats.avgScore > 0 && (
-                  <div className="mt-4 text-xs text-muted-foreground">
-                    Avg Score: {enhancedStats.avgScore}%
-                  </div>
-                )
+                <div className="mt-4 text-xs text-muted-foreground">
+                  Avg Score: {enhancedStats.avgScore}%
+                </div>
               ) : (
                 <div className="mt-4 text-xs text-muted-foreground">No quizzes taken yet</div>
               )}
