@@ -1,5 +1,5 @@
 "use client"
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { api, getUserId } from '@/lib/api'
 import { useErrorContext } from '@/lib/error-context'
 
@@ -42,6 +42,9 @@ export function useTasks(){
     lastFetch: null
   })
   const { pushError } = useErrorContext()
+  
+  // Track in-flight API calls to prevent duplicates
+  const pendingCompletions = useRef<Set<string>>(new Set())
 
   const updateTaskLocally = useCallback((taskId: string, updates: Partial<Task>) => {
     setState(prev => ({
@@ -220,6 +223,15 @@ export function useTasks(){
   }, [updateTaskLocally, fetchTasks, pushError, state])
 
   const completeTask = useCallback(async (taskId: string) => {
+    // Prevent duplicate API calls for the same task
+    if (pendingCompletions.current.has(taskId)) {
+      console.log(`[useTasks] Skipping duplicate completion for task ${taskId}`)
+      return { success: true, duplicate: true }
+    }
+    
+    // Mark as pending
+    pendingCompletions.current.add(taskId)
+    
     try {
       updateTaskLocally(taskId, { status: 'completed', completed: true }) // Optimistic update
       
@@ -247,6 +259,11 @@ export function useTasks(){
         details: e 
       })
       throw e
+    } finally {
+      // Clear pending status after a short delay to prevent rapid re-clicks
+      setTimeout(() => {
+        pendingCompletions.current.delete(taskId)
+      }, 2000)
     }
   }, [updateTaskLocally, fetchTasks, pushError])
 

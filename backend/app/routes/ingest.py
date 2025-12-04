@@ -11,7 +11,12 @@ def _extract_user_id() -> str:
     hdr = (request.headers.get("X-User-Id") or "").strip()
     if hdr:
         return hdr
-    return (request.form.get("user_id") or "").strip()
+    form_uid = (request.form.get("user_id") or "").strip()
+    if form_uid:
+        return form_uid
+    # Fallback: generate a stable anonymous ID for the session
+    import uuid
+    return str(uuid.uuid5(uuid.NAMESPACE_URL, "xenia-anonymous-upload"))
 
 
 @ingest_bp.post("/syllabus")
@@ -91,10 +96,38 @@ def upload_text():
     title = data.get('title', 'Pasted Text Document')
     raw_uid = _extract_user_id()
     
-    # Create a temporary file-like object from the text
-    from io import StringIO
-    text_file = StringIO(text_content)
-    text_file.filename = f"{title}.txt"
+    # Create a file-like object from text for processing
+    import io
+    text_bytes = text_content.encode('utf-8')
+    
+    # Create a mock file object that handle_upload can process
+    class TextFile:
+        def __init__(self, content: bytes, filename: str):
+            self.content = content
+            self.filename = filename
+            self._pos = 0
+            
+        def read(self, size=-1):
+            if size == -1:
+                result = self.content[self._pos:]
+                self._pos = len(self.content)
+            else:
+                result = self.content[self._pos:self._pos + size]
+                self._pos += size
+            return result
+            
+        def seek(self, pos, whence=0):
+            if whence == 0:
+                self._pos = pos
+            elif whence == 1:
+                self._pos += pos
+            elif whence == 2:
+                self._pos = len(self.content) + pos
+                
+        def tell(self):
+            return self._pos
+    
+    text_file = TextFile(text_bytes, f"{title}.txt")
     
     # Process the text as a document
     result = handle_upload(text_file, user_id=raw_uid, artifact_type="syllabus")

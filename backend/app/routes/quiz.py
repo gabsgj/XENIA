@@ -44,16 +44,29 @@ def submit_quiz_api():
     if not quiz or not user_answers:
         raise ApiError("QUIZ_SUBMIT_INVALID", "Missing quiz or answers")
     stats = score_quiz(quiz, user_answers)
-    # Record progress for each topic
+    # Record progress for each topic from the quiz questions (not from topics list)
     user_id = quiz.get("user_id")
     if not user_id or not is_valid_uuid(user_id):
         raise ApiError("AUTH_403", "Invalid user_id in quiz data")
     topic_scores = []
-    for idx, topic in enumerate(quiz.get("topics", [])):
-        correct = 1 if stats["feedback"][idx]["is_correct"] else 0
-        wrong = 0 if correct else 1
-        score = 1.0 if correct else 0.0
-        topic_scores.append({"topic": topic, "correct": correct, "wrong": wrong, "score": score})
+    # Aggregate scores by topic from the feedback
+    topic_score_map = {}
+    for idx, fb in enumerate(stats.get("feedback", [])):
+        # Get topic from the question itself if available
+        question = quiz.get("questions", [])[idx] if idx < len(quiz.get("questions", [])) else {}
+        topic = question.get("topic", "General")
+        if topic not in topic_score_map:
+            topic_score_map[topic] = {"correct": 0, "wrong": 0}
+        if fb.get("is_correct"):
+            topic_score_map[topic]["correct"] += 1
+        else:
+            topic_score_map[topic]["wrong"] += 1
+    
+    for topic, scores in topic_score_map.items():
+        total = scores["correct"] + scores["wrong"]
+        score = scores["correct"] / total if total > 0 else 0.0
+        topic_scores.append({"topic": topic, "correct": scores["correct"], "wrong": scores["wrong"], "score": score})
+    
     if user_id:
         record_quiz_result(user_id, topic_scores)
     return jsonify({"success": True, "stats": stats})

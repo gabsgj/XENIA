@@ -289,6 +289,12 @@ const [taskFormData, setTaskFormData] = useState<TaskFormData>({
   }
 
   const handleCompleteTask = async (task: any) => {
+    // Prevent duplicate completions
+    if (processingIds.has(task.id)) {
+      console.log('[Tasks] Complete task called but task already being processed, skipping')
+      return
+    }
+    
     const isActive = activeTaskId === task.id
     try {
       setProcessingIds(prev => new Set(prev).add(task.id))
@@ -416,6 +422,13 @@ const [taskFormData, setTaskFormData] = useState<TaskFormData>({
 
   const handleTimerComplete = async (actualTime: number) => {
     if (!activeTaskId) return
+    
+    // Prevent duplicate completions
+    if (processingIds.has(activeTaskId)) {
+      console.log('[Tasks] Timer complete called but task already being processed, skipping')
+      return
+    }
+    
     setProcessingIds(prev => new Set(prev).add(activeTaskId))
     try {
       // End the session first so backend records the actual minutes

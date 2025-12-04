@@ -170,6 +170,14 @@ def complete_task():
         raise ApiError("PLAN_400", "Missing task_id")
     
     try:
+        # First check if task is already completed to prevent duplicate XP awards
+        existing = sb.table("tasks").select("status").eq("id", task_id).single().execute()
+        current_status = existing.data.get("status") if existing.data else None
+        
+        if current_status in ["done", "completed"]:
+            logger.info(f"   Task {task_id} is already completed - skipping duplicate completion")
+            return {"ok": True, "success": True, "already_completed": True}
+        
         logger.info("   Updating task status to 'done'...")
         sb.table("tasks").update({"status": "done"}).eq("id", task_id).execute()
         logger.info("   Task status updated successfully")
@@ -326,9 +334,16 @@ def end_session():
         if session_id:
             sb.table('sessions').update({'status': 'completed'}).eq('id', session_id).execute()
         if task_id:
-            sb.table('tasks').update({'status': 'done'}).eq('id', task_id).execute()
-            if user_id:
-                sb.rpc('add_xp', {'p_user_id': user_id, 'p_xp': 20}).execute()
+            # Check if task is already completed before awarding XP
+            existing = sb.table("tasks").select("status").eq("id", task_id).single().execute()
+            current_status = existing.data.get("status") if existing.data else None
+            
+            if current_status not in ["done", "completed"]:
+                sb.table('tasks').update({'status': 'done'}).eq('id', task_id).execute()
+                if user_id:
+                    sb.rpc('add_xp', {'p_user_id': user_id, 'p_xp': 20}).execute()
+            else:
+                logger.info(f"   Task {task_id} already completed, skipping XP award")
         return {'ok': True}
     except Exception as e:
         logger.warning(f'   Failed to end session: {e}')

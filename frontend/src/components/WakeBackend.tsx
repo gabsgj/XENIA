@@ -1,7 +1,7 @@
 "use client";
 import { useEffect } from "react";
 
-const WAKE_URL = "https://xenia-backend-1f0z.onrender.com/health";
+const WAKE_URL = `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/health`;
 
 function fetchWithTimeout(url: string, timeout = 5000) {
   return new Promise<Response>((resolve, reject) => {

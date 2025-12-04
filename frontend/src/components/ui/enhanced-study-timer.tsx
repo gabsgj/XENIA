@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { Badge } from '@/components/ui/badge'
@@ -48,6 +48,9 @@ export function EnhancedStudyTimer({
   pomodoro = false,
   breakMinutes = 5
 }: EnhancedStudyTimerProps) {
+  // Ref to track if completion callback has been fired to prevent duplicates
+  const hasCompletedRef = useRef(false)
+  
   // Internal timer state
   const [timerState, setTimerState] = useState(() => {
     const totalSeconds = Math.max(1, duration) * 60
@@ -173,11 +176,15 @@ export function EnhancedStudyTimer({
     }
   }, [timerState.isRunning, timerState.completed, timerState.remainingSeconds, pomodoro, breakMinutes])
 
-  // Handle completion
+  // Handle completion - use ref to ensure this only fires ONCE per completion
   useEffect(() => {
-    if (timerState.completed && timerState.phase === 'work') {
+    if (timerState.completed && timerState.phase === 'work' && !hasCompletedRef.current) {
+      // Mark as completed to prevent duplicate calls
+      hasCompletedRef.current = true
+      
+      const actualMinutes = Math.max(1, Math.round(timerState.actualTimeSpent / 60))
       onStatusChange('completed')
-      onComplete(Math.max(1, Math.round(timerState.actualTimeSpent / 60)))
+      onComplete(actualMinutes)
       
       // Play completion sound
       try {
@@ -186,7 +193,14 @@ export function EnhancedStudyTimer({
         audio.play().catch(() => {}) // Ignore audio errors
       } catch {}
     }
-  }, [timerState.completed, timerState.phase, timerState.actualTimeSpent, onStatusChange, onComplete])
+  }, [timerState.completed, timerState.phase]) // Removed actualTimeSpent from deps to prevent re-triggers
+
+  // Reset completion ref when timer is reset
+  useEffect(() => {
+    if (!timerState.completed && hasCompletedRef.current) {
+      hasCompletedRef.current = false
+    }
+  }, [timerState.completed])
 
   // Action handlers
   const handleStart = useCallback(() => {
@@ -212,12 +226,18 @@ export function EnhancedStudyTimer({
       actualTimeSpent: 0,
       isPaused: false
     }))
+    // Reset completion guard when timer is reset
+    hasCompletedRef.current = false
     if (status !== 'pending') {
       onStatusChange('pending')
     }
   }, [duration, status, onStatusChange])
 
   const handleComplete = useCallback(() => {
+    // Prevent duplicate completion calls
+    if (hasCompletedRef.current) return
+    hasCompletedRef.current = true
+    
     const actualMinutes = Math.max(1, Math.round(timerState.actualTimeSpent / 60))
     setTimerState(prev => ({
       ...prev,

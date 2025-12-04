@@ -128,27 +128,78 @@ class AIMockProvider:
     
     def get_tutor_response(self, question: str, context: Optional[str] = None) -> Dict[str, Any]:
         """Get a structured tutor response for a question."""
-        question_hash = hashlib.md5(question.encode()).hexdigest()
-        variation = int(question_hash[:4], 16) % 100
+        question_lower = question.lower()
         
-        response = self.mock_responses["tutor_response"].copy()
+        # Topic-specific educational responses
+        topic_responses = {
+            "bernoulli": {
+                "steps": [
+                    {
+                        "title": "Understanding Bernoulli's Principle",
+                        "detail": "Bernoulli's principle states that for an inviscid flow of a non-conducting fluid, an increase in the speed of the fluid occurs simultaneously with a decrease in pressure or a decrease in the fluid's potential energy."
+                    },
+                    {
+                        "title": "The Bernoulli Equation",
+                        "detail": "The equation is: P + ½ρv² + ρgh = constant, where P is pressure, ρ is fluid density, v is velocity, g is gravitational acceleration, and h is height."
+                    },
+                    {
+                        "title": "Real-World Applications",
+                        "detail": "Bernoulli's principle explains how airplane wings generate lift, why shower curtains get sucked inward, and how carburetors and atomizers work."
+                    },
+                    {
+                        "title": "Key Insight",
+                        "detail": "The principle is a manifestation of conservation of energy for flowing fluids. Faster moving fluid has more kinetic energy, so it must have less pressure energy to maintain the total energy constant."
+                    }
+                ],
+                "explanation": "Bernoulli's principle describes the relationship between fluid speed and pressure - as fluid speed increases, pressure decreases. This fundamental concept in fluid dynamics explains phenomena from airplane flight to blood flow."
+            },
+            "derivative": {
+                "steps": [
+                    {"title": "Definition of Derivative", "detail": "The derivative measures the rate of change of a function. It's defined as the limit: f'(x) = lim(h→0) [f(x+h) - f(x)]/h"},
+                    {"title": "Basic Rules", "detail": "Power rule: d/dx[xⁿ] = nxⁿ⁻¹. Sum rule: d/dx[f+g] = f'+g'. Product rule: d/dx[fg] = f'g + fg'"},
+                    {"title": "Geometric Interpretation", "detail": "The derivative at a point equals the slope of the tangent line to the curve at that point."},
+                    {"title": "Applications", "detail": "Derivatives are used to find rates of change, optimize functions, and model real-world phenomena like velocity and acceleration."}
+                ],
+                "explanation": "The derivative is a fundamental concept in calculus that measures instantaneous rate of change."
+            },
+            "integral": {
+                "steps": [
+                    {"title": "Definition of Integral", "detail": "Integration is the reverse of differentiation. The definite integral ∫[a,b] f(x)dx represents the signed area under the curve f(x) from a to b."},
+                    {"title": "Fundamental Theorem of Calculus", "detail": "If F is an antiderivative of f, then ∫[a,b] f(x)dx = F(b) - F(a). This connects derivatives and integrals."},
+                    {"title": "Basic Integration Rules", "detail": "∫xⁿdx = xⁿ⁺¹/(n+1) + C for n≠-1. ∫eˣdx = eˣ + C. ∫sin(x)dx = -cos(x) + C"},
+                    {"title": "Applications", "detail": "Integrals calculate areas, volumes, work done by forces, and solve differential equations."}
+                ],
+                "explanation": "Integration is a fundamental operation in calculus used to find areas, accumulate quantities, and reverse differentiation."
+            }
+        }
         
-        # Customize response based on question content
-        if "equation" in question.lower() or "solve" in question.lower():
-            response["explanation"] = "This is a mathematical equation that requires systematic solving. Let's break it down step by step."
-        elif "concept" in question.lower() or "explain" in question.lower():
-            response["explanation"] = "This concept can be understood by building on fundamental principles. Let me explain the key ideas."
-        else:
-            response["explanation"] = "Let's approach this problem methodically. I'll guide you through the solution process."
+        # Check for topic matches
+        for topic, response in topic_responses.items():
+            if topic in question_lower:
+                return response.copy()
         
-        # Add some variation to steps
-        if variation % 2 == 0:
-            response["steps"].append({
-                "title": "Practice Similar Problems",
-                "detail": "Try solving a few similar problems to reinforce your understanding of this concept.",
-            })
-        
-        return response
+        # Default educational response
+        return {
+            "steps": [
+                {
+                    "title": "Understanding the Question",
+                    "detail": f"Let's break down what you're asking: '{question}'. This requires careful analysis of the key concepts involved."
+                },
+                {
+                    "title": "Key Concepts",
+                    "detail": "To answer this question effectively, we need to identify and understand the fundamental principles and definitions related to the topic."
+                },
+                {
+                    "title": "Step-by-Step Approach",
+                    "detail": "Working through this systematically: First, establish the basics. Then, apply the relevant formulas or principles. Finally, verify the solution makes sense."
+                },
+                {
+                    "title": "Summary",
+                    "detail": "Review the key points and practice with similar problems to reinforce your understanding."
+                }
+            ],
+            "explanation": "I've provided a structured approach to help you understand this topic. Focus on mastering each step before moving to the next."
+        }
     
     def generate_study_plan(self, topics: List[Dict], horizon_days: int = 14) -> Dict[str, Any]:
         """Generate a study plan based on topics and time horizon."""

@@ -35,9 +35,5 @@ export async function getSupabaseClient(): Promise<any> {
   return supabaseSingleton;
 }
 
-import { createClient } from '@supabase/supabase-js'
-
-export const supabase = createClient(
-	process.env.NEXT_PUBLIC_SUPABASE_URL!,
-	process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-)
+// Note: prefer using `getSupabaseClient()` to obtain a client instance in components
+// We avoid creating a second client at module load to prevent duplicated listeners

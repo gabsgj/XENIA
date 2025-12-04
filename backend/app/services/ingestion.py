@@ -243,11 +243,17 @@ def handle_upload(file_storage, user_id: str, artifact_type: str) -> Dict:
     except Exception:
         plan_preview = None
 
+    # Ensure topics are at the top level for frontend compatibility
     return {
         "ok": True,
         "path": object_path,
         "chars": len(text),
         "topics": topics,
-        "analysis": analysis,
+        "analysis": {
+            "prioritized_topics": topics,
+            "filtered_topics": topics,
+            "topic_count": len(topics),
+            **(analysis if isinstance(analysis, dict) else {})
+        },
         "plan_preview": plan_preview,
     }

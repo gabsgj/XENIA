@@ -304,14 +304,9 @@ Return ONLY the JSON, no additional text.
         import traceback
         logger.error(f"   Full traceback: {traceback.format_exc()}")
     
-    # Fallback to simple deterministic steps
+    # Fallback to topic-specific helpful steps
     logger.info("🔄 Using fallback steps")
-    concepts = [
-        w.strip(",.;:!?") for w in question_text.split() if len(w) > 4
-    ]
-    concepts = list(dict.fromkeys(concepts))[:5]
-
-    steps = []
+    
     if not question_text.strip():
         return [
             {
@@ -319,22 +314,51 @@ Return ONLY the JSON, no additional text.
                 "detail": "Please provide the problem statement or a clear photo.",
             }
         ]
-
-    steps.append(
+    
+    question_lower = question_text.lower()
+    
+    # Topic-specific fallback responses
+    topic_fallbacks = {
+        "bernoulli": [
+            {"title": "Bernoulli's Principle Overview", "detail": "Bernoulli's principle states that an increase in the speed of a fluid occurs simultaneously with a decrease in pressure. The equation is: P + ½ρv² + ρgh = constant."},
+            {"title": "Physical Meaning", "detail": "This principle is based on conservation of energy for flowing fluids. When fluid speeds up (higher kinetic energy), pressure must decrease to keep total energy constant."},
+            {"title": "Common Applications", "detail": "Airplane lift, venturi effect, carburetors, blood pressure in arteries, and why shower curtains move inward when water flows."}
+        ],
+        "newton": [
+            {"title": "Newton's Laws of Motion", "detail": "1st Law: An object at rest stays at rest unless acted upon by a force. 2nd Law: F = ma (Force equals mass times acceleration). 3rd Law: Every action has an equal and opposite reaction."},
+            {"title": "Applications", "detail": "These laws explain everything from why you feel pushed back when a car accelerates to how rockets work in space."}
+        ],
+        "derivative": [
+            {"title": "What is a Derivative?", "detail": "The derivative measures the instantaneous rate of change of a function. Geometrically, it's the slope of the tangent line at a point."},
+            {"title": "Key Rules", "detail": "Power rule: d/dx[xⁿ] = nxⁿ⁻¹. Chain rule: d/dx[f(g(x))] = f'(g(x))·g'(x). Product rule: d/dx[fg] = f'g + fg'"}
+        ],
+        "integral": [
+            {"title": "What is Integration?", "detail": "Integration is the reverse of differentiation. A definite integral calculates the signed area under a curve between two points."},
+            {"title": "Fundamental Theorem", "detail": "If F'(x) = f(x), then ∫[a,b] f(x)dx = F(b) - F(a). This connects derivatives and integrals."}
+        ],
+        "photosynthesis": [
+            {"title": "Photosynthesis Equation", "detail": "6CO₂ + 6H₂O + light energy → C₆H₁₂O₆ + 6O₂. Plants convert carbon dioxide and water into glucose and oxygen using sunlight."},
+            {"title": "Two Stages", "detail": "Light-dependent reactions occur in thylakoids (produce ATP and NADPH). Light-independent reactions (Calvin cycle) occur in stroma (produce glucose)."}
+        ]
+    }
+    
+    # Check for topic matches
+    for topic, steps in topic_fallbacks.items():
+        if topic in question_lower:
+            return steps
+    
+    # Generic helpful fallback
+    return [
         {
-            "title": "Understand the problem",
-            "detail": (
-                f"Restate the problem in your own words: '{question_text[:140]}...'"
-            ),
-        }
-    )
-    steps.append(
+            "title": "Understanding Your Question",
+            "detail": f"You asked: '{question_text}'. Let me help you work through this step by step."
+        },
         {
-            "title": "Recall key concepts",
-            "detail": (
-                f"Review: {', '.join(concepts) if concepts else 'core definitions and formulas'}."
-            ),
+            "title": "Approach",
+            "detail": "To solve this effectively: 1) Identify what concept or formula applies, 2) Break the problem into smaller parts, 3) Work through each part systematically."
+        },
+        {
+            "title": "Need More Help?",
+            "detail": "Try rephrasing your question with more specific details, or upload an image of the problem for better assistance."
         }
-    )
-
-    return steps
+    ]

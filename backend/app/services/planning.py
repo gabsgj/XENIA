@@ -196,10 +196,15 @@ def generate_plan(
             logger.info(f"   Using {len(weak)} heuristic weak topics")
         except Exception:
             weak = []
-        # 3. Final fallback
+        # 3. Final fallback - provide sample topics so user has something to work with
         if not weak:
-            weak = [{"topic": "General Review", "score": 1}]
-            logger.info("   Using fallback topics")
+            weak = [
+                {"topic": "Getting Started", "score": 3, "estimated_hours": 1},
+                {"topic": "Core Concepts", "score": 5, "estimated_hours": 2},
+                {"topic": "Practice Problems", "score": 4, "estimated_hours": 2},
+                {"topic": "Review Session", "score": 2, "estimated_hours": 1}
+            ]
+            logger.info("   Using sample fallback topics - please upload your syllabus for personalized plan")
     
     # Smart deadline handling with advanced urgency calculation
     urgency_level, urgency_multiplier = DeadlineManager.calculate_urgency_level(deadline, horizon_days)

@@ -1,6 +1,7 @@
 'use client'
 
 import { API_BASE, api, getUserId } from "@/lib/api";
+import { useRouter } from 'next/navigation';
 
 import { useState, useCallback } from 'react'
 import { useDropzone } from 'react-dropzone'
@@ -33,6 +34,7 @@ import {
 } from 'lucide-react'
 
 export default function UploadPage() {
+  const router = useRouter();
   const [files, setFiles] = useState<File[]>([])
   const [uploading, setUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
@@ -90,10 +92,19 @@ export default function UploadPage() {
     setErrorMessage(null) // Reset error
 
     try {
+      // Add user ID to form data
+      const userId = getUserId()
       const formData = new FormData()
-      files.forEach((file, index) => {
-        formData.append(`file${index}`, file)
-      })
+      
+      // For single file, use 'file' key for backend compatibility
+      if (files.length === 1) {
+        formData.append('file', files[0])
+      } else {
+        // For multiple files, use file0, file1, etc.
+        files.forEach((file, index) => {
+          formData.append(`file${index}`, file)
+        })
+      }
 
       // Simulate upload progress
       const progressInterval = setInterval(() => {
@@ -109,54 +120,60 @@ export default function UploadPage() {
       const response = await fetch(`${API_BASE}/api/ingest/upload-document`, {
         method: 'POST',
         body: formData,
+        headers: {
+          'X-User-Id': userId
+        }
       })
 
-  clearInterval(progressInterval)
-  setUploadProgress(100)
+      clearInterval(progressInterval)
+      setUploadProgress(100)
 
       if (!response.ok) {
         const errorText = await response.text()
+        setProcessingTopics(false)
         throw new Error('Upload failed: ' + errorText)
       }
 
       const result = await response.json()
       
-  // Processing remains true while we extract topics and update UI
-      
-      // Extract topics
+      // Extract topics from result
+      // Handle both direct topics array and nested in analysis
+      const rawTopicList = result.topics || 
+                          result.analysis?.prioritized_topics ||
+                          result.analysis?.filtered_topics ||
+                          []
+
       if (result.analysis) {
         setAnalysis(result.analysis)
-        const rawTopicList = (
-          result.analysis.prioritized_topics ||
-          result.analysis.filtered_topics ||
-          result.topics || []
-        )
+      }
 
-        // Preserve detailed structures
-        setTopicDetails(rawTopicList)
+      // Preserve detailed structures
+      setTopicDetails(rawTopicList)
 
-        // Normalize for badge display
-        const normalized = rawTopicList.map((t: any) => {
-          if (t == null) return 'Untitled'
-            // If already a string
-          if (typeof t === 'string') return t.trim() || 'Untitled'
-          // If object with a topic field
-          if (typeof t === 'object') {
-            const topicName = (t.topic || t.name || '').toString().trim()
-            return topicName || 'Untitled'
-          }
-          return String(t)
-        })
-        setTopics(normalized)
+      // Normalize for badge display
+      const normalized = rawTopicList.map((t: any) => {
+        if (t == null) return 'Untitled'
+        // If already a string
+        if (typeof t === 'string') return t.trim() || 'Untitled'
+        // If object with a topic field
+        if (typeof t === 'object') {
+          const topicName = (t.topic || t.name || '').toString().trim()
+          return topicName || 'Untitled'
+        }
+        return String(t)
+      })
+      setTopics(normalized)
 
-  if (rawTopicList && rawTopicList.length > 0) setShowGeneratePlan(true)
+      if (normalized && normalized.length > 0) {
+        setShowGeneratePlan(true)
       }
       
-  setProcessingTopics(false)
+      setProcessingTopics(false)
       
       console.log('Upload successful:', result)
       
     } catch (error: any) {
+      setProcessingTopics(false)
       setErrorMessage(error.message) // Show error
       pushError({
         errorCode: 'UPLOAD_FAILED',
@@ -178,6 +195,8 @@ export default function UploadPage() {
     setErrorMessage(null)
 
     try {
+      const userId = getUserId()
+      
       // Simulate upload progress
       const progressInterval = setInterval(() => {
         setUploadProgress(prev => {
@@ -193,6 +212,7 @@ export default function UploadPage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'X-User-Id': userId
         },
         body: JSON.stringify({
           text: pastedText,
@@ -200,51 +220,53 @@ export default function UploadPage() {
         }),
       })
 
-  clearInterval(progressInterval)
-  setUploadProgress(100)
+      clearInterval(progressInterval)
+      setUploadProgress(100)
 
       if (!response.ok) {
         const errorText = await response.text()
+        setProcessingTopics(false)
         throw new Error('Text upload failed: ' + errorText)
       }
 
       const result = await response.json()
       
-  // Processing remains true while we extract topics and update UI
-      
-      // Extract topics
+      // Extract topics from result
+      const rawTopicList = result.topics || 
+                          result.analysis?.prioritized_topics ||
+                          result.analysis?.filtered_topics ||
+                          []
+
       if (result.analysis) {
         setAnalysis(result.analysis)
-        const rawTopicList = (
-          result.analysis.prioritized_topics ||
-          result.analysis.filtered_topics ||
-          result.topics || []
-        )
+      }
 
-        // Preserve detailed structures
-        setTopicDetails(rawTopicList)
+      // Preserve detailed structures
+      setTopicDetails(rawTopicList)
 
-        // Normalize for badge display
-        const normalized = rawTopicList.map((t: any) => {
-          if (t == null) return 'Untitled'
-          if (typeof t === 'string') return t.trim() || 'Untitled'
-          if (typeof t === 'object') {
-            const topicName = (t.topic || t.name || '').toString().trim()
-            return topicName || 'Untitled'
-          }
-          return String(t)
-        })
-        setTopics(normalized)
+      // Normalize for badge display
+      const normalized = rawTopicList.map((t: any) => {
+        if (t == null) return 'Untitled'
+        if (typeof t === 'string') return t.trim() || 'Untitled'
+        if (typeof t === 'object') {
+          const topicName = (t.topic || t.name || '').toString().trim()
+          return topicName || 'Untitled'
+        }
+        return String(t)
+      })
+      setTopics(normalized)
 
-        if (rawTopicList && rawTopicList.length > 0) setShowGeneratePlan(true)
+      if (normalized && normalized.length > 0) {
+        setShowGeneratePlan(true)
       }
       
-  setProcessingTopics(false)
+      setProcessingTopics(false)
       
       console.log('Text upload successful:', result)
       
     } catch (error: any) {
       console.error('Text upload error:', error)
+      setProcessingTopics(false)
       setErrorMessage(error.message || 'Failed to upload text')
       pushError({ 
         errorCode: error?.errorCode||'UPLOAD_FAIL', 
@@ -253,6 +275,7 @@ export default function UploadPage() {
       })
     } finally {
       setUploading(false)
+      setUploadProgress(0)
     }
   }
 
@@ -299,7 +322,7 @@ export default function UploadPage() {
       console.log('Enhanced study plan generated with resources!', planData)
       
       // Navigate to dashboard after successful plan generation
-      window.location.href = '/dashboard'
+      router.push('/dashboard')
       
     } catch (e: any) {
       // Surface backend validation details and error payload in UI for debugging
@@ -345,8 +368,18 @@ export default function UploadPage() {
       <div className="container mx-auto px-4 py-8 max-w-7xl">
         {/* Show error message */}
         {errorMessage && (
-          <div className="mb-4 p-3 bg-red-100 text-red-700 rounded">
-            {errorMessage}
+          <div className="mb-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 rounded-lg flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 mt-0.5 flex-shrink-0" />
+            <div className="flex-1">
+              <p className="font-medium">Upload Error</p>
+              <p className="text-sm mt-1">{errorMessage}</p>
+            </div>
+            <button 
+              onClick={() => setErrorMessage(null)} 
+              className="text-red-700 dark:text-red-300 hover:text-red-900 dark:hover:text-red-100"
+            >
+              <X className="w-4 h-4" />
+            </button>
           </div>
         )}
 
@@ -380,7 +413,7 @@ export default function UploadPage() {
             <p className="text-muted-foreground">Upload your syllabus, notes, or study materials for AI analysis</p>
           </div>
           <div className="flex gap-3">
-            <Button variant="outline" onClick={() => window.location.href = '/dashboard'}>
+            <Button variant="outline" onClick={() => router.push('/dashboard')}>
               Skip to Dashboard
             </Button>
           </div>

@@ -73,9 +73,12 @@ export async function api<T = any>(path: string, opts: RequestInit = {}): Promis
     }
   }
   const authHeaders = await getAuthHeaders();
-  const hasBody = typeof (opts as any).body !== "undefined" && (opts as any).body !== null;
+  const body = (opts as any).body;
+  const isFormData = typeof FormData !== 'undefined' && body instanceof FormData;
+  const hasBody = typeof body !== "undefined" && body !== null;
   const baseHeaders: Record<string, string> = { ...(opts.headers as any), ...authHeaders } as any;
-  if (hasBody && !("Content-Type" in baseHeaders)) {
+  // Don't set JSON Content-Type when sending FormData (browser will set proper multipart boundary)
+  if (hasBody && !isFormData && !("Content-Type" in baseHeaders)) {
     baseHeaders["Content-Type"] = "application/json";
   }
   const res = await fetch(`${API_BASE}${path}`, {

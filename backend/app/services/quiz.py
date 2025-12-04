@@ -150,6 +150,8 @@ Generate a high-quality MCQ for the topic: '{topic}'
 """
         try:
             response = get_ai_response(prompt)
+            if not response:
+                raise ValueError("Empty AI response")
             clean_response = response.strip()
             
             # Parse the new format
@@ -160,20 +162,44 @@ Generate a high-quality MCQ for the topic: '{topic}'
             
             for line in lines:
                 line = line.strip()
-                if line.startswith('Q:'):
+                # Handle Q: format
+                if line.startswith('Q:') or line.startswith('Q.'):
                     question = line[2:].strip()
-                elif line.startswith('A.') or line.startswith('B.') or line.startswith('C.') or line.startswith('D.'):
-                    option_text = line[2:].strip()
-                    options.append(option_text)
-                elif line.startswith('Answer:'):
-                    correct_letter = line[7:].strip().upper()
+                # Handle **Q:** markdown format
+                elif line.startswith('**Q') and ':' in line:
+                    question = line.split(':', 1)[1].replace('**', '').strip()
+                # Handle Question: format
+                elif line.lower().startswith('question:'):
+                    question = line[9:].strip()
+                # Handle options with various formats: A., A), (A), a., etc.
+                elif len(line) >= 2 and line[0].upper() in 'ABCD':
+                    if line[1] in '.):' or (len(line) > 2 and line[1] == ')' or line[1:3] == '. '):
+                        # Extract option text after the letter and delimiter
+                        option_text = line[2:].strip() if line[1] in '.)' else line[3:].strip()
+                        if option_text:
+                            options.append(option_text)
+                # Handle Answer: format with various formats
+                elif 'answer' in line.lower() and ':' in line:
+                    answer_part = line.split(':', 1)[1].strip().upper()
+                    # Extract the letter from various formats: "A", "A.", "Option A", etc.
+                    for char in answer_part:
+                        if char in 'ABCD':
+                            correct_letter = char
+                            break
+                # Handle "Correct: A" or similar
+                elif 'correct' in line.lower() and ':' in line:
+                    answer_part = line.split(':', 1)[1].strip().upper()
+                    for char in answer_part:
+                        if char in 'ABCD':
+                            correct_letter = char
+                            break
             
             # Convert letter to index
             letter_to_index = {'A': 0, 'B': 1, 'C': 2, 'D': 3}
             correct_index = letter_to_index.get(correct_letter, 0)
             
             # Validate we got all required parts
-            if question and len(options) == 4 and correct_letter in letter_to_index:
+            if question and len(options) >= 4 and correct_letter in letter_to_index:
                 questions.append({
                     "question": question,
                     "options": options,

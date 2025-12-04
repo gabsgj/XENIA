@@ -373,11 +373,13 @@ export default function TutorPage(){
                         {message.steps.map((s, i) => (
                           <div key={i} className='p-3 rounded border bg-background/50'>
                             <div className='font-semibold text-sm mb-2'>
-                              <strong>{s.title}</strong>
+                              <strong>{i + 1}. {s.title}</strong>
                             </div>
-                            <div className='text-sm leading-relaxed'>
-                              <MarkdownRenderer content={s.detail || ''} />
-                            </div>
+                            {s.detail && (
+                              <div className='text-sm leading-relaxed'>
+                                <MarkdownRenderer content={s.detail || ''} />
+                              </div>
+                            )}
                             {s.calculation && (
                               <div className='mt-2 text-sm'>
                                 <div className='font-medium text-muted-foreground mb-1'>Calculation:</div>

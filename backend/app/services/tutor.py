@@ -141,8 +141,15 @@ class EnhancedTutor:
         context_note = "Please tailor answers to the student's syllabus when available." if syllabus_context and syllabus_context.get("context") == "personalized" else ""
 
         prompt = (
-            f"You are an expert tutor. Return ONLY a single JSON object with a top-level steps array. "
-            f"Each step should be an object with title and detail.\nQUESTION: {question}\n{context_note}"
+            f"You are an expert tutor helping a student. Provide a clear, educational response.\n\n"
+            f"IMPORTANT: Return your answer as a JSON object with this EXACT structure:\n"
+            f'{{"steps": [{{"title": "Step title", "detail": "Detailed explanation"}}], "answer": "Brief summary"}}\n\n'
+            f"Requirements:\n"
+            f"- Include 2-5 clear steps\n"
+            f"- Each step should have a descriptive title (without numbering) and detailed explanation\n"
+            f"- The answer field should be a brief summary of the solution\n"
+            f"- Do NOT include markdown code blocks in your response\n\n"
+            f"QUESTION: {question}\n{context_note}"
         )
 
         try:
@@ -155,13 +162,28 @@ class EnhancedTutor:
             # strip common fences and codeblocks
             if clean_response.startswith('```json'):
                 clean_response = clean_response[len('```json'):].strip()
-            if clean_response.startswith('```') and clean_response.endswith('```'):
-                clean_response = clean_response[3:-3].strip()
+            if clean_response.startswith('```'):
+                # Remove opening fence
+                clean_response = clean_response[3:].strip()
+            if clean_response.endswith('```'):
+                # Remove closing fence
+                clean_response = clean_response[:-3].strip()
+            # Also handle responses that start with "json" label
+            if clean_response.lower().startswith('json'):
+                clean_response = clean_response[4:].strip()
 
-            # find JSON object
-            m = re.search(r"\{.*\}", clean_response, re.DOTALL)
+            # find JSON object - be more flexible with whitespace
+            m = re.search(r"\{[\s\S]*\}", clean_response)
             if not m:
-                logger.warning("Advanced AI: no JSON object found in response")
+                # Try to construct a response from plain text if no JSON found
+                logger.warning("Advanced AI: no JSON object found in response, attempting text extraction")
+                # Return the clean response as a single step if it has content
+                if clean_response and len(clean_response) > 10:
+                    return {
+                        'steps': [{'title': 'Solution', 'detail': clean_response}],
+                        'answer': clean_response[:500] if len(clean_response) > 500 else clean_response,
+                        'raw': clean_response
+                    }
                 return []
 
             json_text = m.group(0)
@@ -310,54 +332,46 @@ def solve_question(
         # Build comprehensive response with metadata
         # Per UI contract: if `steps` are present, keep `answer` as a short intro/summary only
         # Normalize and ensure sequential numbering on step titles so frontend can render them verbatim
-        def _renumber_steps(steps_list, add_numbers=True):
+        def _renumber_steps(steps_list, add_numbers=False):
+            """Normalize step titles by removing existing numbering."""
             normalized = []
             for idx, st in enumerate(steps_list, start=1):
                 if not isinstance(st, dict):
                     st = {'title': str(st)}
                 title = st.get('title', '') or ''
-                logger.info(f"Original title {idx}: '{title}'")
-                # strip existing leading numbering - be very aggressive
-                # Remove patterns like: 1., 1), Step 1:, **1.**, etc.
+                # Remove existing numbering patterns aggressively
+                # Patterns: "1.", "1)", "Step 1:", "**1.**", etc.
+                import re
                 title_clean = re.sub(r'^\s*\*?\*?\s*(?:Step\s+)?\d+\s*[\)\.:\-\s]+\*?\*?\s*', '', title, flags=re.IGNORECASE).strip()
                 # Also remove any remaining number patterns at the start
-                title_clean = re.sub(r'^\s*\d+\s*[\)\.:\-\s]*', '', title_clean, flags=re.IGNORECASE).strip()
+                title_clean = re.sub(r'^\s*\d+\s*[\)\.:\-\s]*', '', title_clean).strip()
                 # Clean up any double spaces or weird formatting
                 title_clean = re.sub(r'\s+', ' ', title_clean).strip()
+                # Only add numbers if explicitly requested (frontend will handle numbering)
                 if add_numbers:
                     new_title = f"{idx}. {title_clean}" if title_clean else f"{idx}."
                 else:
-                    new_title = title_clean
-                logger.info(f"Renumbered title {idx}: '{new_title}'")
+                    new_title = title_clean or f"Step {idx}"
                 st['title'] = new_title
                 normalized.append(st)
             return normalized
 
-        # If we have steps, renumber and build a suitable 'answer' text if needed
+        # If we have steps, normalize them (don't add numbers, let frontend handle it)
         if steps:
             try:
-                steps = _renumber_steps(steps, add_numbers=True)  # Set to False to remove numbering
+                steps = _renumber_steps(steps, add_numbers=False)
             except Exception as e:
-                logger.warning(f"Failed to renumber steps: {e}")
+                logger.warning(f"Failed to normalize steps: {e}")
 
-            # If answer hasn't been provided by the advanced AI, build one from steps
-            if not answer or answer == "Here are the steps to solve the problem.":
-                if advanced_answer_text:
-                    answer = advanced_answer_text
-                else:
-                    # Build a readable answer by concatenating step titles and details
-                    try:
-                        built = []
-                        for s in steps:
-                            t = s.get('title','')
-                            d = s.get('detail','') or ''
-                            built.append(f"{t}\n\n{d}".strip())
-                        answer = "\n\n".join(built)
-                    except Exception:
-                        answer = "Here are the steps to solve the problem."
+            # When we have steps, DON'T include a separate answer to avoid duplication
+            # The frontend displays steps as the main content, showing both would be redundant
+            answer = ""
         else:
-            # No steps found
-            answer = "I'm sorry, I couldn't generate an answer."
+            # No steps found - use the AI answer or a fallback message
+            if advanced_answer_text:
+                answer = advanced_answer_text
+            else:
+                answer = "I'm sorry, I couldn't generate an answer."
 
         # Save conversation to history if valid user
         if is_valid_uuid(user_id):
