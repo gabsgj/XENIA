@@ -13,21 +13,23 @@ export async function getSupabaseClient(): Promise<any> {
   supabaseSingleton = createClient(url || "", key || "");
   try {
     // Persist user id whenever auth state changes (requirement: save as supabase_user_id)
+    // IMPORTANT: Only update if we get an authenticated user ID, never remove the anonymous ID
     supabaseSingleton.auth.onAuthStateChange(async (_event: string, session: any) => {
       try {
         if (typeof window === 'undefined') return;
         const uid = session?.user?.id;
         if (uid) {
+          // Only overwrite with authenticated user ID
           localStorage.setItem('supabase_user_id', uid);
-        } else {
-          localStorage.removeItem('supabase_user_id');
         }
+        // DON'T remove supabase_user_id when session is null - keep anonymous ID
       } catch {/* ignore */}
     });
-    // Seed immediately if session exists
+    // Seed immediately if session exists (only if authenticated)
     if (typeof window !== 'undefined') {
       supabaseSingleton.auth.getSession().then(({ data }: any) => {
         const uid = data?.session?.user?.id;
+        // Only set if we have an authenticated user
         if (uid) localStorage.setItem('supabase_user_id', uid);
       }).catch(()=>{});
     }

@@ -90,26 +90,35 @@ def track_session():
     sb = get_supabase()
     data = request.get_json(silent=True) or {}
     
-    user_id = data.get("user_id")
+    raw_user_id = data.get("user_id")
     topic = data.get("topic")
     duration_min = data.get("duration_min", 30)
     
-    logger.info(f"   User ID: {user_id}")
+    logger.info(f"   User ID: {raw_user_id}")
     logger.info(f"   Topic: {topic}")
     logger.info(f"   Duration: {duration_min} minutes")
     
-    if not user_id:
+    if not raw_user_id:
         logger.error("   Missing user_id in request")
         raise ApiError("AUTH_401", "Missing user id")
     if not topic:
         logger.error("   Missing topic in request")
         raise ApiError("PLAN_400", "Missing topic")
     
+    from ..utils import normalize_user_id
+    user_id = normalize_user_id(raw_user_id)
+    
     try:
         logger.info("   Inserting session into database...")
-        # Store timezone-aware UTC timestamp
-        data["created_at"] = datetime.now(timezone.utc).isoformat()
-        sb.table("sessions").insert(data).execute()
+        # Store timezone-aware UTC timestamp and mark as completed (session logged = completed)
+        session_data = {
+            "user_id": user_id,
+            "topic": topic,
+            "duration_min": duration_min,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "status": "completed"  # Logged sessions are completed sessions
+        }
+        sb.table("sessions").insert(session_data).execute()
         logger.info("   Session inserted successfully")
         
         # XP mechanic: +10 per 30 min
@@ -134,9 +143,12 @@ def list_sessions():
     """
     logger.info("📚 List sessions endpoint called")
     sb = get_supabase()
-    user_id = request.headers.get("X-User-Id") or request.args.get("user_id")
-    if not user_id:
+    raw_user_id = request.headers.get("X-User-Id") or request.args.get("user_id")
+    if not raw_user_id:
         raise ApiError("AUTH_401", "Missing user_id")
+
+    from ..utils import normalize_user_id
+    user_id = normalize_user_id(raw_user_id)
 
     try:
         limit = int(request.args.get("limit", 20))
@@ -160,14 +172,17 @@ def complete_task():
     data = request.get_json(silent=True) or {}
     
     task_id = data.get("task_id")
-    user_id = data.get("user_id") or request.headers.get("X-User-Id")
+    raw_user_id = data.get("user_id") or request.headers.get("X-User-Id")
     
     logger.info(f"   Task ID: {task_id}")
-    logger.info(f"   User ID: {user_id}")
+    logger.info(f"   User ID: {raw_user_id}")
     
     if not task_id:
         logger.error("   Missing task_id in request")
         raise ApiError("PLAN_400", "Missing task_id")
+    
+    from ..utils import normalize_user_id
+    user_id = normalize_user_id(raw_user_id) if raw_user_id else None
     
     try:
         # First check if task is already completed to prevent duplicate XP awards
@@ -294,13 +309,17 @@ def start_session():
     logger.info('▶️ Start session')
     sb = get_supabase()
     data = request.get_json(silent=True) or {}
-    user_id = data.get('user_id') or request.headers.get('X-User-Id')
+    raw_user_id = data.get('user_id') or request.headers.get('X-User-Id')
     task_id = data.get('task_id')
     duration_min = data.get('duration_min', 25)
-    if not user_id:
+    if not raw_user_id:
         raise ApiError('AUTH_401', 'Missing user_id')
     if not task_id:
         raise ApiError('PLAN_400', 'Missing task_id')
+    
+    from ..utils import normalize_user_id
+    user_id = normalize_user_id(raw_user_id)
+    
     try:
         from datetime import datetime, timezone
         record = {
@@ -327,9 +346,13 @@ def end_session():
     data = request.get_json(silent=True) or {}
     session_id = data.get('session_id')
     task_id = data.get('task_id')
-    user_id = data.get('user_id') or request.headers.get('X-User-Id')
+    raw_user_id = data.get('user_id') or request.headers.get('X-User-Id')
     if not session_id and not task_id:
         raise ApiError('PLAN_400', 'Missing session_id or task_id')
+    
+    from ..utils import normalize_user_id
+    user_id = normalize_user_id(raw_user_id) if raw_user_id else None
+    
     try:
         if session_id:
             sb.table('sessions').update({'status': 'completed'}).eq('id', session_id).execute()
@@ -428,9 +451,13 @@ def reorder_tasks():
     sb = get_supabase()
     data = request.get_json(silent=True) or {}
     order = data.get('order') or []
-    user_id = data.get('user_id') or request.headers.get('X-User-Id')
-    if not user_id:
+    raw_user_id = data.get('user_id') or request.headers.get('X-User-Id')
+    if not raw_user_id:
         raise ApiError('AUTH_401', 'Missing user_id')
+    
+    from ..utils import normalize_user_id
+    user_id = normalize_user_id(raw_user_id)
+    
     try:
         # Save an 'priority_index' on each task based on the order list
         for idx, tid in enumerate(order):

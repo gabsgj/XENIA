@@ -51,7 +51,9 @@ def get_dashboard():
     """
     start = time.time()
     raw_user_id = request.headers.get('X-User-Id') or ''
-    user_id = raw_user_id if raw_user_id else ''
+    if not raw_user_id:
+        raise ApiError('AUTH_401', 'Missing user id')
+    user_id = normalize_user_id(raw_user_id)
     logger.info(f"dashboard.get for user={user_id}")
     if not user_id:
         raise ApiError('AUTH_401', 'Missing user id')
@@ -102,20 +104,43 @@ def get_dashboard():
                                   .execute())
         profile = profile_resp.data[0] if profile_resp and getattr(profile_resp, 'data', None) else {}
 
+        # Also fetch completed tasks from tasks table
+        completed_tasks_resp = _safe_exec(lambda: sb.table('tasks')
+                                          .select('id, topic, due_date, status')
+                                          .eq('user_id', user_id)
+                                          .eq('status', 'done')
+                                          .limit(200)
+                                          .execute())
+        completed_tasks = completed_tasks_resp.data if completed_tasks_resp and hasattr(completed_tasks_resp, 'data') else []
+
         # Aggregations
-        sessions_completed = sum(1 for s in sessions if s.get('status') == 'completed')
+        # Count sessions: any logged session counts as completed study time
+        # Also count completed tasks as sessions
+        sessions_from_log = len(sessions)  # All logged sessions count
+        sessions_from_tasks = len(completed_tasks)  # Completed tasks
+        sessions_completed = sessions_from_log + sessions_from_tasks
+        
+        # Total study time from logged sessions
         total_minutes = sum((s.get('duration_min') or 0) for s in sessions)
+        # Add estimated time from completed tasks (30 min default per task)
+        total_minutes += sum(30 for _ in completed_tasks)
+        
         quizzes_taken = len(quizzes)
 
-        # Weekly progress: group last 14 days
+        # Weekly progress: group last 14 days (include both sessions and completed tasks)
         from datetime import datetime, timedelta
         today = datetime.utcnow().date()
         start_date = today - timedelta(days=13)
         weekly = []
         for i in range(14):
             d = start_date + timedelta(days=i)
-            minutes = sum((int(s.get('duration_min') or 0) for s in sessions if s.get('created_at', '').startswith(d.isoformat())),)
-            weekly.append({'date': d.isoformat(), 'minutes': minutes})
+            d_str = d.isoformat()
+            # Minutes from logged sessions
+            minutes = sum((int(s.get('duration_min') or 0) for s in sessions if s.get('created_at', '').startswith(d_str)),)
+            # Also count completed tasks for this day (30 min each)
+            tasks_on_day = sum(1 for t in completed_tasks if (t.get('due_date') or '').startswith(d_str))
+            minutes += tasks_on_day * 30
+            weekly.append({'date': d_str, 'minutes': minutes})
 
         # Subject performance and distribution
         subj_map = {}
@@ -166,7 +191,7 @@ def get_dashboard():
         payload = {
             'stats': {
                 'sessionsCompleted': sessions_completed,
-                'sessionPercent': round((sessions_completed / (len(sessions) or 1)) * 100, 2),
+                'sessionPercent': 100 if sessions_completed > 0 else 0,  # Logged sessions are 100% complete
                 'totalStudyTimeMin': total_minutes,
                 'currentStreakDays': int(profile.get('streak_days') or 0),
                 'topicsTracked': len(subj_map),

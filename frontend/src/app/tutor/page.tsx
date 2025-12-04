@@ -1,6 +1,6 @@
 'use client'
 import { useState, useRef, useEffect } from 'react'
-import { API_BASE } from '@/lib/api'
+import { API_BASE, getUserId } from '@/lib/api'
 import { useErrorContext } from '@/lib/error-context'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -50,18 +50,7 @@ export default function TutorPage(){
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // Generate or load anonymous user ID for session-based conversations
-  const getAnonymousUserId = () => {
-    const storageKey = 'xenia-tutor-anonymous-id'
-    let anonymousId = localStorage.getItem(storageKey)
-    if (!anonymousId) {
-      anonymousId = `anon-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-      localStorage.setItem(storageKey, anonymousId)
-    }
-    return anonymousId
-  }
-
-  // Load authenticated user id if available (Supabase); fallback to anonymous ID
+  // Load user ID consistently with the rest of the app
   useEffect(() => {
     let active = true
     ;(async () => {
@@ -73,10 +62,13 @@ export default function TutorPage(){
         if (data.session?.user?.id) {
           setUserId(data.session.user.id)
         } else {
-          // Use anonymous ID for session-based conversations
-          setUserId(getAnonymousUserId())
+          // Use consistent getUserId() from api.ts to match other pages
+          setUserId(getUserId())
         }
-      } catch {/* ignore */}
+      } catch {
+        // Fallback to consistent user ID
+        if (active) setUserId(getUserId())
+      }
     })()
     return () => { active = false }
   }, [])
@@ -130,8 +122,8 @@ export default function TutorPage(){
   async function ask(){
     if (!question.trim() && !file) return
 
-    // Ensure we have a user ID (either authenticated or anonymous)
-    const currentUserId = userId || getAnonymousUserId()
+    // Ensure we have a user ID (use consistent getUserId from api.ts)
+    const currentUserId = userId || getUserId()
     if (!currentUserId) {
       pushError({ errorCode: 'TUTOR_NO_USER', errorMessage: 'Unable to identify user session' })
       return
