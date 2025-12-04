@@ -61,7 +61,7 @@ def _legacy_get_ai_response(prompt: str, model: Optional[str] = None) -> str:
             genai.configure(api_key=gemini_key.strip())
             
             logger.info("   Creating Gemini model...")
-            gemini_model = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
+            gemini_model = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
             model_instance = genai.GenerativeModel(gemini_model)
             
             # Use threading-based timeout (works on Windows)
@@ -280,8 +280,8 @@ Return ONLY valid JSON:
             genai.configure(api_key=gemini_key)
             
             logger.info("    Creating Gemini model...")
-            # Use gemini-2.0-flash for fast processing
-            model = genai.GenerativeModel('gemini-2.0-flash')
+            # Use gemini-2.5-flash for fast processing
+            model = genai.GenerativeModel('gemini-2.5-flash')
             
             logger.info("    Generating content...")
             response = model.generate_content(prompt)
@@ -1355,8 +1355,8 @@ def filter_syllabus_content(extracted_text: str) -> str:
             logger.info("🤖 Using Gemini for advanced content filtering...")
             
             genai.configure(api_key=os.getenv("GEMINI_API_KEY").strip())
-            # Use gemini-2.0-flash for fast filtering
-            model = genai.GenerativeModel("gemini-2.0-flash")
+            # Use gemini-2.5-flash for fast filtering
+            model = genai.GenerativeModel("gemini-2.5-flash")
 
             prompt = f"""
             Analyze the following syllabus text and extract ONLY the core academic topics and their descriptions.
@@ -1440,8 +1440,8 @@ def extract_topics_with_gemini(text: str) -> Dict[str, Any]:
             logger.info("🤖 Using Gemini for topic extraction...")
             
             genai.configure(api_key=os.getenv("GEMINI_API_KEY").strip())
-            # Use gemini-2.0-flash for fast topic extraction (pro models are too slow)
-            model = genai.GenerativeModel("gemini-2.0-flash")
+            # Use gemini-2.5-flash for fast topic extraction (pro models are too slow)
+            model = genai.GenerativeModel("gemini-2.5-flash")
 
             prompt = f"""
             Analyze the following academic text and extract the main topics.

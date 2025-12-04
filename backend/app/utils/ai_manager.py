@@ -143,8 +143,8 @@ class AIProviderManager:
         import platform
         
         genai.configure(api_key=config.api_key)
-        # Use gemini-2.0-flash which is the current stable model
-        model_name = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
+        # Use gemini-2.5-flash for faster responses
+        model_name = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
         model = genai.GenerativeModel(model_name)
         
         # Configure generation with timeout considerations
