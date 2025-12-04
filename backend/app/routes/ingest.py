@@ -1,6 +1,7 @@
 from flask import Blueprint, request
 from ..errors import ApiError
 from ..services.ingestion import handle_upload
+from ..utils import normalize_user_id
 
 
 ingest_bp = Blueprint("ingest", __name__)
@@ -10,10 +11,10 @@ def _extract_user_id() -> str:
     """Normalize user id acquisition: prefer X-User-Id header (objective A)."""
     hdr = (request.headers.get("X-User-Id") or "").strip()
     if hdr:
-        return hdr
+        return normalize_user_id(hdr)
     form_uid = (request.form.get("user_id") or "").strip()
     if form_uid:
-        return form_uid
+        return normalize_user_id(form_uid)
     # Fallback: generate a stable anonymous ID for the session
     import uuid
     return str(uuid.uuid5(uuid.NAMESPACE_URL, "xenia-anonymous-upload"))

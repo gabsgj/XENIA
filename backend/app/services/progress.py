@@ -22,6 +22,9 @@ def record_quiz_result(user_id, topic_scores):
     Persist quiz results to Supabase: insert history rows and upsert aggregated progress.
     topic_scores: List of dicts: [{topic: str, correct: int, wrong: int, score: float}]
     """
+    from ..utils import normalize_user_id
+    user_id = normalize_user_id(user_id)  # Ensure consistent user ID
+    
     sb = get_supabase()
     now = datetime.datetime.utcnow().isoformat() + "Z"
 
@@ -123,6 +126,9 @@ def record_quiz_result(user_id, topic_scores):
 
 
 def get_user_progress(user_id):
+    from ..utils import normalize_user_id
+    user_id = normalize_user_id(user_id)  # Ensure consistent user ID
+    
     # For dev/test users (non-UUID), read from local cache only
     if not is_valid_uuid(user_id):
         return LOCAL_CACHE.get(user_id, {})

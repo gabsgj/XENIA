@@ -9,6 +9,7 @@ Restarting the server clears the data.
 """
 from typing import Dict, List
 from threading import RLock
+from ..utils import normalize_user_id
 
 _topics: Dict[str, List[str]] = {}
 _lock = RLock()
@@ -17,6 +18,7 @@ _lock = RLock()
 def add_topics(user_id: str, topics: List[str]) -> None:
     if not topics:
         return
+    user_id = normalize_user_id(user_id)  # Ensure consistent user ID
     with _lock:
         existing = _topics.get(user_id, [])
         # Preserve order while deduping
@@ -29,5 +31,6 @@ def add_topics(user_id: str, topics: List[str]) -> None:
 
 
 def get_topics(user_id: str) -> List[str]:
+    user_id = normalize_user_id(user_id)  # Ensure consistent user ID
     with _lock:
         return list(_topics.get(user_id, []))
