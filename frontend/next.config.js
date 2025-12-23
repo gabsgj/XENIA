@@ -1,7 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   /* config options here */
-  output: 'export',
+  output: 'standalone',
   eslint: {
     // Disable ESLint during builds for production
     ignoreDuringBuilds: true,
