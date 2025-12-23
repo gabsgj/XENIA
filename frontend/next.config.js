@@ -1,7 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   /* config options here */
-  output: 'standalone',
+  output: 'export',
   eslint: {
     // Disable ESLint during builds for production
     ignoreDuringBuilds: true,
@@ -11,6 +11,7 @@ const nextConfig = {
     ignoreBuildErrors: true,
   },
   images: {
+    unoptimized: true,
     // Use remotePatterns for external images and allow local avatars
     remotePatterns: [
       {
