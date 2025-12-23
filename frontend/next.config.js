@@ -11,7 +11,6 @@ const nextConfig = {
     ignoreBuildErrors: true,
   },
   images: {
-    unoptimized: true,
     // Use remotePatterns for external images and allow local avatars
     remotePatterns: [
       {
