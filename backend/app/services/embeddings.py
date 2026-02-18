@@ -73,7 +73,7 @@ def _embed_gemini(
     texts: List[str], model: Optional[str]
 ) -> Optional[List[List[float]]]:
     try:
-        import google.generativeai as genai  # type: ignore
+        from google import genai  # type: ignore
     except Exception:
         return None
     api_key = os.getenv("GEMINI_API_KEY")
@@ -84,7 +84,7 @@ def _embed_gemini(
     if "demo" in api_key.lower() or api_key.startswith("AIzaSyDemo_"):
         return _generate_mock_embeddings(texts)
     
-    genai.configure(api_key=api_key)
+    client = genai.Client(api_key=api_key)
     # Gemini embeddings require model names prefixed with 'models/' or 'tunedModels/'.
     # Accept both forms and normalize here for robustness.
     raw_model_name = model or os.getenv("EMBEDDING_MODEL", "models/text-embedding-004") or "models/text-embedding-004"
@@ -97,17 +97,10 @@ def _embed_gemini(
         model_name = raw_model_name
     vectors: List[List[float]] = []
     for t in texts:
-        res = genai.embed_content(model=model_name, content=t[:8000])  # type: ignore
-        vec = None
-        if isinstance(res, dict):
-            vec = res.get("embedding")
-            if vec is None:
-                try:
-                    vec = res["data"][0]["embedding"]  # type: ignore
-                except Exception:
-                    vec = None
-        if vec is not None:
-            vectors.append(vec)  # type: ignore
+        res = client.models.embed_content(model=model_name, contents=t[:8000])  # type: ignore
+        # New SDK returns res.embeddings which is a list of ContentEmbedding objects
+        if res and res.embeddings:
+            vectors.append(list(res.embeddings[0].values))  # type: ignore
     return vectors
 
 

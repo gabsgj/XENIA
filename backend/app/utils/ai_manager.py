@@ -138,17 +138,16 @@ class AIProviderManager:
     
     def _call_gemini(self, prompt: str, config: ProviderConfig) -> str:
         """Call Gemini API with timeout handling."""
-        import google.generativeai as genai
+        from google import genai
+        from google.genai import types
         import threading
-        import platform
         
-        genai.configure(api_key=config.api_key)
+        client = genai.Client(api_key=config.api_key)
         # Use gemini-2.5-flash for faster responses
         model_name = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
-        model = genai.GenerativeModel(model_name)
         
         # Configure generation with timeout considerations
-        generation_config = genai.types.GenerationConfig(
+        gen_config = types.GenerateContentConfig(
             temperature=0.7,
             max_output_tokens=2000,
             candidate_count=1,
@@ -160,7 +159,9 @@ class AIProviderManager:
         
         def call_api():
             try:
-                response = model.generate_content(prompt, generation_config=generation_config)
+                response = client.models.generate_content(
+                    model=model_name, contents=prompt, config=gen_config
+                )
                 result[0] = response
             except Exception as e:
                 exception[0] = e

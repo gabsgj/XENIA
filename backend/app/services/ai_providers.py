@@ -54,26 +54,27 @@ def _legacy_get_ai_response(prompt: str, model: Optional[str] = None) -> str:
     
     if gemini_key and gemini_key.strip() and not is_demo_gemini:
         try:
-            import google.generativeai as genai
+            from google import genai
+            from google.genai import types
             import concurrent.futures
             
             logger.info("   Configuring real Gemini API...")
-            genai.configure(api_key=gemini_key.strip())
+            client = genai.Client(api_key=gemini_key.strip())
             
             logger.info("   Creating Gemini model...")
             gemini_model = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
-            model_instance = genai.GenerativeModel(gemini_model)
             
             # Use threading-based timeout (works on Windows)
             timeout_seconds = int(os.getenv("AI_REQUEST_TIMEOUT_SECONDS", "60"))
             
+            gen_config = types.GenerateContentConfig(
+                temperature=0.7,
+                max_output_tokens=2000,
+            )
+            
             def call_gemini():
-                return model_instance.generate_content(
-                    prompt,
-                    generation_config=genai.types.GenerationConfig(
-                        temperature=0.7,
-                        max_output_tokens=2000,
-                    )
+                return client.models.generate_content(
+                    model=gemini_model, contents=prompt, config=gen_config
                 )
             
             try:
@@ -275,16 +276,19 @@ Return ONLY valid JSON:
         logger.info(f"🤖 Filter function - Gemini API key: {'✅ Real' if gemini_key and not is_demo_gemini else '🎭 Demo/Missing' if gemini_key else '❌ Missing'}")
         
         if gemini_key and not is_demo_gemini:
-            import google.generativeai as genai
+            from google import genai
+            from google.genai import types
             logger.info("    Configuring real Gemini API...")
-            genai.configure(api_key=gemini_key)
+            client = genai.Client(api_key=gemini_key)
             
             logger.info("    Creating Gemini model...")
             # Use gemini-2.5-flash for fast processing
-            model = genai.GenerativeModel('gemini-2.5-flash')
             
             logger.info("    Generating content...")
-            response = model.generate_content(prompt)
+            response = client.models.generate_content(
+                model='gemini-2.5-flash', contents=prompt,
+                config=types.GenerateContentConfig(temperature=0.7, max_output_tokens=4000)
+            )
             logger.info(f"    ✅ Gemini response received: {len(response.text)} characters")
             
             # Clean and parse JSON response
@@ -1351,12 +1355,11 @@ def filter_syllabus_content(extracted_text: str) -> str:
     try:
         # Use Gemini for advanced content filtering
         if os.getenv("GEMINI_API_KEY"):
-            import google.generativeai as genai
+            from google import genai
+            from google.genai import types
             logger.info("🤖 Using Gemini for advanced content filtering...")
             
-            genai.configure(api_key=os.getenv("GEMINI_API_KEY").strip())
-            # Use gemini-2.5-flash for fast filtering
-            model = genai.GenerativeModel("gemini-2.5-flash")
+            client = genai.Client(api_key=os.getenv("GEMINI_API_KEY").strip())
 
             prompt = f"""
             Analyze the following syllabus text and extract ONLY the core academic topics and their descriptions.
@@ -1372,9 +1375,10 @@ def filter_syllabus_content(extracted_text: str) -> str:
             ---
             """
             
-            response = model.generate_content(
-                prompt,
-                generation_config=genai.types.GenerationConfig(
+            response = client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=prompt,
+                config=types.GenerateContentConfig(
                     temperature=0.1,  # Low temperature for consistent filtering
                     max_output_tokens=2000,
                 )
@@ -1436,12 +1440,11 @@ def extract_topics_with_gemini(text: str) -> Dict[str, Any]:
     
     try:
         if os.getenv("GEMINI_API_KEY"):
-            import google.generativeai as genai
+            from google import genai
+            from google.genai import types
             logger.info("🤖 Using Gemini for topic extraction...")
             
-            genai.configure(api_key=os.getenv("GEMINI_API_KEY").strip())
-            # Use gemini-2.5-flash for fast topic extraction (pro models are too slow)
-            model = genai.GenerativeModel("gemini-2.5-flash")
+            client = genai.Client(api_key=os.getenv("GEMINI_API_KEY").strip())
 
             prompt = f"""
             Analyze the following academic text and extract the main topics.
@@ -1473,9 +1476,10 @@ def extract_topics_with_gemini(text: str) -> Dict[str, Any]:
             ---
             """
             
-            response = model.generate_content(
-                prompt,
-                generation_config=genai.types.GenerationConfig(
+            response = client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=prompt,
+                config=types.GenerateContentConfig(
                     temperature=0.2,
                     max_output_tokens=2000,
                 )

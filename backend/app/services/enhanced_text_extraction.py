@@ -1,6 +1,7 @@
 import asyncio
 import concurrent.futures
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 from typing import List, Dict, Tuple, Optional
 import re
 import numpy as np
@@ -24,8 +25,8 @@ logger = logging.getLogger('xenia')
 
 class EnhancedTextExtractor:
     def __init__(self, gemini_api_key: str):
-        genai.configure(api_key=gemini_api_key)
-        self.model = genai.GenerativeModel('gemini-2.5-flash')
+        self.client = genai.Client(api_key=gemini_api_key)
+        self.model_name = 'gemini-2.5-flash'
         self.extraction_cache = {}
         self.thread_pool = concurrent.futures.ThreadPoolExecutor(max_workers=4)
         
@@ -213,9 +214,10 @@ class EnhancedTextExtractor:
         
         try:
             response = await asyncio.to_thread(
-                self.model.generate_content,
-                prompt,
-                generation_config=genai.GenerationConfig(
+                self.client.models.generate_content,
+                model=self.model_name,
+                contents=prompt,
+                config=types.GenerateContentConfig(
                     temperature=0.2,  # Lower temperature for more focused extraction
                     top_p=0.8,
                     max_output_tokens=500,
@@ -446,9 +448,10 @@ class EnhancedTextExtractor:
             
             try:
                 response = await asyncio.to_thread(
-                    self.model.generate_content,
-                    validation_prompt,
-                    generation_config=genai.GenerationConfig(
+                    self.client.models.generate_content,
+                    model=self.model_name,
+                    contents=validation_prompt,
+                    config=types.GenerateContentConfig(
                         temperature=0.1,  # Very low temperature for consistency
                         top_p=0.9,
                         max_output_tokens=200,

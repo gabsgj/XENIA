@@ -1,0 +1,30 @@
+﻿============================= test session starts =============================
+platform win32 -- Python 3.13.12, pytest-8.0.0, pluggy-1.6.0 -- C:\Users\gabri\AppData\Local\Microsoft\WindowsApps\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\python.exe
+cachedir: .pytest_cache
+rootdir: C:\Users\gabri\Desktop\XENIA\backend
+plugins: anyio-4.10.0, cov-7.0.0
+collecting ... collected 11 items
+
+tests/test_extraction.py::TestExtractionServices::test_extract_topics_with_gemini PASSED [  9%]
+tests/test_extraction.py::TestExtractionServices::test_filter_syllabus_content_no_gemini PASSED [ 18%]
+tests/test_ai_mock.py::TestAIMockProvider::test_mock_provider_creation PASSED [ 27%]
+tests/test_ai_mock.py::TestAIMockProvider::test_embedding_generation PASSED [ 36%]
+tests/test_ai_mock.py::TestAIMockProvider::test_multiple_embeddings PASSED [ 45%]
+tests/test_ai_mock.py::TestAIMockProvider::test_tutor_response PASSED    [ 54%]
+tests/test_ai_mock.py::TestAIMockProvider::test_syllabus_analysis PASSED [ 63%]
+tests/test_ai_mock.py::TestAIMockProvider::test_assessment_analysis PASSED [ 72%]
+tests/test_ai_mock.py::TestAIMockProvider::test_study_plan_generation PASSED [ 81%]
+tests/test_ai_mock.py::TestMockIntegration::test_mock_enabled_flag PASSED [ 90%]
+tests/test_ai_mock.py::TestMockIntegration::test_get_mock_provider_singleton PASSED [100%]
+
+============================== warnings summary ===============================
+..\..\..\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\supabase\__init__.py:1
+  C:\Users\gabri\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\supabase\__init__.py:1: DeprecationWarning: The `gotrue` package is deprecated, is not going to receive updates in the future. Please, use `supabase_auth` instead.
+    from gotrue.errors import (
+
+app\schemas.py:86
+  C:\Users\gabri\Desktop\XENIA\backend\app\schemas.py:86: RemovedInMarshmallow4Warning: Passing field metadata as keyword arguments is deprecated. Use the explicit `metadata=...` argument instead. Additional metadata: {'type': 'file'}
+    file = fields.Raw(type='file', required=False)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+======================= 11 passed, 2 warnings in 2.31s ========================
