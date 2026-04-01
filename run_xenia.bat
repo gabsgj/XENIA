@@ -4,7 +4,7 @@
 
 echo.
 echo ========================================
-echo         XENIA AI STUDY PLANNER
+echo         XENIA AI STUDY SUITE
 echo          One-Click Starter
 echo ========================================
 echo.

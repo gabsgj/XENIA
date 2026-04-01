@@ -1,6 +1,6 @@
 # XENIA Frontend
 
-A modern, responsive React/Next.js frontend for the XENIA AI Study Planner application.
+A modern, responsive React/Next.js frontend for the XENIA AI Study Suite application.
 
 ## ✨ Features
 
@@ -40,7 +40,7 @@ A modern, responsive React/Next.js frontend for the XENIA AI Study Planner appli
 - **Charts**: Study progress visualization with Recharts
 - **Quick Actions**: Direct access to key features
 
-#### 📅 Study Planner
+#### 📅 Study Suite
 - **Kanban View**: Study sessions organized by date
 - **Timeline View**: Tabular view with sorting and filtering
 - **List View**: Detailed session cards with actions
@@ -120,7 +120,7 @@ A modern, responsive React/Next.js frontend for the XENIA AI Study Planner appli
 - [x] Authentication (login/register/onboarding)
 - [x] Student dashboard with analytics
 - [x] AI tutor chat interface
-- [x] Study planner with multiple views
+- [x] Study suite with multiple views
 - [x] Task and session management
 - [x] File upload with drag-and-drop
 - [x] Teacher dashboard and tools
@@ -189,7 +189,7 @@ frontend/
 │   │   ├── dashboard/         # Main dashboard
 │   │   ├── onboarding/        # User onboarding flow
 │   │   ├── parent/            # Parent dashboard
-│   │   ├── planner/           # Study planner
+│   │   ├── planner/           # Study suite
 │   │   ├── settings/          # User settings
 │   │   ├── share/             # Shared study plans
 │   │   ├── tasks/             # Task management

@@ -1,8 +1,8 @@
 @echo off
-title XENIA AI Study Planner
+title XENIA AI Study Suite
 
 echo ====================================
-echo    XENIA AI Study Planner
+echo    XENIA AI Study Suite
 echo ====================================
 echo.
 

@@ -403,7 +403,7 @@ export default function Home() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {/* AI Study Planner */}
+          {/* AI Study Suite */}
           <Card className="hover:shadow-lg transition-all duration-300 hover:scale-103 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/50 group">
             <CardContent className="p-6">
               <div className="w-14 h-14 bg-slate-900 dark:bg-slate-100 rounded-2xl flex items-center justify-center mb-5 group-hover:scale-105 transition-transform duration-300">
@@ -411,7 +411,7 @@ export default function Home() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
                 </svg>
               </div>
-              <h3 className="text-lg font-semibold mb-2">AI Study Planner</h3>
+              <h3 className="text-lg font-semibold mb-2">AI Study Suite</h3>
               <p className="text-muted-foreground mb-3 text-sm">
                 Get personalized study schedules based on your syllabus, learning patterns, and exam dates. AI adapts your plan as you progress.
               </p>
@@ -1115,7 +1115,7 @@ export default function Home() {
                   <span className="w-5 h-5 rounded-full bg-green-100 dark:bg-green-900/20 flex items-center justify-center">
                     <span className="text-green-600 dark:text-green-400 text-xs">✓</span>
                   </span>
-                  <span>Basic study planner</span>
+                  <span>Basic study suite</span>
                 </li>
                 <li className="flex items-center gap-2">
                   <span className="w-5 h-5 rounded-full bg-green-100 dark:bg-green-900/20 flex items-center justify-center">
@@ -1157,7 +1157,7 @@ export default function Home() {
                   <span className="w-5 h-5 rounded-full bg-accent/20 flex items-center justify-center">
                     <span className="text-accent text-xs">✓</span>
                   </span>
-                  <span>Advanced study planner</span>
+                  <span>Advanced study suite</span>
                 </li>
                 <li className="flex items-center gap-2">
                   <span className="w-5 h-5 rounded-full bg-accent/20 flex items-center justify-center">
@@ -1279,14 +1279,14 @@ export default function Home() {
               <Logo withText />
             </div>
             <p className="text-slate-700 dark:text-slate-300 mb-3 text-sm">
-              Your AI-powered personal study planner and tutor.
+              Your AI-powered personal study suite and tutor.
             </p>
           </div>
 
           <div>
             <h3 className="font-bold mb-4">Product</h3>
             <ul className="space-y-2">
-              <li><Link href="/planner" className="text-black/80 dark:text-slate-300/80 hover:text-black dark:hover:text-white transition-all">Study Planner</Link></li>
+              <li><Link href="/planner" className="text-black/80 dark:text-slate-300/80 hover:text-black dark:hover:text-white transition-all">Study Suite</Link></li>
               <li><Link href="/tutor" className="text-black/80 dark:text-slate-300/80 hover:text-black dark:hover:text-white transition-all">AI Tutor</Link></li>
               <li><Link href="/quiz" className="text-black/80 dark:text-slate-300/80 hover:text-black dark:hover:text-white transition-all">Quiz</Link></li>
               <li><Link href="/upload" className="text-black/80 dark:text-slate-300/80 hover:text-black dark:hover:text-white transition-all">Upload</Link></li>

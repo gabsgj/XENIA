@@ -2,7 +2,7 @@
 # This script sets up both frontend and backend environments
 
 Write-Host "======================================" -ForegroundColor Cyan
-Write-Host "    XENIA AI Study Planner Setup     " -ForegroundColor Cyan
+Write-Host "    XENIA AI Study Suite Setup     " -ForegroundColor Cyan
 Write-Host "======================================" -ForegroundColor Cyan
 Write-Host ""
 

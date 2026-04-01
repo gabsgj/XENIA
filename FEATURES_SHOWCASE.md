@@ -1,4 +1,4 @@
-# XENIA AI Study Planner - Feature Showcase 🌟
+# XENIA AI Study Suite - Feature Showcase 🌟
 
 ## 📚 Core Features
 
@@ -246,7 +246,7 @@ RESTful API for third-party integrations.
 ### Why XENIA Stands Out:
 
 1. **Intelligent Deadline Management**
-   - Only study planner that truly respects deadlines
+   - Only study suite that truly respects deadlines
    - Automatic redistribution when plans change
 
 2. **Multi-AI Redundancy**

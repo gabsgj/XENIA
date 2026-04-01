@@ -2,7 +2,7 @@
 # Launches both backend and frontend servers
 
 Write-Host "======================================" -ForegroundColor Cyan
-Write-Host "   Starting XENIA AI Study Planner   " -ForegroundColor Cyan
+Write-Host "   Starting XENIA AI Study Suite   " -ForegroundColor Cyan
 Write-Host "======================================" -ForegroundColor Cyan
 Write-Host ""
 

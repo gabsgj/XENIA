@@ -1,4 +1,4 @@
-XENIA – AI Study Planner (Frontend)
+XENIA – AI Study Suite (Frontend)
 
 **Live Demo**: [https://xenia.onrender.com](https://xenia.onrender.com)
 

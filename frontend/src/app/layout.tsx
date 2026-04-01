@@ -7,9 +7,9 @@ import WakeBackend from "@/components/WakeBackend";
 import EnhancedErrorBoundary from "@/components/ui/enhanced-error-boundary";
 
 export const metadata: Metadata = {
-  title: "XENIA - AI Study Planner",
-  description: "Your personal AI-powered study planner and tutor. Generate personalized study plans, get help from AI tutors, and track your progress with powerful analytics.",
-  keywords: ["AI", "study planner", "education", "tutoring", "learning", "analytics"],
+  title: "XENIA - AI Study Suite",
+  description: "Your personal AI-powered study suite and tutor. Generate personalized study plans, get help from AI tutors, and track your progress with powerful analytics.",
+  keywords: ["AI", "study suite", "education", "tutoring", "learning", "analytics"],
   authors: [{ name: "XENIA Team" }],
   icons: {
     // Prefer the PNG logo for modern browsers, keep /favicon.ico as fallback

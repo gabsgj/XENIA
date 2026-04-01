@@ -1,4 +1,4 @@
-# 🎯 XENIA AI Study Planner
+# 🎯 XENIA AI Study Suite
 
 > **Intelligent Learning Companion powered by Gemini 2.5 Flash**
 
@@ -132,13 +132,13 @@ npm run dev
 - **Frontend**: http://localhost:3000
 - **Backend API**: http://localhost:8000
 - **Upload Interface**: http://localhost:3000/upload
-- **Study Planner**: http://localhost:3000/planner
+- **Study Suite**: http://localhost:3000/planner
 
 #### Production (Deployed on Render)
 - **Frontend**: https://xenia.onrender.com
 - **Backend API**: https://xenia-backend-1f0z.onrender.com
 - **Upload Interface**: https://xenia.onrender.com/upload
-- **Study Planner**: https://xenia.onrender.com/planner
+- **Study Suite**: https://xenia.onrender.com/planner
 
 ## 📱 User Guide
 

@@ -12,7 +12,7 @@ echo      /  \ |  __| | . ` | | |   / /\ \
 echo     / /\ \| |____| |\  |_| |_ / ____ \ 
 echo    /_/  \_\______|_| \_|_____/_/    \_\
 echo.
-echo        AI Study Planner - Quick Start
+echo        AI Study Suite - Quick Start
 echo =========================================
 echo.
 
