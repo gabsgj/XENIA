@@ -1,0 +1,84 @@
+%% Paste into https://mermaid.live
+flowchart TB
+    classDef client fill:#E8F0FE,stroke:#4C6EF5,stroke-width:1px,color:#111827;
+    classDef frontend fill:#E6FCF5,stroke:#0CA678,stroke-width:1px,color:#111827;
+    classDef backend fill:#FFF4E6,stroke:#F08C00,stroke-width:1px,color:#111827;
+    classDef service fill:#FFF9DB,stroke:#FAB005,stroke-width:1px,color:#111827;
+    classDef data fill:#F3F0FF,stroke:#7048E8,stroke-width:1px,color:#111827;
+    classDef external fill:#FFF0F6,stroke:#D6336C,stroke-width:1px,color:#111827;
+
+    subgraph clientLayer["Client Layer"]
+        users["Students<br/>Parents<br/>Teachers"]:::client
+        browser["Web Browser<br/>XENIA Next.js App"]:::client
+        externalClients["External API Clients<br/>Future LMS / integrations"]:::client
+        users --> browser
+    end
+
+    subgraph frontendLayer["Frontend Layer"]
+        pages["App Router pages<br/>Dashboard, Planner, Upload, Tasks<br/>Tutor, Quiz, Analytics, Teacher, Parent"]:::frontend
+        ui["UI components<br/>Tailwind CSS + Radix + custom components"]:::frontend
+        hooks["Hooks + API client<br/>fetch wrapper, cache, local state"]:::frontend
+        supabaseWeb["Supabase web client<br/>Auth session + Realtime subscriptions"]:::frontend
+        browser --> pages
+        pages --> ui
+        pages --> hooks
+        pages --> supabaseWeb
+    end
+
+    subgraph backendLayer["Backend Layer"]
+        routes["Flask blueprints<br/>upload, ingest, plan, tasks, tutor, quiz<br/>dashboard, analytics, progress<br/>teacher, parent, resources, ai"]:::backend
+        middleware["Cross-cutting concerns<br/>CORS, request logging, error handlers<br/>health check, request validation"]:::backend
+        services["Domain services<br/>ingestion, planning, scheduling<br/>smart_scheduler, plan_regeneration<br/>progress, tutor, quiz, resources"]:::service
+        aiOrchestration["AI orchestration<br/>ai_manager, ai_providers<br/>circuit_breaker, embeddings"]:::service
+        filePipeline["File processing<br/>PDF/text extraction, OCR<br/>topic filtering and normalization"]:::service
+        hooks -- "REST / JSON<br/>X-User-Id header" --> routes
+        externalClients -- "REST API" --> routes
+        routes --> middleware
+        routes --> services
+        services --> aiOrchestration
+        services --> filePipeline
+    end
+
+    subgraph aiProviders["AI and Content Providers"]
+        gemini["Gemini 2.5 Flash<br/>Primary planning, extraction, tutoring"]:::external
+        openai["OpenAI<br/>Fallback provider"]:::external
+        anthropic["Anthropic<br/>Fallback provider"]:::external
+        youtube["YouTube API / curated resources<br/>Learning recommendations"]:::external
+    end
+
+    subgraph dataLayer["Data and Persistence"]
+        supabase["Supabase PostgreSQL<br/>plans, tasks, progress, analytics"]:::data
+        auth["Supabase Auth + RLS<br/>identity and access control"]:::data
+        realtime["Supabase Realtime<br/>live updates to subscribed clients"]:::data
+        storage["Supabase Storage<br/>uploaded syllabus artifacts"]:::data
+        vectors["pgvector embeddings<br/>semantic topic retrieval"]:::data
+        redis["Redis cache<br/>optional local / performance layer"]:::data
+    end
+
+    aiOrchestration --> gemini
+    aiOrchestration -. "fallback" .-> openai
+    aiOrchestration -. "fallback" .-> anthropic
+    services --> youtube
+
+    routes --> supabase
+    services --> supabase
+    services --> storage
+    aiOrchestration --> vectors
+    services -. "cache hot paths" .-> redis
+
+    supabaseWeb --> auth
+    supabaseWeb --> realtime
+    auth --> supabase
+    realtime --> supabase
+
+    filePipeline --> storage
+    filePipeline --> aiOrchestration
+
+    subgraph runtime["Deployment View"]
+        frontendDeploy["Frontend service<br/>Render or Docker"]:::frontend
+        backendDeploy["Backend service<br/>Flask + Gunicorn"]:::backend
+    end
+
+    browser -. "served by" .-> frontendDeploy
+    frontendDeploy -. "calls" .-> hooks
+    routes -. "hosted on" .-> backendDeploy
